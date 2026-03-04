@@ -1,15 +1,29 @@
-import type { DesktopIpcClient } from "@farfield/api";
+import type { IpcConnectionState } from "@farfield/api";
+import type { IpcFrame } from "@farfield/protocol";
 import {
   type CodexIpcFrameEvent,
   INBOUND_IPC_FRAME_DIRECTION,
 } from "./CodexAgentAdapterContracts.js";
-import type { CodexConnectionLifecycleOwner } from "./CodexConnectionLifecycleOwner.js";
-import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
+import type { CodexIpcFrameDescription } from "./CodexThreadStreamStateOwner.js";
+
+export interface CodexAgentAdapterIpcClient {
+  onConnectionState: (listener: (state: IpcConnectionState) => void) => () => void;
+  onFrame: (listener: (frame: IpcFrame) => void) => () => void;
+}
+
+export interface CodexAgentAdapterIpcConnectionLifecycleOwner {
+  handleIpcConnectionState: (state: IpcConnectionState) => void;
+}
+
+export interface CodexAgentAdapterIpcThreadStreamStateOwner {
+  describeFrame: (frame: IpcFrame) => CodexIpcFrameDescription;
+  ingestInboundFrame: (frame: IpcFrame) => void;
+}
 
 interface CodexAgentAdapterIpcIngressWiringInput {
-  ipcClient: DesktopIpcClient;
-  connectionLifecycleOwner: CodexConnectionLifecycleOwner;
-  threadStreamStateOwner: CodexThreadStreamStateOwner;
+  ipcClient: CodexAgentAdapterIpcClient;
+  connectionLifecycleOwner: CodexAgentAdapterIpcConnectionLifecycleOwner;
+  threadStreamStateOwner: CodexAgentAdapterIpcThreadStreamStateOwner;
   emitIpcFrame: (event: CodexIpcFrameEvent) => void;
 }
 
@@ -26,12 +40,13 @@ export function wireCodexAgentAdapterIpcIngress(
   input.ipcClient.onFrame((frame) => {
     const frameDescription = input.threadStreamStateOwner.describeFrame(frame);
 
+    // Ingest first so downstream observers can read current live-state/stream projections.
+    input.threadStreamStateOwner.ingestInboundFrame(frame);
     input.emitIpcFrame({
       direction: INBOUND_IPC_FRAME_DIRECTION,
       frame,
       method: frameDescription.method,
       threadId: frameDescription.threadId,
     });
-    input.threadStreamStateOwner.ingestInboundFrame(frame);
   });
 }

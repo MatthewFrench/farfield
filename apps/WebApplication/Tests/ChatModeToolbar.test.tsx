@@ -26,6 +26,7 @@ const baseChatModeToolbarProperties: ChatModeToolbarProps = {
   effortOptionsWithoutAssumedDefault: ["low", "high"],
   isModeSyncing: false,
   pendingRequestCount: 0,
+  runningTerminalCount: 0,
   runtimeUsageSummaryLines: null,
   onTogglePlanMode: () => {},
   onModelChange: () => {},
@@ -54,6 +55,7 @@ interface ChatModeToolbarPropertyOverrides {
   effortOptionsWithoutAssumedDefault?: string[];
   isModeSyncing?: boolean;
   pendingRequestCount?: number;
+  runningTerminalCount?: number;
   runtimeUsageSummaryLines?: Array<{ label: string; leftPercent: number }> | null;
   onTogglePlanMode?: () => void;
   onModelChange?: (nextModelId: string) => void;
@@ -116,6 +118,28 @@ describe("ChatModeToolbar", () => {
     );
 
     expect(screen.queryByTestId("chat-mode-toolbar-pending-count")).toBeNull();
+  });
+
+  it("shows running terminal count when terminal executions are in progress", () => {
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        runningTerminalCount: 2,
+      }),
+    );
+
+    expect(screen.getByTestId("chat-mode-toolbar-running-terminals").textContent).toContain(
+      "2 terminals running",
+    );
+  });
+
+  it("hides running terminal count when no terminal executions are in progress", () => {
+    renderChatModeToolbar(
+      buildChatModeToolbarProperties({
+        runningTerminalCount: 0,
+      }),
+    );
+
+    expect(screen.queryByTestId("chat-mode-toolbar-running-terminals")).toBeNull();
   });
 
   it("shows runtime usage summary when available", () => {

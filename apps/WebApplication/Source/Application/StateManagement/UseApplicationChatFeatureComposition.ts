@@ -43,6 +43,7 @@ export interface UseApplicationChatModeToolbarPropertiesInput {
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
+  runningTerminalCount: number;
   setSelectedModeKey: (modeKey: string) => void;
   setSelectedModelId: (modelId: string) => void;
   setSelectedReasoningEffort: (reasoningEffort: string) => void;
@@ -80,6 +81,7 @@ export function useApplicationChatFeatureComposition(
       chatModeToolbarPropertiesInput.effortOptionsWithoutAssumedDefault,
     isModeSyncing: chatModeToolbarPropertiesInput.isModeSyncing,
     pendingRequestCount: chatModeToolbarPropertiesInput.pendingRequestCount,
+    runningTerminalCount: chatModeToolbarPropertiesInput.runningTerminalCount,
     setSelectedModeKey: chatModeToolbarPropertiesInput.setSelectedModeKey,
     setSelectedModelId: chatModeToolbarPropertiesInput.setSelectedModelId,
     setSelectedReasoningEffort: chatModeToolbarPropertiesInput.setSelectedReasoningEffort,

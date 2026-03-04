@@ -34,6 +34,7 @@ export interface BuildChatModeToolbarPropertiesInput {
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
+  runningTerminalCount: number;
   onSetSelectedModeKey: (modeKey: string) => void;
   onSetSelectedModelId: (modelId: string) => void;
   onSetSelectedReasoningEffort: (reasoningEffort: string) => void;
@@ -65,6 +66,7 @@ export class ChatModeToolbarPropertiesBuilder {
       effortOptionsWithoutAssumedDefault: input.effortOptionsWithoutAssumedDefault,
       isModeSyncing: input.isModeSyncing,
       pendingRequestCount: input.pendingRequestCount,
+      runningTerminalCount: input.runningTerminalCount,
       onTogglePlanMode: () => {
         const nextModeKey = this.readNextModeKeyForPlanToggle(input);
         if (nextModeKey.length === 0) {

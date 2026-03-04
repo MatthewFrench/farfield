@@ -1,7 +1,10 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef } from "react";
 import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShellSessionBootstrapClient";
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
-import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
+import {
+  ApiSessionBootstrapCoordinator,
+  type ApiSessionBootstrapDecision,
+} from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
 import { STARTUP_CRITICAL_EVENTS_SESSION_OPERATION } from "@/Application/StateManagement/CoreDataStartupRequestProfile";
 import { UserInterfaceActionRequestBuilder } from "@/Application/StateManagement/UserInterfaceActionRequestBuilder";
 import { shouldIgnoreUiErrorMessage } from "@/Features/Debugging/StateManagement/TrackedUserInterfaceErrorPolicy";
@@ -23,6 +26,9 @@ const RUNTIME_REQUEST_ERROR_HANDLER_NAME =
   "UseApplicationRuntimeRequestHandlers.handleRuntimeRequestError";
 const RUNTIME_REQUEST_ERROR_HANDLER_DETAIL_KEY = "handler";
 const API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE = "";
+const API_SESSION_ENDPOINT_PATH = "/api/events/session";
+const API_SESSION_CONNECTION_RETRY_ATTEMPTS = 1;
+const API_SESSION_CONNECTION_RETRY_DELAY_MILLISECONDS = 500;
 const RUNTIME_REQUEST_ERROR_DEDUPLICATION_WINDOW_MILLISECONDS = 5_000;
 const RUNTIME_REQUEST_ERROR_DEDUPLICATION_MAXIMUM_ENTRIES = 200;
 
@@ -49,6 +55,54 @@ function clearApiSessionBootstrapErrorMessage(
   setApiSessionBootstrapErrorMessage: Dispatch<SetStateAction<string>>,
 ): void {
   setApiSessionBootstrapErrorMessage(API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE);
+}
+
+function delayMilliseconds(durationMilliseconds: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMilliseconds);
+  });
+}
+
+function isApiSessionConnectionErrorMessage(rawMessage: string): boolean {
+  const normalizedMessage = rawMessage.toLowerCase();
+  const normalizedSessionEndpointPath = API_SESSION_ENDPOINT_PATH.toLowerCase();
+  if (!normalizedMessage.includes(normalizedSessionEndpointPath)) {
+    return false;
+  }
+
+  if (normalizedMessage.includes(`request timed out for ${normalizedSessionEndpointPath}`)) {
+    return true;
+  }
+
+  if (normalizedMessage.includes(`request failed for ${normalizedSessionEndpointPath}`)) {
+    if (normalizedMessage.includes("status=n/a")) {
+      return true;
+    }
+    if (normalizedMessage.includes("failed to fetch")) {
+      return true;
+    }
+  }
+
+  if (normalizedMessage.includes(`invalid json response from ${normalizedSessionEndpointPath}`)) {
+    return (
+      normalizedMessage.includes("status=502") ||
+      normalizedMessage.includes("status=503") ||
+      normalizedMessage.includes("status=504")
+    );
+  }
+
+  return false;
+}
+
+function clearApiSessionConnectionErrorBannerIfPresent(
+  setErrorMessage: Dispatch<SetStateAction<string>>,
+): void {
+  setErrorMessage((previousErrorMessage) => {
+    if (!isApiSessionConnectionErrorMessage(previousErrorMessage)) {
+      return previousErrorMessage;
+    }
+    return API_SESSION_BOOTSTRAP_EMPTY_ERROR_MESSAGE;
+  });
 }
 
 function applyApiSessionTokenRequiredState(input: ApiSessionTokenRequirementStateInput): void {
@@ -230,9 +284,8 @@ export function useApplicationRuntimeRequestHandlers(
   );
 
   const ensureApiSessionBootstrapped = useCallback(async (): Promise<boolean> => {
-    let bootstrapDecision;
-    try {
-      bootstrapDecision = await input.apiSessionBootstrapCoordinator.ensureSession(() => {
+    const requestBootstrapDecision = async () => {
+      return await input.apiSessionBootstrapCoordinator.ensureSession(() => {
         const actionRequest = input.userInterfaceActionRequestBuilder.create(
           STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
         );
@@ -240,8 +293,38 @@ export function useApplicationRuntimeRequestHandlers(
           actionRequest.requestOptions,
         );
       });
+    };
+
+    let bootstrapDecision: ApiSessionBootstrapDecision | null = null;
+    try {
+      bootstrapDecision = await requestBootstrapDecision();
     } catch (error) {
+      const bootstrapErrorMessage = toErrorMessage(error);
       handleRuntimeRequestError(error);
+      if (!isApiSessionConnectionErrorMessage(bootstrapErrorMessage)) {
+        return false;
+      }
+
+      for (
+        let retryAttempt = 0;
+        retryAttempt < API_SESSION_CONNECTION_RETRY_ATTEMPTS;
+        retryAttempt += 1
+      ) {
+        await delayMilliseconds(API_SESSION_CONNECTION_RETRY_DELAY_MILLISECONDS);
+        try {
+          bootstrapDecision = await requestBootstrapDecision();
+          clearApiSessionConnectionErrorBannerIfPresent(input.setErrorMessage);
+          break;
+        } catch (retryError) {
+          handleRuntimeRequestError(retryError);
+          if (retryAttempt === API_SESSION_CONNECTION_RETRY_ATTEMPTS - 1) {
+            return false;
+          }
+        }
+      }
+    }
+
+    if (bootstrapDecision === null) {
       return false;
     }
 

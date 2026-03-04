@@ -339,6 +339,67 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     );
   });
 
+  it("retries bootstrap after a connection-class error and clears only the matching banner after success", async () => {
+    const harness = createRuntimeRequestHandlersHarness();
+    const bootstrapError = new Error(
+      "Request timed out for /api/events/session after 120000ms requestId req_bootstrap_retry_1",
+    );
+    harness.bootstrapWithRequestOptionsSpy
+      .mockRejectedValueOnce(bootstrapError)
+      .mockResolvedValueOnce(
+        createBootstrapResponse({
+          authRequired: true,
+          bootstrapped: true,
+          expiresAt: FUTURE_BOOTSTRAP_EXPIRY_ISO8601,
+        }),
+      );
+    const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
+
+    let bootstrapReady = false;
+    await act(async () => {
+      bootstrapReady = await runtimeRequestHandlers.ensureApiSessionBootstrapped();
+    });
+
+    const expectedDescriptor = resolveRuntimeRequestErrorDescriptor({
+      rawMessage: bootstrapError.message,
+      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
+      actionId: "action-2",
+    });
+    const clearErrorMessageStateUpdate = harness.setErrorMessage.mock.calls[1]?.[0] as
+      | ((previousErrorMessage: string) => string)
+      | undefined;
+    if (clearErrorMessageStateUpdate === undefined) {
+      throw new Error("Expected a banner-clearing state update callback after successful retry");
+    }
+
+    expect(bootstrapReady).toBe(true);
+    expect(harness.bootstrapWithRequestOptionsSpy).toHaveBeenCalledTimes(2);
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      1,
+      STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      2,
+      RUNTIME_REQUEST_ERROR_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      3,
+      STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+    );
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledTimes(1);
+    expect(harness.setErrorMessage).toHaveBeenCalledTimes(2);
+    expect(harness.setErrorMessage).toHaveBeenNthCalledWith(
+      1,
+      expectedDescriptor.bannerErrorMessage,
+    );
+    expect(clearErrorMessageStateUpdate(expectedDescriptor.bannerErrorMessage)).toBe("");
+    expect(
+      clearErrorMessageStateUpdate(
+        "runtime-request-error: thread.refresh failed actionId=action-9",
+      ),
+    ).toBe("runtime-request-error: thread.refresh failed actionId=action-9");
+  });
+
   it("reports bootstrap read failures through runtime-request-error ownership and returns not-ready", async () => {
     const harness = createRuntimeRequestHandlersHarness();
     const bootstrapError = new Error(
@@ -359,12 +420,21 @@ describe("useApplicationRuntimeRequestHandlers", () => {
     });
 
     expect(bootstrapReady).toBe(false);
+    expect(harness.bootstrapWithRequestOptionsSpy).toHaveBeenCalledTimes(2);
     expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
       1,
       STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
     );
     expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
       2,
+      RUNTIME_REQUEST_ERROR_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      3,
+      STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      4,
       RUNTIME_REQUEST_ERROR_OPERATION,
     );
     expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledWith({
@@ -376,6 +446,51 @@ describe("useApplicationRuntimeRequestHandlers", () => {
         handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
       },
     });
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledTimes(1);
+    expect(harness.setErrorMessage).toHaveBeenCalledTimes(1);
+    expect(harness.setErrorMessage).toHaveBeenCalledWith(expectedDescriptor.bannerErrorMessage);
+  });
+
+  it("does not retry bootstrap when the first failure is not a connection-class error", async () => {
+    const harness = createRuntimeRequestHandlersHarness();
+    const bootstrapError = new Error(
+      "Request failed for /api/events/session: Unexpected server exception status=500 Internal Server Error requestId req_bootstrap_no_retry_1",
+    );
+    harness.bootstrapWithRequestOptionsSpy.mockRejectedValue(bootstrapError);
+    const runtimeRequestHandlers = mountRuntimeRequestHandlers(harness.input);
+
+    let bootstrapReady = true;
+    await act(async () => {
+      bootstrapReady = await runtimeRequestHandlers.ensureApiSessionBootstrapped();
+    });
+
+    const expectedDescriptor = resolveRuntimeRequestErrorDescriptor({
+      rawMessage: bootstrapError.message,
+      defaultOperation: RUNTIME_REQUEST_ERROR_OPERATION,
+      actionId: "action-2",
+    });
+
+    expect(bootstrapReady).toBe(false);
+    expect(harness.bootstrapWithRequestOptionsSpy).toHaveBeenCalledTimes(1);
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      1,
+      STARTUP_CRITICAL_EVENTS_SESSION_OPERATION,
+    );
+    expect(harness.buildActionRequestSpy).toHaveBeenNthCalledWith(
+      2,
+      RUNTIME_REQUEST_ERROR_OPERATION,
+    );
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledTimes(1);
+    expect(harness.reportTrackedUserInterfaceErrorSpy).toHaveBeenCalledWith({
+      operation: expectedDescriptor.operation,
+      actionId: "action-2",
+      threadId: null,
+      error: expectedDescriptor.trackingErrorMessage,
+      details: {
+        handler: RUNTIME_REQUEST_ERROR_HANDLER_NAME,
+      },
+    });
+    expect(harness.setErrorMessage).toHaveBeenCalledTimes(1);
     expect(harness.setErrorMessage).toHaveBeenCalledWith(expectedDescriptor.bannerErrorMessage);
   });
 });

@@ -56,6 +56,7 @@ const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
     effortOptionsWithoutAssumedDefault: [],
     isModeSyncing: false,
     pendingRequestCount: 0,
+    runningTerminalCount: 0,
     onTogglePlanMode: () => {},
     onModelChange: () => {},
     onReasoningEffortChange: () => {},

@@ -180,6 +180,7 @@ export interface ApplicationDerivedState {
   archivedThreadIds: ReadThreadListPresentationStateResult["archivedThreadIdentifiers"];
   archivedSectionThreadCount: number;
   conversationState: ConversationState | null;
+  runningTerminalCount: number;
   pendingRequests: PendingRequest[];
   liveStateReductionError: LiveStateResponse["liveStateError"] | null;
   activeRequest: PendingRequest | null;

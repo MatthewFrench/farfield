@@ -141,6 +141,7 @@ function createChatModeToolbarPropertiesFixture(): ChatModeToolbarProps {
     effortOptionsWithoutAssumedDefault: [],
     isModeSyncing: false,
     pendingRequestCount: 0,
+    runningTerminalCount: 0,
     onTogglePlanMode: (): void => {},
     onModelChange: (): void => {},
     onReasoningEffortChange: (): void => {},

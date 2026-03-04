@@ -21,7 +21,7 @@ export function readConversationStateSelection(
     conversationSyncSignatureBuilder.readConversationStateUpdatedAt(liveConversationState);
   const readUpdatedAt =
     conversationSyncSignatureBuilder.readConversationStateUpdatedAt(readConversationState);
-  return liveUpdatedAt > readUpdatedAt ? liveConversationState : readConversationState;
+  return liveUpdatedAt >= readUpdatedAt ? liveConversationState : readConversationState;
 }
 
 export function readActiveRequestSelection(

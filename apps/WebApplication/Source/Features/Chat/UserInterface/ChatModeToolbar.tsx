@@ -1,4 +1,4 @@
-import { Circle, CircleDot, Loader2 } from "lucide-react";
+import { Circle, CircleDot, Loader2, Terminal } from "lucide-react";
 import { Button } from "@/Components/UserInterface/Button";
 import {
   Select,
@@ -22,6 +22,8 @@ const MODEL_PLACEHOLDER_TEXT = "Model";
 const EFFORT_PLACEHOLDER_TEXT = "Effort";
 const PLAN_LABEL_TEXT = "Plan";
 const EMPTY_MODE_KEY = "";
+const RUNNING_TERMINAL_SINGULAR_LABEL = "terminal running";
+const RUNNING_TERMINAL_PLURAL_LABEL = "terminals running";
 
 function readSelectedOptionValue(value: string, appDefaultValue: string): string {
   return value.length > 0 ? value : appDefaultValue;
@@ -48,6 +50,7 @@ export interface ChatModeToolbarProps {
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
+  runningTerminalCount: number;
   runtimeUsageSummaryLines?: readonly RuntimeUsageSummaryLine[] | null;
   onTogglePlanMode: () => void;
   onModelChange: (nextModelId: string) => void;
@@ -71,6 +74,7 @@ export function ChatModeToolbar({
   effortOptionsWithoutAssumedDefault,
   isModeSyncing,
   pendingRequestCount,
+  runningTerminalCount,
   runtimeUsageSummaryLines,
   onTogglePlanMode,
   onModelChange,
@@ -180,6 +184,17 @@ export function ChatModeToolbar({
           }`}
         >
           <Loader2 size={10} className={isModeSyncing ? "animate-spin" : ""} />
+        </span>
+      )}
+      {runningTerminalCount > 0 && (
+        <span
+          data-testid="chat-mode-toolbar-running-terminals"
+          className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground"
+        >
+          <Terminal size={10} />
+          {runningTerminalCount === 1
+            ? `1 ${RUNNING_TERMINAL_SINGULAR_LABEL}`
+            : `${String(runningTerminalCount)} ${RUNNING_TERMINAL_PLURAL_LABEL}`}
         </span>
       )}
       {pendingRequestCount > 0 && (

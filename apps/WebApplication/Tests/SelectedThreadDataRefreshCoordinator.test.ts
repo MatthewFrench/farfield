@@ -191,6 +191,72 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     expect(snapshot.containsAnyTurns).toBe(true);
   });
 
+  it("retries transient live-state read errors once before succeeding", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readLiveState = vi
+      .fn<SelectedThreadDataRefreshChatClient["readLiveState"]>()
+      .mockRejectedValueOnce(
+        new Error(
+          "Request failed for /api/threads/thread-2b/live-state: Failed to fetch status=n/a",
+        ),
+      )
+      .mockResolvedValueOnce(buildLiveStateSnapshot("thread-2b", null));
+    const chatClient = createChatClient({
+      readLiveState,
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-2b",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: true,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readLiveState).toHaveBeenCalledTimes(2);
+    expect(waitDurations).toEqual([120]);
+  });
+
+  it("retries transient stream-event read errors once before succeeding", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readStreamEvents = vi
+      .fn<SelectedThreadDataRefreshChatClient["readStreamEvents"]>()
+      .mockRejectedValueOnce(
+        new Error(
+          "Invalid JSON response from /api/threads/thread-2c/stream-events: empty response status=200 OK requestId req_123",
+        ),
+      )
+      .mockResolvedValueOnce(buildStreamEventsSnapshot("thread-2c"));
+    const chatClient = createChatClient({
+      readStreamEvents,
+    });
+
+    await coordinator.readSnapshot({
+      threadId: "thread-2c",
+      includeTurns: false,
+      includeReadThread: false,
+      canReadLiveState: false,
+      canReadStreamEvents: true,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readStreamEvents).toHaveBeenCalledTimes(2);
+    expect(waitDurations).toEqual([120]);
+  });
+
   it("caps retry delay growth at configured maximum across repeated transient retries", async () => {
     const waitDurations: number[] = [];
     const coordinator = new SelectedThreadDataRefreshCoordinator({

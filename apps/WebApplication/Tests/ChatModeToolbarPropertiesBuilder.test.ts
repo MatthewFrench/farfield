@@ -25,6 +25,7 @@ function createInput(): BuildChatModeToolbarPropertiesInput {
     effortOptionsWithoutAssumedDefault: ["low", "high"],
     isModeSyncing: false,
     pendingRequestCount: 0,
+    runningTerminalCount: 0,
     onSetSelectedModeKey: vi.fn(),
     onSetSelectedModelId: vi.fn(),
     onSetSelectedReasoningEffort: vi.fn(),
@@ -107,5 +108,15 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
       modelId: "gpt-5",
       reasoningEffort: "low",
     });
+  });
+
+  it("passes running terminal count through to toolbar view properties", () => {
+    const builder = new ChatModeToolbarPropertiesBuilder();
+    const input = createInput();
+    input.runningTerminalCount = 4;
+
+    const properties = builder.build(input);
+
+    expect(properties.runningTerminalCount).toBe(4);
   });
 });

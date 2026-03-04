@@ -278,6 +278,26 @@ function buildAgentMessageTurn(turnIdentifier: string, text: string): Conversati
   };
 }
 
+function buildCommandExecutionTurn(
+  turnIdentifier: string,
+  commandStatus: "inProgress" | "completed",
+  processIdentifier: string,
+): ConversationTurn {
+  return {
+    id: turnIdentifier,
+    status: commandStatus,
+    items: [
+      {
+        id: `command-${turnIdentifier}`,
+        type: "commandExecution",
+        command: "npm run dev",
+        processId: processIdentifier,
+        status: commandStatus,
+      },
+    ],
+  };
+}
+
 function buildConversationState(
   input: ConversationStateInput,
 ): NonNullable<ChatLiveStateResponse["conversationState"]> {
@@ -690,6 +710,25 @@ describe("useApplicationDerivedState", () => {
         count: 1,
       },
     ]);
+  });
+
+  it("derives running terminal count from in-progress command executions", () => {
+    const input: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      readThreadState: buildReadThreadSnapshot({
+        threadIdentifier: "thread-1",
+        turns: [
+          buildCommandExecutionTurn("turn-1", "inProgress", "pty-1"),
+          buildCommandExecutionTurn("turn-2", "completed", "pty-2"),
+        ],
+        latestModel: "gpt-5",
+        latestReasoningEffort: "medium",
+      }),
+    };
+
+    const derivedState = renderDerivedState(input);
+
+    expect(derivedState.runningTerminalCount).toBe(1);
   });
 
   it("keeps the newest thread-list worker projection when an older response resolves later", async () => {

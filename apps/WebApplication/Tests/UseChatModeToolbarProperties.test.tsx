@@ -50,6 +50,7 @@ function createInput(): UseChatModeToolbarPropertiesInput {
     effortOptionsWithoutAssumedDefault: ["low", "medium"],
     isModeSyncing: false,
     pendingRequestCount: 0,
+    runningTerminalCount: 0,
     setSelectedModeKey: vi.fn(),
     setSelectedModelId: vi.fn(),
     setSelectedReasoningEffort: vi.fn(),
@@ -74,6 +75,7 @@ describe("useChatModeToolbarProperties", () => {
 
   it("delegates toolbar actions through state setters and draft application", async () => {
     const input = createInput();
+    input.runningTerminalCount = 3;
     const toolbarPropertiesSnapshot: { current: ChatModeToolbarProps | null } = {
       current: null,
     };
@@ -92,6 +94,7 @@ describe("useChatModeToolbarProperties", () => {
     });
 
     const toolbarProperties = readToolbarPropertiesSnapshot(toolbarPropertiesSnapshot);
+    expect(toolbarProperties.runningTerminalCount).toBe(3);
     toolbarProperties.onModelChange("gpt-5.1");
     toolbarProperties.onReasoningEffortChange("low");
     toolbarProperties.onTogglePlanMode();

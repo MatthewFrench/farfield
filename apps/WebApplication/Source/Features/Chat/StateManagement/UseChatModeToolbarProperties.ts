@@ -30,6 +30,7 @@ export interface UseChatModeToolbarPropertiesInput {
   effortOptionsWithoutAssumedDefault: string[];
   isModeSyncing: boolean;
   pendingRequestCount: number;
+  runningTerminalCount: number;
   setSelectedModeKey: (modeKey: string) => void;
   setSelectedModelId: (modelId: string) => void;
   setSelectedReasoningEffort: (reasoningEffort: string) => void;
@@ -61,6 +62,7 @@ export function useChatModeToolbarProperties(
     effortOptionsWithoutAssumedDefault,
     isModeSyncing,
     pendingRequestCount,
+    runningTerminalCount,
     setSelectedModeKey,
     setSelectedModelId,
     setSelectedReasoningEffort,
@@ -94,6 +96,7 @@ export function useChatModeToolbarProperties(
         effortOptionsWithoutAssumedDefault,
         isModeSyncing,
         pendingRequestCount,
+        runningTerminalCount,
         onSetSelectedModeKey: setSelectedModeKey,
         onSetSelectedModelId: setSelectedModelId,
         onSetSelectedReasoningEffort: setSelectedReasoningEffort,
@@ -115,6 +118,7 @@ export function useChatModeToolbarProperties(
       modelOptionsWithoutAssumedDefault,
       pendingRequestCount,
       planModeOption,
+      runningTerminalCount,
       selectedModeKey,
       selectedModelId,
       selectedReasoningEffort,

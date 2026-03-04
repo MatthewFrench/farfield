@@ -391,6 +391,7 @@ export function buildApplicationChatFeatureCompositionInput(
           .length +
         readPendingFileChangeApprovalRequests(applicationDerivedState.conversationState).length +
         readPendingToolCallRequests(applicationDerivedState.conversationState).length,
+      runningTerminalCount: applicationDerivedState.runningTerminalCount,
       setSelectedModeKey: applicationShellState.setSelectedModeKey,
       setSelectedModelId: applicationShellState.setSelectedModelId,
       setSelectedReasoningEffort: applicationShellState.setSelectedReasoningEffort,

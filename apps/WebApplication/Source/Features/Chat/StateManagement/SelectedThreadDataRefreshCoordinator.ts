@@ -76,13 +76,54 @@ const DEFAULT_RETRY_CONFIGURATION: SelectedThreadDataRefreshRetryConfiguration =
   baseDelayMilliseconds: 140,
   maximumDelayMilliseconds: 1_000,
 };
+const SNAPSHOT_READ_RETRY_MAXIMUM_ATTEMPTS = 2;
+const SNAPSHOT_READ_RETRY_BASE_DELAY_MILLISECONDS = 120;
+const SNAPSHOT_READ_RETRY_MAXIMUM_DELAY_MILLISECONDS = 320;
 const STREAM_EVENTS_EMPTY_SEQUENCE = 0;
 const READ_THREAD_RETRY_BACKOFF_MULTIPLIER = 2;
+const LIVE_STATE_ROUTE_SEGMENT = "/live-state";
+const STREAM_EVENTS_ROUTE_SEGMENT = "/stream-events";
+const FAILED_TO_FETCH_STATUS_NA_ERROR_PATTERN = "failed to fetch status=n/a";
+const REQUEST_TIMED_OUT_ERROR_PATTERN = "request timed out for";
+const INVALID_JSON_RESPONSE_ERROR_PATTERN = "invalid json response from";
+const EMPTY_RESPONSE_STATUS_200_ERROR_PATTERN = "empty response status=200";
+const STATUS_502_ERROR_PATTERN = "status=502";
+const STATUS_503_ERROR_PATTERN = "status=503";
+const STATUS_504_ERROR_PATTERN = "status=504";
 
 async function waitForMilliseconds(durationMilliseconds: number): Promise<void> {
   await new Promise<void>((resolve) => {
     window.setTimeout(resolve, durationMilliseconds);
   });
+}
+
+function isTransientSnapshotReadError(errorMessage: string): boolean {
+  const normalizedErrorMessage = errorMessage.toLowerCase();
+  const targetsLiveState =
+    normalizedErrorMessage.includes(LIVE_STATE_ROUTE_SEGMENT) ||
+    normalizedErrorMessage.includes(STREAM_EVENTS_ROUTE_SEGMENT);
+  if (!targetsLiveState) {
+    return false;
+  }
+
+  if (normalizedErrorMessage.includes(FAILED_TO_FETCH_STATUS_NA_ERROR_PATTERN)) {
+    return true;
+  }
+  if (normalizedErrorMessage.includes(REQUEST_TIMED_OUT_ERROR_PATTERN)) {
+    return true;
+  }
+  if (!normalizedErrorMessage.includes(INVALID_JSON_RESPONSE_ERROR_PATTERN)) {
+    return false;
+  }
+  if (normalizedErrorMessage.includes(EMPTY_RESPONSE_STATUS_200_ERROR_PATTERN)) {
+    return true;
+  }
+
+  return (
+    normalizedErrorMessage.includes(STATUS_502_ERROR_PATTERN) ||
+    normalizedErrorMessage.includes(STATUS_503_ERROR_PATTERN) ||
+    normalizedErrorMessage.includes(STATUS_504_ERROR_PATTERN)
+  );
 }
 
 function buildUnreadableLiveStateSnapshot(threadId: string): SelectedThreadLiveStateSnapshot {
@@ -204,11 +245,15 @@ export class SelectedThreadDataRefreshCoordinator {
     if (!input.canReadLiveState) {
       return buildUnreadableLiveStateSnapshot(input.threadId);
     }
-    if (!input.signal) {
-      return input.chatClient.readLiveState(input.threadId);
-    }
-    return input.chatClient.readLiveState(input.threadId, {
-      signal: input.signal,
+    return this.readSnapshotReadWithRetry({
+      readSnapshot: () => {
+        if (!input.signal) {
+          return input.chatClient.readLiveState(input.threadId);
+        }
+        return input.chatClient.readLiveState(input.threadId, {
+          signal: input.signal,
+        });
+      },
     });
   }
 
@@ -218,10 +263,13 @@ export class SelectedThreadDataRefreshCoordinator {
     if (!input.canReadStreamEvents) {
       return buildUnreadableStreamEventsSnapshot(input.threadId);
     }
-    return input.chatClient.readStreamEvents(
-      input.threadId,
-      this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal),
-    );
+    return this.readSnapshotReadWithRetry({
+      readSnapshot: () =>
+        input.chatClient.readStreamEvents(
+          input.threadId,
+          this.buildStreamEventsRequestOptions(input.streamEventsSinceSequence, input.signal),
+        ),
+    });
   }
 
   private async readThreadSnapshotWithRetry(
@@ -276,6 +324,47 @@ export class SelectedThreadDataRefreshCoordinator {
     return Math.min(
       currentDelayMilliseconds * READ_THREAD_RETRY_BACKOFF_MULTIPLIER,
       this.retryConfiguration.maximumDelayMilliseconds,
+    );
+  }
+
+  private async readSnapshotReadWithRetry<SnapshotType>(input: {
+    readSnapshot: () => Promise<SnapshotType>;
+  }): Promise<SnapshotType> {
+    let nextRetryDelayMilliseconds = SNAPSHOT_READ_RETRY_BASE_DELAY_MILLISECONDS;
+    for (
+      let attemptIndex = 0;
+      attemptIndex < SNAPSHOT_READ_RETRY_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      try {
+        return await input.readSnapshot();
+      } catch (error) {
+        if (!this.canRetrySnapshotRead(error, attemptIndex)) {
+          throw error;
+        }
+        await this.waitForMilliseconds(nextRetryDelayMilliseconds);
+        nextRetryDelayMilliseconds = this.computeNextSnapshotReadRetryDelayMilliseconds(
+          nextRetryDelayMilliseconds,
+        );
+      }
+    }
+
+    throw new Error(
+      `Failed to read selected thread snapshot after ${String(SNAPSHOT_READ_RETRY_MAXIMUM_ATTEMPTS)} attempts`,
+    );
+  }
+
+  private canRetrySnapshotRead<ErrorType>(error: ErrorType, attemptIndex: number): boolean {
+    if (attemptIndex >= SNAPSHOT_READ_RETRY_MAXIMUM_ATTEMPTS - 1) {
+      return false;
+    }
+    return isTransientSnapshotReadError(toErrorMessage(error));
+  }
+
+  private computeNextSnapshotReadRetryDelayMilliseconds(currentDelayMilliseconds: number): number {
+    return Math.min(
+      currentDelayMilliseconds * READ_THREAD_RETRY_BACKOFF_MULTIPLIER,
+      SNAPSHOT_READ_RETRY_MAXIMUM_DELAY_MILLISECONDS,
     );
   }
 
