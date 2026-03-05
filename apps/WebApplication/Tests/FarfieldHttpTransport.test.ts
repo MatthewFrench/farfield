@@ -275,4 +275,38 @@ describe("FarfieldHttpTransport", () => {
 
     await expect(requestPromise).rejects.toBeInstanceOf(RequestCanceledError);
   });
+
+  it("defaults request credentials mode to include for browser-managed auth continuity", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: "ok",
+      }),
+    );
+
+    await request("/api/credentials-default");
+
+    const firstFetchCall = fetchMock.mock.calls[0];
+    expect(firstFetchCall).toBeDefined();
+    const requestInit = firstFetchCall?.[1];
+    expect(requestInit?.credentials).toBe("include");
+  });
+
+  it("preserves explicit caller request credentials mode", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        ok: true,
+        data: "ok",
+      }),
+    );
+
+    await request("/api/credentials-override", {
+      credentials: "same-origin",
+    });
+
+    const firstFetchCall = fetchMock.mock.calls[0];
+    expect(firstFetchCall).toBeDefined();
+    const requestInit = firstFetchCall?.[1];
+    expect(requestInit?.credentials).toBe("same-origin");
+  });
 });

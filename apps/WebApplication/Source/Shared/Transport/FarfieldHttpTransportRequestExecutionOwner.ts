@@ -17,6 +17,7 @@ const REQUEST_TIMEOUT_MESSAGE_PREFIX = "Request timed out for";
 const FETCH_ABORT_ERROR_NAME = "AbortError";
 const CLIENT_REQUEST_ID_RANDOM_MAX_EXCLUSIVE = 1_000_000_000;
 const CLIENT_REQUEST_ID_HEX_RADIX = 16;
+const DEFAULT_REQUEST_CREDENTIALS_MODE: RequestCredentials = "include";
 
 function createClientRequestId(): string {
   return `req_${String(Date.now())}_${Math.floor(Math.random() * CLIENT_REQUEST_ID_RANDOM_MAX_EXCLUSIVE).toString(CLIENT_REQUEST_ID_HEX_RADIX)}`;
@@ -34,6 +35,8 @@ function isAbortError(error: Error): boolean {
 // treated differently from caller-signal aborts so cancellation reporting stays deterministic.
 export async function performRequest(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
+  const requestCredentialsMode: RequestCredentials =
+    init?.credentials ?? DEFAULT_REQUEST_CREDENTIALS_MODE;
   const requestId = createClientRequestId();
   headers.set(REQUEST_ID_HEADER_NAME, requestId);
   const timeoutController = new AbortController();
@@ -62,6 +65,7 @@ export async function performRequest(path: string, init?: RequestInit): Promise<
     return await fetch(path, {
       ...init,
       headers,
+      credentials: requestCredentialsMode,
       signal: timeoutController.signal,
     });
   } catch (error) {
