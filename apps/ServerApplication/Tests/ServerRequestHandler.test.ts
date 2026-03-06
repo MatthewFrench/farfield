@@ -26,6 +26,7 @@ import {
   type ServerRequestHandlerDependencies,
 } from "../Source/Network/ServerRequestHandler.js";
 import { ServerRequestUtilityOwner } from "../Source/Network/ServerRequestUtilityOwner.js";
+import { SidebarThreadSyncSnapshotCache } from "../Source/Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 
@@ -111,6 +112,7 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     threadAdapterResolver,
     replayAdapter: null,
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 8),
+    sidebarThreadSyncSnapshotCache: new SidebarThreadSyncSnapshotCache(1_000, 8),
     threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
     eventStreamClientRegistry,
     runtimeStateOwner: createRuntimeStateOwner(),
@@ -248,6 +250,7 @@ function createRequestResponsePair(): {
 } {
   const socket = new Socket();
   const request = new IncomingMessage(socket);
+  request.headers = {};
   const response = new ServerResponse(request);
   return {
     request,

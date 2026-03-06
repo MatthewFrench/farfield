@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiThreadListResponse } from "@/Features/Threads/DataAccess/ThreadApi";
 import * as ThreadApi from "@/Features/Threads/DataAccess/ThreadApi";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
+import * as ThreadSidebarSyncApi from "@/Features/Threads/DataAccess/ThreadSidebarSyncApi";
 
 function buildThreadListResponse(): ApiThreadListResponse {
   return {
@@ -85,6 +86,81 @@ describe("ThreadServerClient", () => {
       maxPages: 20,
       all: true,
       sortKey: "created_at",
+    });
+  });
+
+  it("maps sidebar sync options to the strict sidebar sync API contract", async () => {
+    const syncSidebarThreadListSpy = vi
+      .spyOn(ThreadSidebarSyncApi, "syncSidebarThreadList")
+      .mockResolvedValue({
+        syncStatus: "notModified",
+        snapshotUpdatedAt: 1_735_000_000_100,
+        snapshotVersion: "snapshot-version-1",
+      });
+    const threadServerClient = new ThreadServerClient();
+    const abortController = new AbortController();
+
+    const result = await threadServerClient.syncSidebarThreadList({
+      archived: true,
+      limit: 42,
+      maxPages: 5,
+      sortKey: "updated_at",
+      cwd: "/tmp/workspace",
+      signal: abortController.signal,
+      actionId: "action-sync-archived-threads",
+      actionName: "sync-archived-threads",
+      knownSnapshotVersion: "snapshot-version-0",
+    });
+
+    expect(result).toEqual({
+      syncStatus: "notModified",
+      snapshotUpdatedAt: 1_735_000_000_100,
+      snapshotVersion: "snapshot-version-1",
+    });
+    expect(syncSidebarThreadListSpy).toHaveBeenCalledTimes(1);
+    expect(syncSidebarThreadListSpy).toHaveBeenCalledWith({
+      archived: true,
+      limit: 42,
+      maxPages: 5,
+      sortKey: "updated_at",
+      cwd: "/tmp/workspace",
+      signal: abortController.signal,
+      actionId: "action-sync-archived-threads",
+      actionName: "sync-archived-threads",
+      knownSnapshotVersion: "snapshot-version-0",
+    });
+  });
+
+  it("omits optional sidebar sync request fields when not provided", async () => {
+    const syncSidebarThreadListSpy = vi
+      .spyOn(ThreadSidebarSyncApi, "syncSidebarThreadList")
+      .mockResolvedValue({
+        syncStatus: "notModified",
+        snapshotUpdatedAt: 1_735_000_000_100,
+        snapshotVersion: "snapshot-version-1",
+      });
+    const threadServerClient = new ThreadServerClient();
+
+    await threadServerClient.syncSidebarThreadList({
+      archived: false,
+      limit: 80,
+      maxPages: 20,
+      sortKey: "created_at",
+      knownSnapshotVersion: null,
+    });
+
+    const callArguments = syncSidebarThreadListSpy.mock.calls[0];
+    if (!callArguments) {
+      throw new Error("Expected syncSidebarThreadList to be called");
+    }
+    const [requestOptions] = callArguments;
+
+    expect(requestOptions).toEqual({
+      archived: false,
+      limit: 80,
+      maxPages: 20,
+      sortKey: "created_at",
+      knownSnapshotVersion: null,
     });
   });
 });

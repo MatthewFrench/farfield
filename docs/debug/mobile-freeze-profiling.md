@@ -53,6 +53,12 @@ For a Safari-like automated run, use:
 pnpm end-to-end:real:mobile-freeze-profile:webkit
 ```
 
+For the adjacent authenticated thread-open scenario, use:
+
+```bash
+node scripts/tooling/with-env.mjs "bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts end-to-end/real/scenarios/thread-open.spec.ts"
+```
+
 This run:
 
 1. opens the real app with a mobile viewport
@@ -119,6 +125,13 @@ Typical interpretations:
    - The stall likely includes transport decode, structured clone, worker message handling, or follow-up render work.
 3. Freeze overlaps `thread-list-pane-committed`
    - The stall is likely render/commit heavy rather than network bound.
+
+After the sidebar sync migration, also check whether the dominant request path is:
+
+1. still `/api/threads`
+   - the migration is incomplete or another path is still driving the broad thread-list route
+2. now `/api/sidebar/threads/sync`
+   - the data shape is slimmer, so the next target is request count, request timing, or render churn
 
 ## Live Devtools Loop
 

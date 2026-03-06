@@ -10,6 +10,7 @@ export * from "./Contracts/Thread/UserInputRequestContracts.js";
 export * from "./Errors.js";
 export * from "./FarfieldPerformanceProbe.js";
 export * from "./FarfieldServer.js";
+export * from "./FarfieldSidebarThreads.js";
 export * from "./Ipc.js";
 export * from "./Parsers/ThreadParsers.js";
 export * from "./Push.js";

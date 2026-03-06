@@ -38,6 +38,7 @@ export const FarfieldThreadListSyncMetadataSchema = z
     mode: z.enum(["full", "delta"]),
     sinceUpdatedAt: z.number().int().nonnegative().nullable(),
     snapshotUpdatedAt: z.number().int().nonnegative(),
+    snapshotVersion: z.string().min(1),
   })
   .strict();
 

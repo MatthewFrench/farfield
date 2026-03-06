@@ -22,9 +22,11 @@ import { handleDebugRoutes } from "./Routes/DebugRoutes.js";
 import { handleLocalImageRoutes } from "./Routes/LocalImageRoutes.js";
 import { handlePushRoutes } from "./Routes/PushRoutes.js";
 import { handleRuntimeRoutes, type RuntimeStateSnapshotReader } from "./Routes/RuntimeRoutes.js";
+import { handleSidebarThreadSyncRoutes } from "./Routes/SidebarThreadSyncRoutes.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
 import { handleThreadRoutes } from "./Routes/ThreadRoutes.js";
 import type { ServerObservabilitySnapshot } from "./ServerObservabilitySnapshotOwner.js";
+import type { SidebarThreadSyncSnapshotCache } from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 
@@ -47,6 +49,7 @@ export interface ServerRequestRouteDispatchOwnerDependencies {
   threadAdapterResolver: ThreadAdapterResolver;
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
+  sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
   runtimeStateOwner: RuntimeStateSnapshotReader;
@@ -158,6 +161,28 @@ export class ServerRequestRouteDispatchOwner {
         pathname: input.pathname,
         url: input.url,
         jsonResponse: this.deps.jsonResponse,
+      })
+    ) {
+      return true;
+    }
+
+    if (
+      await handleSidebarThreadSyncRoutes({
+        req: input.req,
+        res: input.res,
+        pathname: input.pathname,
+        url: input.url,
+        threadListAggregationCache: this.deps.threadListAggregationCache,
+        sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
+        listEnabledAdapters: () => this.deps.registry.listEnabled(),
+        registerThreadAdapterOwnership: (threadId, agentId) => {
+          this.deps.threadAdapterResolver.registerThreadOwner(threadId, agentId);
+        },
+        listThreadsTimeoutMs: this.deps.threadListAdapterTimeoutMs,
+        normalizeOptionalString: this.deps.normalizeOptionalString,
+        readJsonBody: this.deps.readJsonBody,
+        jsonResponse: this.deps.jsonResponse,
+        withTimeout: this.deps.withTimeout,
       })
     ) {
       return true;

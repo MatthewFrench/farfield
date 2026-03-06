@@ -21,10 +21,6 @@ import {
 import { ThreadRefreshConcurrencyCoordinator } from "./ThreadRefreshConcurrencyCoordinator";
 
 const THREAD_LIST_RESPONSE_NOT_TRUNCATED = false;
-const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at";
-const THREAD_LIST_SYNC_MODE_DELTA = "delta";
-const THREAD_LIST_SYNC_MODE_FULL = "full";
-const THREAD_LIST_UPDATED_AT_EMPTY_VALUE = 0;
 
 class InMemoryThreadDisplayNamePreferenceStore {
   public readThreadDisplayName(_threadIdentifier: string): string | null {
@@ -425,8 +421,8 @@ export class ThreadListStateController {
     cacheKey: string,
     loadOptions: ThreadListLoadOptions,
   ): Promise<ThreadListResponse> {
-    const baselineResponse = this.threadQueryCache.readFresh(cacheKey);
-    const serverResponse = await this.readThreadListFromServerWithDelta(
+    const baselineResponse = await this.readThreadListBaselineResponse(cacheKey);
+    const serverResponse = await this.readThreadListFromServerWithSync(
       loadOptions,
       baselineResponse,
     );
@@ -440,98 +436,68 @@ export class ThreadListStateController {
     return responseWithDisplayNames;
   }
 
-  private async readThreadListFromServerWithDelta(
-    loadOptions: ThreadListLoadOptions,
-    baselineResponse: ThreadListResponse | null,
-  ): Promise<ThreadListResponse> {
-    if (!this.shouldReadThreadListDelta(loadOptions, baselineResponse)) {
-      return this.threadServerClient.listThreads(loadOptions);
+  private async readThreadListBaselineResponse(
+    cacheKey: string,
+  ): Promise<ThreadListResponse | null> {
+    const cachedResponse = this.threadQueryCache.readCached(cacheKey);
+    if (cachedResponse !== null) {
+      return this.applyDisplayNamesToThreadListResponse(cachedResponse);
     }
 
-    const sinceUpdatedAt = this.readThreadListSnapshotUpdatedAt(baselineResponse);
-    const deltaResponse = await this.threadServerClient.listThreads({
-      ...loadOptions,
-      sinceUpdatedAt,
-    });
-    if (deltaResponse.sync?.mode !== THREAD_LIST_SYNC_MODE_DELTA) {
-      return deltaResponse;
-    }
-
-    const mergedDeltaResponse = this.mergeDeltaThreadListResponse(deltaResponse, baselineResponse);
-    if (mergedDeltaResponse !== null) {
-      return mergedDeltaResponse;
-    }
-
-    return this.threadServerClient.listThreads(loadOptions);
-  }
-
-  private shouldReadThreadListDelta(
-    loadOptions: ThreadListLoadOptions,
-    baselineResponse: ThreadListResponse | null,
-  ): baselineResponse is ThreadListResponse {
-    return (
-      loadOptions.sortKey === THREAD_LIST_UPDATED_AT_SORT_KEY &&
-      baselineResponse !== null &&
-      baselineResponse.data.length > 0
-    );
-  }
-
-  private mergeDeltaThreadListResponse(
-    deltaResponse: ThreadListResponse,
-    baselineResponse: ThreadListResponse,
-  ): ThreadListResponse | null {
-    const orderedThreadIds = deltaResponse.orderedThreadIds;
-    if (orderedThreadIds === undefined) {
+    const persistedCachedResponse =
+      await this.threadListSnapshotPersistenceStore.readThreadListSnapshot(cacheKey);
+    if (persistedCachedResponse === null) {
       return null;
     }
 
-    const threadByIdentifier = new Map<string, ThreadListResponse["data"][number]>();
-    for (const thread of baselineResponse.data) {
-      threadByIdentifier.set(thread.id, thread);
-    }
-    for (const thread of deltaResponse.data) {
-      threadByIdentifier.set(thread.id, thread);
-    }
+    return this.applyDisplayNamesToThreadListResponse(persistedCachedResponse);
+  }
 
-    const mergedData: ThreadListResponse["data"] = [];
-    for (const threadIdentifier of orderedThreadIds) {
-      const thread = threadByIdentifier.get(threadIdentifier);
-      if (thread === undefined) {
-        return null;
-      }
-      mergedData.push(thread);
+  private async readThreadListFromServerWithSync(
+    loadOptions: ThreadListLoadOptions,
+    baselineResponse: ThreadListResponse | null,
+  ): Promise<ThreadListResponse> {
+    if (loadOptions.signal?.aborted === true) {
+      throw new Error("Thread list sync request aborted before dispatch.");
     }
-
-    const snapshotUpdatedAt =
-      deltaResponse.sync?.snapshotUpdatedAt ??
-      this.readThreadListSnapshotUpdatedAtFromItems(mergedData);
-
-    return {
-      ...deltaResponse,
-      data: mergedData,
-      orderedThreadIds: undefined,
-      sync: {
-        mode: THREAD_LIST_SYNC_MODE_FULL,
-        sinceUpdatedAt: null,
-        snapshotUpdatedAt,
-      },
+    const syncRequestOptions: {
+      archived: boolean;
+      limit: number;
+      maxPages: number;
+      sortKey: "created_at" | "updated_at";
+      knownSnapshotVersion: string | null;
+      cwd?: string;
+      signal?: AbortSignal;
+      actionId?: string;
+      actionName?: string;
+    } = {
+      archived: loadOptions.archived,
+      limit: loadOptions.limit,
+      maxPages: loadOptions.maxPages,
+      sortKey: loadOptions.sortKey,
+      knownSnapshotVersion: baselineResponse?.sync?.snapshotVersion ?? null,
     };
-  }
-
-  private readThreadListSnapshotUpdatedAt(response: ThreadListResponse): number {
-    return this.readThreadListSnapshotUpdatedAtFromItems(response.data);
-  }
-
-  private readThreadListSnapshotUpdatedAtFromItems(threads: ThreadListResponse["data"]): number {
-    if (threads.length === 0) {
-      return THREAD_LIST_UPDATED_AT_EMPTY_VALUE;
+    if (loadOptions.cwd !== undefined) {
+      syncRequestOptions.cwd = loadOptions.cwd;
+    }
+    if (loadOptions.signal !== undefined) {
+      syncRequestOptions.signal = loadOptions.signal;
+    }
+    if (loadOptions.actionId !== undefined) {
+      syncRequestOptions.actionId = loadOptions.actionId;
+    }
+    if (loadOptions.actionName !== undefined) {
+      syncRequestOptions.actionName = loadOptions.actionName;
     }
 
-    let snapshotUpdatedAt = THREAD_LIST_UPDATED_AT_EMPTY_VALUE;
-    for (const thread of threads) {
-      snapshotUpdatedAt = Math.max(snapshotUpdatedAt, thread.updatedAt);
+    const syncResult = await this.threadServerClient.syncSidebarThreadList(syncRequestOptions);
+    if (syncResult.syncStatus === "snapshot") {
+      return syncResult.threadList;
     }
-    return snapshotUpdatedAt;
+    if (baselineResponse !== null) {
+      return baselineResponse;
+    }
+    throw new Error("Sidebar thread sync returned notModified without a baseline snapshot.");
   }
 
   private applyDisplayNamesToThreadListResponse(response: ThreadListResponse): ThreadListResponse {

@@ -28,6 +28,7 @@ import { ServerErrorEventRecorder } from "../Network/ServerErrorEventRecorder.js
 import { ServerObservabilitySnapshotOwner } from "../Network/ServerObservabilitySnapshotOwner.js";
 import { ServerRequestHandler } from "../Network/ServerRequestHandler.js";
 import { ServerRequestUtilityOwner } from "../Network/ServerRequestUtilityOwner.js";
+import { SidebarThreadSyncSnapshotCache } from "../Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Network/ThreadListAggregationCache.js";
 import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
@@ -179,6 +180,10 @@ const threadListAggregationCache = new ThreadListAggregationCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
   runtimeConfiguration.threadListAggregationCacheMaximumEntries,
 );
+const sidebarThreadSyncSnapshotCache = new SidebarThreadSyncSnapshotCache(
+  runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
+  runtimeConfiguration.threadListAggregationCacheMaximumEntries,
+);
 const threadConcurrencyCoordinator = new ThreadConcurrencyCoordinator();
 const browserSessionAuthOwner = new BrowserSessionAuthOwner({
   cookieName: runtimeConfiguration.apiSessionCookieName,
@@ -274,6 +279,9 @@ function pushSystem(message: string, details: HistoryEntry["meta"] = {}): void {
 
 const threadListCacheInvalidationOwner = new ThreadListCacheInvalidationOwner(
   threadListAggregationCache,
+  {
+    sidebarThreadSyncSnapshotCache,
+  },
 );
 
 function invalidateThreadListAggregationCache(
@@ -326,6 +334,7 @@ const registry = agentRuntimeOwner.readRegistry();
 const threadAdapterResolver = new ThreadAdapterResolver(registry, threadIndex);
 const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   threadListAggregationCache,
+  sidebarThreadSyncSnapshotCache,
   threadConcurrencyCoordinator,
   pushDispatchConcurrencyCoordinator,
   pushMutationConcurrencyCoordinator,
@@ -375,6 +384,7 @@ const serverRequestHandler = new ServerRequestHandler({
   threadAdapterResolver,
   replayAdapter: readCodexAdapter(),
   threadListAggregationCache,
+  sidebarThreadSyncSnapshotCache,
   threadConcurrencyCoordinator,
   eventStreamClientRegistry,
   runtimeStateOwner,

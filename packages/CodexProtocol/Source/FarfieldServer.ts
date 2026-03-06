@@ -352,6 +352,17 @@ export const FarfieldThreadListAggregationCacheStatisticsSchema = z
   })
   .strict();
 
+export const FarfieldSidebarThreadSyncSnapshotCacheStatisticsSchema = z
+  .object({
+    hitCount: z.number().int().nonnegative(),
+    missCount: z.number().int().nonnegative(),
+    writeCount: z.number().int().nonnegative(),
+    invalidationCount: z.number().int().nonnegative(),
+    evictionCount: z.number().int().nonnegative(),
+    entryCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const FarfieldThreadConcurrencyStatisticsSchema = z
   .object({
     queuedExecutionCount: z.number().int().nonnegative(),
@@ -510,6 +521,7 @@ export const FarfieldDebugObservabilitySnapshotSchema = z
     cache: z
       .object({
         threadListAggregation: FarfieldThreadListAggregationCacheStatisticsSchema,
+        sidebarThreadSyncSnapshot: FarfieldSidebarThreadSyncSnapshotCacheStatisticsSchema,
       })
       .strict(),
     concurrency: z

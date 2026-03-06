@@ -57,6 +57,10 @@ export class ThreadQueryCache {
     return entry.response;
   }
 
+  public readCached(cacheKey: string): ThreadListResponse | null {
+    return this.entryByKey.get(cacheKey)?.response ?? null;
+  }
+
   public write(cacheKey: string, response: ThreadListResponse): void {
     if (this.entryByKey.has(cacheKey)) {
       this.entryByKey.delete(cacheKey);

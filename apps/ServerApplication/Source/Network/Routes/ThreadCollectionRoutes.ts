@@ -1,23 +1,23 @@
-import type {
-  AgentAdapter,
-  AgentCreateThreadInput,
-  AgentId,
-  AgentListLoadedThreadsResult,
-  AgentListThreadsInput,
-} from "../../Agents/Types.js";
+import type { AgentCreateThreadInput, AgentId } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 import { parseStartThreadBody, type StartThreadBody } from "../RequestSchemas/HttpSchemas.js";
-import type {
-  ThreadListItemWithAgentId,
-  ThreadListSortKey,
-} from "../ThreadListAggregationCache.js";
-import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
+import type { ThreadListSortKey } from "../ThreadListAggregationCache.js";
 import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 import {
   type ThreadCollectionRouteDependencies,
   ThreadCollectionRouteMethodByName,
   ThreadCollectionRoutePathnameByName,
 } from "./ThreadCollectionRouteContracts.js";
+import {
+  buildAggregationAdapterListThreadsInput,
+  loadThreadListAggregationSnapshot,
+} from "./ThreadListAggregationSnapshotLoader.js";
+import {
+  buildThreadListPageProjection,
+  readThreadListDeltaPageData,
+  readThreadListSnapshotUpdatedAt,
+  readThreadListSnapshotVersion,
+} from "./ThreadListPageProjection.js";
 
 /**
  * Owns list/create route orchestration for `/api/threads`, including adapter fan-out,
@@ -45,29 +45,15 @@ const ThreadCollectionRouteCacheInvalidationReasonByName = {
 } as const;
 
 const ThreadCollectionRouteLogEventByName = {
-  agentListThreadsFailed: "agent-list-threads-failed",
-  agentListLoadedThreadsFailed: "agent-list-loaded-threads-failed",
   threadListAggregationCacheRead: "thread-list-aggregation-cache-read",
 } as const;
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
-const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
-const ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix = "list-loaded-threads:";
 const ThreadListResponseSyncModeByName = {
   full: "full",
   delta: "delta",
 } as const;
-const THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE = 0;
-
 const threadCollectionListQueryOwner = new ThreadCollectionListQueryOwner();
-
-type ThreadCollectionRouteWithTimeout = <ValueType>(
-  promise: Promise<ValueType>,
-  timeoutMs: number,
-  label: string,
-) => Promise<ValueType>;
-
-type ThreadCollectionRouteThreadOwnershipRegistrar = (threadId: string, agentId: AgentId) => void;
 
 export type { ThreadCollectionRouteDependencies } from "./ThreadCollectionRouteContracts.js";
 
@@ -272,7 +258,7 @@ async function handleThreadCollectionListRoute(
   }
   const cwd = normalizeOptionalString(rawCwd);
   const enabledAdapterList = listEnabledAdapters();
-  const adapterListThreadsInput = buildAdapterListThreadsInput({
+  const adapterListThreadsInput = buildAggregationAdapterListThreadsInput({
     limit,
     archived,
     maxPages,
@@ -291,13 +277,14 @@ async function handleThreadCollectionListRoute(
       cwd,
     },
     async () =>
-      await loadThreadListSnapshot({
+      await loadThreadListAggregationSnapshot({
         enabledAdapterList,
         adapterListThreadsInput,
         listThreadsTimeoutMs,
         withTimeout,
         registerThreadAdapterOwnership,
-        sortKey,
+        sortItems: (left, right) =>
+          threadCollectionListQueryOwner.compareThreadListItems(left, right, sortKey),
       }),
   );
 
@@ -315,14 +302,22 @@ async function handleThreadCollectionListRoute(
     ThreadCollectionRouteLogEventByName.threadListAggregationCacheRead,
   );
 
-  const threadListPage = buildThreadListPage({
+  const threadListPage = buildThreadListPageProjection({
     mergedData: cacheReadResult.snapshot.mergedData,
     cursorOffset: decodedCursor.offset,
     limit,
     maxPages,
     all,
+    encodeCursor: (offset) => threadCollectionListQueryOwner.encodeCursor(offset),
   });
   const snapshotUpdatedAt = readThreadListSnapshotUpdatedAt(threadListPage.pageData);
+  const truncated = cacheReadResult.snapshot.combinedTruncated || threadListPage.hasMoreData;
+  const snapshotVersion = readThreadListSnapshotVersion({
+    pageData: threadListPage.pageData,
+    nextCursor: threadListPage.nextCursor,
+    pages: threadListPage.pages,
+    truncated,
+  });
   const responseData =
     sinceUpdatedAt === null
       ? threadListPage.pageData
@@ -333,7 +328,7 @@ async function handleThreadCollectionListRoute(
     data: responseData,
     nextCursor: threadListPage.nextCursor,
     pages: threadListPage.pages,
-    truncated: cacheReadResult.snapshot.combinedTruncated || threadListPage.hasMoreData,
+    truncated,
     orderedThreadIds:
       sinceUpdatedAt === null ? undefined : threadListPage.pageData.map((thread) => thread.id),
     sync: {
@@ -343,204 +338,7 @@ async function handleThreadCollectionListRoute(
           : ThreadListResponseSyncModeByName.delta,
       sinceUpdatedAt,
       snapshotUpdatedAt,
+      snapshotVersion,
     },
   });
-}
-
-function buildAdapterListThreadsInput(input: {
-  limit: number;
-  archived: boolean;
-  maxPages: number;
-  sortKey: ThreadListSortKey;
-  cwd: string | null;
-}): AgentListThreadsInput {
-  // The collection owner requests each adapter's full uncursored window and applies
-  // cross-adapter paging after merge so ordering and cursors stay deterministic.
-  return {
-    limit: input.limit,
-    archived: input.archived,
-    all: true,
-    maxPages: input.maxPages,
-    cursor: null,
-    sortKey: input.sortKey,
-    cwd: input.cwd,
-  };
-}
-
-async function loadThreadListSnapshot(input: {
-  enabledAdapterList: AgentAdapter[];
-  adapterListThreadsInput: AgentListThreadsInput;
-  listThreadsTimeoutMs: number;
-  withTimeout: ThreadCollectionRouteWithTimeout;
-  registerThreadAdapterOwnership: ThreadCollectionRouteThreadOwnershipRegistrar;
-  sortKey: ThreadListSortKey;
-}): Promise<{
-  mergedData: ThreadListItemWithAgentId[];
-  combinedTruncated: boolean;
-}> {
-  const mergedData: ThreadListItemWithAgentId[] = [];
-  let combinedTruncated = false;
-
-  const adapterResults = await Promise.all(
-    input.enabledAdapterList.map(async (adapter) => {
-      try {
-        const loadedThreadIdentifierSet = await loadAdapterLoadedThreadIdentifierSet({
-          adapter,
-          listThreadsTimeoutMs: input.listThreadsTimeoutMs,
-          withTimeout: input.withTimeout,
-        });
-        const boundedResult = await input.withTimeout(
-          adapter.listThreads(input.adapterListThreadsInput),
-          input.listThreadsTimeoutMs,
-          buildListThreadsTimeoutLabel(adapter.id),
-        );
-
-        return {
-          ok: true as const,
-          adapter,
-          result: boundedResult,
-          loadedThreadIdentifierSet,
-        };
-      } catch (error) {
-        logger.warn(
-          {
-            agentId: adapter.id,
-            error: toErrorMessage(error),
-          },
-          ThreadCollectionRouteLogEventByName.agentListThreadsFailed,
-        );
-
-        return {
-          ok: false as const,
-          adapter,
-        };
-      }
-    }),
-  );
-
-  for (const adapterResult of adapterResults) {
-    if (!adapterResult.ok) {
-      continue;
-    }
-
-    combinedTruncated = combinedTruncated || (adapterResult.result.truncated ?? false);
-    for (const thread of adapterResult.result.data) {
-      input.registerThreadAdapterOwnership(thread.id, adapterResult.adapter.id);
-      const isLoadedInMemory =
-        adapterResult.loadedThreadIdentifierSet !== null
-          ? adapterResult.loadedThreadIdentifierSet.has(thread.id)
-          : undefined;
-      const projectedThreadListItem: ThreadListItemWithAgentId =
-        projectThreadListItemFromAgentThreadListItem({
-          thread,
-          agentId: adapterResult.adapter.id,
-          isLoadedInMemory,
-        });
-      mergedData.push(projectedThreadListItem);
-    }
-  }
-
-  mergedData.sort((left, right) =>
-    threadCollectionListQueryOwner.compareThreadListItems(left, right, input.sortKey),
-  );
-
-  return {
-    mergedData,
-    combinedTruncated,
-  };
-}
-
-function buildListThreadsTimeoutLabel(agentId: AgentId): string {
-  return `${ThreadCollectionRouteListThreadsTimeoutLabelPrefix}${agentId}`;
-}
-
-function buildListLoadedThreadsTimeoutLabel(agentId: AgentId): string {
-  return `${ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix}${agentId}`;
-}
-
-async function loadAdapterLoadedThreadIdentifierSet(input: {
-  adapter: AgentAdapter;
-  listThreadsTimeoutMs: number;
-  withTimeout: ThreadCollectionRouteWithTimeout;
-}): Promise<Set<string> | null> {
-  if (input.adapter.listLoadedThreads === undefined) {
-    return null;
-  }
-
-  try {
-    const loadedThreads = await input.withTimeout(
-      input.adapter.listLoadedThreads(),
-      input.listThreadsTimeoutMs,
-      buildListLoadedThreadsTimeoutLabel(input.adapter.id),
-    );
-    return mapLoadedThreadIdentifierSet(loadedThreads);
-  } catch (error) {
-    logger.warn(
-      {
-        agentId: input.adapter.id,
-        error: toErrorMessage(error),
-      },
-      ThreadCollectionRouteLogEventByName.agentListLoadedThreadsFailed,
-    );
-    return null;
-  }
-}
-
-function mapLoadedThreadIdentifierSet(loadedThreads: AgentListLoadedThreadsResult): Set<string> {
-  return new Set(loadedThreads.data);
-}
-
-function buildThreadListPage(input: {
-  mergedData: ThreadListItemWithAgentId[];
-  cursorOffset: number;
-  limit: number;
-  maxPages: number;
-  all: boolean;
-}): {
-  pageData: ThreadListItemWithAgentId[];
-  nextCursor: string | null;
-  pages: number;
-  hasMoreData: boolean;
-} {
-  const pageSize = input.all ? input.limit * input.maxPages : input.limit;
-  const pageData = input.mergedData.slice(input.cursorOffset, input.cursorOffset + pageSize);
-  const nextOffset = input.cursorOffset + pageData.length;
-  const hasMoreData = nextOffset < input.mergedData.length;
-  const nextCursor = hasMoreData ? threadCollectionListQueryOwner.encodeCursor(nextOffset) : null;
-  const pages = pageData.length === 0 ? 0 : Math.ceil(pageData.length / input.limit);
-
-  return {
-    pageData,
-    nextCursor,
-    pages,
-    hasMoreData,
-  };
-}
-
-function readThreadListDeltaPageData(
-  pageData: ThreadListItemWithAgentId[],
-  sinceUpdatedAt: number,
-): ThreadListItemWithAgentId[] {
-  return pageData.filter((thread) => thread.updatedAt >= sinceUpdatedAt);
-}
-
-function readThreadListSnapshotUpdatedAt(pageData: ThreadListItemWithAgentId[]): number {
-  if (pageData.length === 0) {
-    return THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE;
-  }
-  let snapshotUpdatedAt = THREAD_LIST_RESPONSE_SNAPSHOT_UPDATED_AT_EMPTY_VALUE;
-  for (const thread of pageData) {
-    snapshotUpdatedAt = Math.max(snapshotUpdatedAt, thread.updatedAt);
-  }
-  return snapshotUpdatedAt;
-}
-
-function toErrorMessage<ErrorType>(error: ErrorType): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return String(error);
 }

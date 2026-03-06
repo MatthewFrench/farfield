@@ -34,6 +34,7 @@ import {
 } from "./ServerRequestErrorResponder.js";
 import { ServerRequestLifecycleOwner } from "./ServerRequestLifecycleOwner.js";
 import { ServerRequestRouteDispatchOwner } from "./ServerRequestRouteDispatchOwner.js";
+import type { SidebarThreadSyncSnapshotCache } from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 
@@ -78,6 +79,7 @@ export interface ServerRequestHandlerDependencies {
   threadAdapterResolver: ThreadAdapterResolver;
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
+  sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   eventStreamClientRegistry: EventStreamClientRegistry;
   runtimeStateOwner: RuntimeStateSnapshotReader;
@@ -178,6 +180,7 @@ export class ServerRequestHandler {
       threadAdapterResolver: this.deps.threadAdapterResolver,
       replayAdapter: this.deps.replayAdapter,
       threadListAggregationCache: this.deps.threadListAggregationCache,
+      sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
       threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
       eventStreamClientRegistry: this.deps.eventStreamClientRegistry,
       runtimeStateOwner: this.deps.runtimeStateOwner,

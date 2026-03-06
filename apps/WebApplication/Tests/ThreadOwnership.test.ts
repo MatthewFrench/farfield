@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { type ThreadListSnapshotPersistenceStore } from "@/Features/Threads/DataAccess/ThreadListSnapshotIndexedDatabaseStore";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
+import type { ApiThreadSidebarSyncResult } from "@/Features/Threads/DataAccess/ThreadSidebarSyncApi";
 import type {
   ThreadListItem,
-  ThreadListLoadOptions,
   ThreadListResponse,
 } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import {
@@ -17,36 +17,55 @@ import { ThreadListStateController } from "@/Features/Threads/StateManagement/Th
 import { ThreadListStateStore } from "@/Features/Threads/StateManagement/ThreadListStateStore";
 import { ThreadRefreshConcurrencyCoordinator } from "@/Features/Threads/StateManagement/ThreadRefreshConcurrencyCoordinator";
 
+function readSnapshotUpdatedAt(threads: ThreadListItem[]): number {
+  return threads.reduce(
+    (maximumUpdatedAt, thread) => Math.max(maximumUpdatedAt, thread.updatedAt),
+    0,
+  );
+}
+
+function buildSnapshotVersion(threads: ThreadListItem[]): string {
+  return threads.map((thread) => `${thread.id}:${thread.updatedAt}`).join("|");
+}
+
 function buildThreadListResponse(input: {
   threadOneUpdatedAt: number;
   threadTwoUpdatedAt: number;
 }): ThreadListResponse {
+  const data: ThreadListResponse["data"] = [
+    {
+      id: "thread-1",
+      preview: "Thread one",
+      createdAt: 1_700_000_000,
+      updatedAt: input.threadOneUpdatedAt,
+      cwd: "/tmp/project",
+      agentId: "opencode",
+      hasUnreadTurn: null,
+      isProjectRemoved: false,
+    },
+    {
+      id: "thread-2",
+      preview: "Thread two",
+      createdAt: 1_700_000_010,
+      updatedAt: input.threadTwoUpdatedAt,
+      cwd: "/tmp/project",
+      agentId: "opencode",
+      hasUnreadTurn: null,
+      isProjectRemoved: false,
+    },
+  ];
+
   return {
-    data: [
-      {
-        id: "thread-1",
-        preview: "Thread one",
-        createdAt: 1_700_000_000,
-        updatedAt: input.threadOneUpdatedAt,
-        cwd: "/tmp/project",
-        agentId: "opencode",
-        hasUnreadTurn: null,
-        isProjectRemoved: false,
-      },
-      {
-        id: "thread-2",
-        preview: "Thread two",
-        createdAt: 1_700_000_010,
-        updatedAt: input.threadTwoUpdatedAt,
-        cwd: "/tmp/project",
-        agentId: "opencode",
-        hasUnreadTurn: null,
-        isProjectRemoved: false,
-      },
-    ],
+    data,
     nextCursor: null,
     pages: 1,
     truncated: false,
+    sync: {
+      mode: "full",
+      sinceUpdatedAt: null,
+      snapshotUpdatedAt: readSnapshotUpdatedAt(data),
+      snapshotVersion: buildSnapshotVersion(data),
+    },
   };
 }
 
@@ -54,20 +73,28 @@ function buildThreadListResponseFromThreadIdentifiers(
   threadIdentifiers: string[],
   updatedAtSeed: number,
 ): ThreadListResponse {
+  const data: ThreadListResponse["data"] = threadIdentifiers.map((threadIdentifier, index) => ({
+    id: threadIdentifier,
+    preview: `Thread ${threadIdentifier}`,
+    createdAt: updatedAtSeed + index,
+    updatedAt: updatedAtSeed + index + 1,
+    cwd: "/tmp/project",
+    agentId: "opencode",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
+  }));
+
   return {
-    data: threadIdentifiers.map((threadIdentifier, index) => ({
-      id: threadIdentifier,
-      preview: `Thread ${threadIdentifier}`,
-      createdAt: updatedAtSeed + index,
-      updatedAt: updatedAtSeed + index + 1,
-      cwd: "/tmp/project",
-      agentId: "opencode",
-      hasUnreadTurn: null,
-      isProjectRemoved: false,
-    })),
+    data,
     nextCursor: null,
     pages: 1,
     truncated: false,
+    sync: {
+      mode: "full",
+      sinceUpdatedAt: null,
+      snapshotUpdatedAt: readSnapshotUpdatedAt(data),
+      snapshotVersion: buildSnapshotVersion(data),
+    },
   };
 }
 
@@ -76,8 +103,18 @@ class TestThreadServerClient extends ThreadServerClient {
     active: ThreadListResponse;
     archived: ThreadListResponse;
   };
-  private listRequestCount: number;
-  private readonly listRequestOptions: ThreadListLoadOptions[];
+  private syncRequestCount: number;
+  private readonly syncRequestOptions: Array<{
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }>;
 
   public constructor(input: {
     active: ThreadListResponse;
@@ -88,24 +125,54 @@ class TestThreadServerClient extends ThreadServerClient {
       active: input.active,
       archived: input.archived,
     };
-    this.listRequestCount = 0;
-    this.listRequestOptions = [];
+    this.syncRequestCount = 0;
+    this.syncRequestOptions = [];
   }
 
   public getListRequestCount(): number {
-    return this.listRequestCount;
+    return this.syncRequestCount;
   }
 
-  public readListRequestOptions(): ThreadListLoadOptions[] {
-    return this.listRequestOptions;
+  public readSyncRequestOptions(): Array<{
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }> {
+    return this.syncRequestOptions;
   }
 
-  public override async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
-    this.listRequestCount += 1;
-    this.listRequestOptions.push({ ...options });
-    return options.archived
+  public override async syncSidebarThreadList(options: {
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }): Promise<ApiThreadSidebarSyncResult> {
+    this.syncRequestCount += 1;
+    this.syncRequestOptions.push({ ...options });
+    const threadList = options.archived
       ? this.responseByArchiveMode.archived
       : this.responseByArchiveMode.active;
+    const snapshotMetadata = threadList.sync;
+    if (snapshotMetadata === undefined) {
+      throw new Error("Expected test thread-list response sync metadata");
+    }
+    return {
+      syncStatus: "snapshot",
+      snapshotUpdatedAt: snapshotMetadata.snapshotUpdatedAt,
+      snapshotVersion: snapshotMetadata.snapshotVersion,
+      threadList,
+    };
   }
 }
 
@@ -153,26 +220,56 @@ class TestThreadListSnapshotPersistenceStore implements ThreadListSnapshotPersis
 }
 
 class SequencedThreadServerClient extends ThreadServerClient {
-  private readonly queuedResponses: ThreadListResponse[];
-  private readonly listRequestOptions: ThreadListLoadOptions[];
+  private readonly queuedResults: ApiThreadSidebarSyncResult[];
+  private readonly syncRequestOptions: Array<{
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }>;
 
-  public constructor(queuedResponses: ThreadListResponse[]) {
+  public constructor(queuedResults: ApiThreadSidebarSyncResult[]) {
     super();
-    this.queuedResponses = [...queuedResponses];
-    this.listRequestOptions = [];
+    this.queuedResults = [...queuedResults];
+    this.syncRequestOptions = [];
   }
 
-  public readListRequestOptions(): ThreadListLoadOptions[] {
-    return [...this.listRequestOptions];
+  public readSyncRequestOptions(): Array<{
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }> {
+    return [...this.syncRequestOptions];
   }
 
-  public override async listThreads(options: ThreadListLoadOptions): Promise<ThreadListResponse> {
-    this.listRequestOptions.push({ ...options });
-    const nextResponse = this.queuedResponses.shift();
-    if (!nextResponse) {
-      throw new Error("Expected queued thread-list response");
+  public override async syncSidebarThreadList(options: {
+    archived: boolean;
+    limit: number;
+    maxPages: number;
+    sortKey: "created_at" | "updated_at";
+    cwd?: string;
+    signal?: AbortSignal;
+    actionId?: string;
+    actionName?: string;
+    knownSnapshotVersion: string | null;
+  }): Promise<ApiThreadSidebarSyncResult> {
+    this.syncRequestOptions.push({ ...options });
+    const nextResult = this.queuedResults.shift();
+    if (!nextResult) {
+      throw new Error("Expected queued thread-sidebar sync result");
     }
-    return nextResponse;
+    return nextResult;
   }
 }
 
@@ -490,7 +587,7 @@ describe("Thread ownership modules", () => {
     expect(serverClient.getListRequestCount()).toBe(0);
   });
 
-  it("ThreadListStateController requests delta updates and merges by ordered thread identifiers", async () => {
+  it("ThreadListStateController reuses cached baseline rows when sidebar sync reports notModified", async () => {
     const baselineResponse: ThreadListResponse = {
       data: [
         {
@@ -521,32 +618,22 @@ describe("Thread ownership modules", () => {
         mode: "full",
         sinceUpdatedAt: null,
         snapshotUpdatedAt: 90,
+        snapshotVersion: "snapshot-version-1",
       },
     };
-    const deltaResponse: ThreadListResponse = {
-      data: [
-        {
-          id: "thread-2",
-          preview: "Thread two",
-          createdAt: 1_700_000_010,
-          updatedAt: 95,
-          cwd: "/tmp/project",
-          agentId: "codex",
-          hasUnreadTurn: null,
-          isProjectRemoved: false,
-        },
-      ],
-      nextCursor: null,
-      pages: 1,
-      truncated: false,
-      orderedThreadIds: ["thread-2", "thread-1"],
-      sync: {
-        mode: "delta",
-        sinceUpdatedAt: 90,
-        snapshotUpdatedAt: 95,
+    const serverClient = new SequencedThreadServerClient([
+      {
+        syncStatus: "snapshot",
+        snapshotUpdatedAt: 90,
+        snapshotVersion: "snapshot-version-1",
+        threadList: baselineResponse,
       },
-    };
-    const serverClient = new SequencedThreadServerClient([baselineResponse, deltaResponse]);
+      {
+        syncStatus: "notModified",
+        snapshotUpdatedAt: 90,
+        snapshotVersion: "snapshot-version-1",
+      },
+    ]);
     const controller = new ThreadListStateController({
       threadServerClient: serverClient,
       threadQueryCache: new ThreadQueryCache(10_000, 8),
@@ -572,21 +659,22 @@ describe("Thread ownership modules", () => {
       readFromCache: false,
     });
 
-    expect(secondRead.nextThreads.map((thread) => thread.id)).toEqual(["thread-2", "thread-1"]);
-    expect(secondRead.nextThreads[0]?.updatedAt).toBe(95);
-    expect(serverClient.readListRequestOptions()).toEqual([
+    expect(secondRead.nextThreads.map((thread) => thread.id)).toEqual(["thread-1", "thread-2"]);
+    expect(secondRead.nextThreads[0]?.updatedAt).toBe(90);
+    expect(serverClient.readSyncRequestOptions()).toEqual([
       {
         archived: false,
         limit: 80,
         maxPages: 20,
         sortKey: "updated_at",
+        knownSnapshotVersion: null,
       },
       {
         archived: false,
         limit: 80,
         maxPages: 20,
         sortKey: "updated_at",
-        sinceUpdatedAt: 90,
+        knownSnapshotVersion: "snapshot-version-1",
       },
     ]);
   });
@@ -754,7 +842,7 @@ describe("Thread ownership modules", () => {
       actionName: "thread-list.refresh-archived",
     });
 
-    expect(serverClient.readListRequestOptions()).toEqual([
+    expect(serverClient.readSyncRequestOptions()).toEqual([
       {
         archived: false,
         limit: 30,
@@ -762,6 +850,7 @@ describe("Thread ownership modules", () => {
         sortKey: "updated_at",
         actionId: "action-active",
         actionName: "thread-list.refresh-active",
+        knownSnapshotVersion: null,
       },
       {
         archived: true,
@@ -770,6 +859,7 @@ describe("Thread ownership modules", () => {
         sortKey: "created_at",
         actionId: "action-archived",
         actionName: "thread-list.refresh-archived",
+        knownSnapshotVersion: null,
       },
     ]);
   });

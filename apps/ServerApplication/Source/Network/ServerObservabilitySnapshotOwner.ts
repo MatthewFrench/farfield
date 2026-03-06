@@ -20,6 +20,10 @@ import type {
   RequestObservabilityOwner,
   RequestObservabilitySnapshot,
 } from "./RequestObservabilityOwner.js";
+import type {
+  SidebarThreadSyncSnapshotCache,
+  SidebarThreadSyncSnapshotCacheStatistics,
+} from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type {
   ThreadListAggregationCache,
@@ -48,6 +52,7 @@ export interface ServerObservabilitySnapshot {
   recordedAt: string;
   cache: {
     threadListAggregation: ThreadListAggregationCacheStatistics;
+    sidebarThreadSyncSnapshot: SidebarThreadSyncSnapshotCacheStatistics;
   };
   concurrency: {
     thread: ServerObservabilityThreadConcurrencySnapshot;
@@ -68,6 +73,7 @@ export interface ServerObservabilitySnapshot {
 
 export interface ServerObservabilitySnapshotOwnerDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
+  sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   pushDispatchConcurrencyCoordinator: PushDispatchConcurrencyCoordinator;
   pushMutationConcurrencyCoordinator: PushMutationConcurrencyCoordinator;
@@ -102,6 +108,8 @@ export class ServerObservabilitySnapshotOwner {
       recordedAt: this.readNowIsoString(),
       cache: {
         threadListAggregation: this.dependencies.threadListAggregationCache.readStatistics(),
+        sidebarThreadSyncSnapshot:
+          this.dependencies.sidebarThreadSyncSnapshotCache.readStatistics(),
       },
       concurrency: {
         thread: {

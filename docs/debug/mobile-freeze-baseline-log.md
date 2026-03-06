@@ -410,3 +410,117 @@ Interpretation:
 1. Longer thread-list cache TTLs reduced the number of user-visible sidebar freezes substantially on Chromium.
 2. The dominant remaining cost is still the thread-list path itself, but it now appears far less often as a user-visible stall.
 3. The next structural step should be a cheaper thread-list change-detection path so even the remaining `/api/threads` work can be reduced.
+
+## 2026-03-06 Follow-Up: Farfield Sidebar Sync Endpoint
+
+Changes under test:
+
+1. Add Farfield-owned `POST /api/sidebar/threads/sync`.
+2. Switch the web thread-list owner to use sidebar sync instead of `/api/threads` for normal sidebar refresh.
+3. Use deterministic `snapshotVersion` matching for `notModified`.
+4. Add a dedicated bounded sidebar snapshot cache with mutation-driven invalidation.
+
+Commands used:
+
+```bash
+bun run smoke:app
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile:webkit
+node scripts/tooling/with-env.mjs "bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts end-to-end/real/scenarios/thread-open.spec.ts"
+```
+
+### Chromium Mobile Sidebar Repeated Profile After Sidebar Sync Migration
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/browser-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `14`
+3. Total freeze duration: `4153ms`
+4. Max freeze duration: `684ms`
+5. Long-task count: `102`
+6. Total long-task duration: `8715ms`
+7. Max long-task duration: `400ms`
+
+Observed request mix:
+
+1. `/api/sidebar/threads/sync`
+   - count `21`
+   - top single observed duration about `801ms`
+2. `/api/apps?limit=100`
+   - count `1`
+3. `/api/account/rate-limits?agentId=codex`
+   - count `1`
+4. `/api/account?agentId=codex`
+   - count `1`
+5. `/api/health`
+   - count `1`
+
+Interpretation:
+
+1. The sidebar loop no longer pays the generic `/api/threads` route cost.
+2. The remaining Chromium issue is repeated sidebar sync request activity plus render churn around sidebar open.
+3. This follow-up is a route-ownership win, but it is not yet a pure performance win compared with the earlier Chromium TTL-only run.
+
+### WebKit Mobile Sidebar Repeated Profile After Sidebar Sync Migration
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/webkit-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `15`
+3. Total freeze duration: `37352ms`
+4. Max freeze duration: `7368ms`
+5. Long-task count: `0`
+6. Total long-task duration: `0ms`
+
+Observed request mix:
+
+1. `/api/sidebar/threads/sync`
+   - count `33`
+   - top observed durations about `8724ms`, `8635ms`, and `8000ms`
+2. `/api/health`
+   - count `2`
+3. `/api/notifications/events?limit=80&agentId=codex`
+   - count `1`
+
+Interpretation:
+
+1. The data-path migration succeeded on WebKit too: `/api/threads` is out of the sidebar loop.
+2. WebKit is still catastrophically bad, but the remaining problem is now concentrated in `/api/sidebar/threads/sync` request behavior rather than generic thread-list payload breadth.
+3. Because direct shell timing for the new endpoint is fast, the next investigation should focus on browser-side request behavior, duplicate sync scheduling, or render churn rather than raw server data retrieval cost.
+
+### Direct Endpoint Benchmark
+
+Direct authenticated shell timing against the live Farfield server:
+
+1. Cold `/api/sidebar/threads/sync` snapshot response: about `236ms`
+2. `notModified` response with matching `snapshotVersion`: about `2ms`
+3. Warm cached snapshot response with `knownSnapshotVersion: null`: about `2ms`
+
+Interpretation:
+
+1. The server-side sidebar sync path is cheap when measured directly.
+2. The remaining browser-side freezes are not explained by the server still pulling or returning full thread payloads.
+
+### Thread-Open Scenario Spot Check After Sidebar Sync Migration
+
+Observed result:
+
+1. Scenario passed.
+2. `thread-open-behavior` reported:
+   - `lcp=7848ms`
+   - `cls=0.1582`
+   - `longTasks=9`
+   - `longTaskDurationMs=1369`
+
+Interpretation:
+
+1. Thread open is currently healthier than the repeated sidebar loop because it passed its scenario budgets.
+2. It still is not especially fast, and the LCP readout is worth watching while sidebar work continues.

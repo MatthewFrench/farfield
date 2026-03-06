@@ -9,6 +9,7 @@ import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispat
 import { PushMutationConcurrencyCoordinator } from "../Source/Network/PushMutationConcurrencyCoordinator.js";
 import { RequestObservabilityOwner } from "../Source/Network/RequestObservabilityOwner.js";
 import { ServerObservabilitySnapshotOwner } from "../Source/Network/ServerObservabilitySnapshotOwner.js";
+import { SidebarThreadSyncSnapshotCache } from "../Source/Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
 
@@ -25,6 +26,7 @@ const REQUEST_OBSERVABILITY_MAX_STARTUP_REQUEST_ENTRIES = 16;
 interface ServerObservabilitySnapshotOwnerFixture {
   owner: ServerObservabilitySnapshotOwner;
   threadListAggregationCache: ThreadListAggregationCache;
+  sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   pushDispatchConcurrencyCoordinator: PushDispatchConcurrencyCoordinator;
   requestObservabilityOwner: RequestObservabilityOwner;
@@ -37,6 +39,10 @@ function createFixture(
   readNowIsoString: () => string = () => OBSERVABILITY_RECORDED_AT_TIMESTAMP,
 ): ServerObservabilitySnapshotOwnerFixture {
   const threadListAggregationCache = new ThreadListAggregationCache(
+    THREAD_LIST_CACHE_TIME_TO_LIVE_MILLISECONDS,
+    THREAD_LIST_CACHE_MAXIMUM_ENTRIES,
+  );
+  const sidebarThreadSyncSnapshotCache = new SidebarThreadSyncSnapshotCache(
     THREAD_LIST_CACHE_TIME_TO_LIVE_MILLISECONDS,
     THREAD_LIST_CACHE_MAXIMUM_ENTRIES,
   );
@@ -64,6 +70,7 @@ function createFixture(
 
   const owner = new ServerObservabilitySnapshotOwner({
     threadListAggregationCache,
+    sidebarThreadSyncSnapshotCache,
     threadConcurrencyCoordinator,
     pushDispatchConcurrencyCoordinator,
     pushMutationConcurrencyCoordinator,
@@ -77,6 +84,7 @@ function createFixture(
   return {
     owner,
     threadListAggregationCache,
+    sidebarThreadSyncSnapshotCache,
     threadConcurrencyCoordinator,
     pushDispatchConcurrencyCoordinator,
     requestObservabilityOwner,
@@ -112,6 +120,33 @@ describe("ServerObservabilitySnapshotOwner", () => {
           combinedTruncated: false,
         },
       );
+      fixture.sidebarThreadSyncSnapshotCache.write(
+        {
+          enabledAgentIds: ["codex"],
+          limit: 20,
+          archived: false,
+          all: true,
+          maxPages: 10,
+          sortKey: "updated_at",
+          cwd: null,
+        },
+        {
+          threadList: {
+            data: [],
+            nextCursor: null,
+            pages: 0,
+            truncated: false,
+            sync: {
+              mode: "full",
+              sinceUpdatedAt: null,
+              snapshotUpdatedAt: 0,
+              snapshotVersion: "snapshot-version-1",
+            },
+          },
+          snapshotUpdatedAt: 0,
+          snapshotVersion: "snapshot-version-1",
+        },
+      );
 
       await fixture.threadConcurrencyCoordinator.runExclusive("thread_1", async () => {});
       fixture.pushDispatchConcurrencyCoordinator.schedule("thread_1");
@@ -141,6 +176,7 @@ describe("ServerObservabilitySnapshotOwner", () => {
 
       expect(snapshot.recordedAt).toBe(OBSERVABILITY_RECORDED_AT_TIMESTAMP);
       expect(snapshot.cache.threadListAggregation.entryCount).toBeGreaterThanOrEqual(1);
+      expect(snapshot.cache.sidebarThreadSyncSnapshot.entryCount).toBeGreaterThanOrEqual(1);
       expect(snapshot.concurrency.thread.queuedExecutionCount).toBeGreaterThanOrEqual(1);
       expect(snapshot.concurrency.pushDispatch.scheduledCheckCount).toBeGreaterThanOrEqual(1);
       expect(snapshot.concurrency.pushMutation.queuedExecutionCount).toBeGreaterThanOrEqual(0);
