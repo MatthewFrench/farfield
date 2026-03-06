@@ -217,6 +217,30 @@ describe("ThreadListPane", () => {
     expect(screen.queryByTestId("thread-generating-indicator-thread_active_two")).not.toBeNull();
   });
 
+  it("suppresses unread marker while a thread runtime status is still active", () => {
+    cleanup();
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          unreadThreadIds: {
+            thread_active_two: true,
+          },
+          threadRuntimeStatusByThreadIdentifier: {
+            thread_active_two: {
+              sequence: 25,
+              statusType: "active",
+              activeFlags: [],
+              receivedAtMilliseconds: 8_500,
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("thread-unread-indicator-thread_active_two")).toBeNull();
+    expect(screen.queryByTestId("thread-generating-indicator-thread_active_two")).not.toBeNull();
+  });
+
   it("prefers last user message text for active thread row titles", () => {
     cleanup();
     const firstActiveThread = ACTIVE_THREAD_ITEMS[0];

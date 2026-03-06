@@ -1,11 +1,8 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: Interface-client decomposition follow-up is tracked in docs/proposed-structure-and-migration.md decision entry 20.
 import {
   type AppServerCollaborationModeListResponse,
-  AppServerCollaborationModeListResponseSchema,
   type AppServerConfigReadResponse,
-  AppServerConfigReadResponseSchema,
   type AppServerListModelsResponse,
-  AppServerListModelsResponseSchema,
   type AppServerListThreadsResponse,
   AppServerListThreadsResponseSchema,
   type AppServerReadThreadResponse,
@@ -21,10 +18,10 @@ import {
   type TurnStartParams,
 } from "@farfield/protocol";
 import { z } from "zod";
-import { buildReadAuthStatusRequestParameters } from "./AppServerClientAuthStatusRequestBuilders.js";
+import { AppServerCapabilityAccountClient } from "./AppServerCapabilityAccountClient.js";
+import { AppServerCapabilityCatalogClient } from "./AppServerCapabilityCatalogClient.js";
+import { AppServerCapabilityConfigurationClient } from "./AppServerCapabilityConfigurationClient.js";
 import { buildCommandExecutionRequestParameters } from "./AppServerClientCommandExecutionRequestBuilders.js";
-import { buildConfigBatchWriteRequestParameters } from "./AppServerClientConfigBatchWriteRequestBuilders.js";
-import { buildConfigValueWriteRequestParameters } from "./AppServerClientConfigValueWriteRequestBuilders.js";
 import {
   buildExternalAgentConfigDetectRequestParameters,
   buildExternalAgentConfigImportRequestParameters,
@@ -39,28 +36,15 @@ import {
 import { buildGitDiffToRemoteRequestParameters } from "./AppServerClientGitDiffRequestBuilders.js";
 import { APP_SERVER_CLIENT_METHODS } from "./AppServerClientMethodConstants.js";
 import {
-  APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
   buildArchiveThreadRequest,
-  buildCancelAccountLoginRequestParameters,
   buildForkThreadRequest,
-  buildListAppsRequestParameters,
-  buildListExperimentalFeaturesRequestParameters,
   buildListLoadedThreadsRequestParameters,
-  buildListMcpServerStatusesRequestParameters,
-  buildListSkillsRequestParameters,
   buildListThreadsAllPageOptions,
   buildListThreadsRequestParameters,
-  buildLogoutAccountRequestParameters,
-  buildReadAccountRateLimitsRequestParameters,
-  buildReadAccountRequestParameters,
-  buildReadConfigRequestParameters,
-  buildReadConfigRequirementsRequestParameters,
   buildReadThreadRequestParameters,
-  buildReloadMcpServerConfigRequestParameters,
   buildResumeThreadRequest,
   buildRollbackThreadRequest,
   buildSetThreadNameRequest,
-  buildStartAccountLoginRequestParameters,
   buildStartMcpServerOauthLoginRequestParameters,
   buildStartReviewRequest,
   buildStartThreadRequest,
@@ -700,194 +684,6 @@ const AppServerThreadLoadedListResponseSchema = z
     nextCursor: z.string().nullable(),
   })
   .passthrough();
-const AppServerConfigRequirementsNetworkSchema = z
-  .object({
-    enabled: z.boolean().nullable().optional(),
-    httpPort: z.number().int().nonnegative().nullable().optional(),
-    socksPort: z.number().int().nonnegative().nullable().optional(),
-    allowUpstreamProxy: z.boolean().nullable().optional(),
-    dangerouslyAllowNonLoopbackProxy: z.boolean().nullable().optional(),
-    dangerouslyAllowNonLoopbackAdmin: z.boolean().nullable().optional(),
-    dangerouslyAllowAllUnixSockets: z.boolean().nullable().optional(),
-    allowedDomains: z.array(z.string()).nullable().optional(),
-    deniedDomains: z.array(z.string()).nullable().optional(),
-    allowUnixSockets: z.array(z.string()).nullable().optional(),
-    allowLocalBinding: z.boolean().nullable().optional(),
-  })
-  .passthrough();
-const AppServerConfigRequirementsSchema = z
-  .object({
-    allowedApprovalPolicies: z.array(z.string()).nullable().optional(),
-    allowedSandboxModes: z.array(z.string()).nullable().optional(),
-    allowedWebSearchModes: z.array(z.string()).nullable().optional(),
-    enforceResidency: z.string().nullable().optional(),
-    network: AppServerConfigRequirementsNetworkSchema.nullable().optional(),
-  })
-  .passthrough();
-const AppServerConfigRequirementsReadResponseSchema = z
-  .object({
-    requirements: AppServerConfigRequirementsSchema.nullable(),
-  })
-  .passthrough();
-const AppServerExperimentalFeatureStageSchema = z.enum([
-  "beta",
-  "underDevelopment",
-  "stable",
-  "deprecated",
-  "removed",
-]);
-const AppServerExperimentalFeatureSchema = z
-  .object({
-    name: z.string().min(1),
-    stage: AppServerExperimentalFeatureStageSchema,
-    displayName: z.string().nullable().optional(),
-    description: z.string().nullable().optional(),
-    announcement: z.string().nullable().optional(),
-    enabled: z.boolean(),
-    defaultEnabled: z.boolean(),
-  })
-  .passthrough();
-const AppServerExperimentalFeatureListResponseSchema = z
-  .object({
-    data: z.array(AppServerExperimentalFeatureSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .passthrough();
-const AppServerMcpServerStatusSchema = z
-  .object({
-    name: z.string().min(1),
-    tools: z.record(JsonValueSchema),
-    resources: z.array(JsonValueSchema),
-    resourceTemplates: z.array(JsonValueSchema),
-    authStatus: JsonValueSchema,
-  })
-  .passthrough();
-const AppServerMcpServerStatusListResponseSchema = z
-  .object({
-    data: z.array(AppServerMcpServerStatusSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .passthrough();
-const AppServerAppListItemSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    description: z.string().nullable().optional(),
-    logoUrl: z.string().nullable().optional(),
-    logoUrlDark: z.string().nullable().optional(),
-    installUrl: z.string().nullable().optional(),
-    isAccessible: z.boolean().optional(),
-    isEnabled: z.boolean().optional(),
-  })
-  .passthrough();
-const AppServerAppListResponseSchema = z
-  .object({
-    data: z.array(AppServerAppListItemSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .passthrough();
-const AppServerSkillMetadataSchema = z
-  .object({
-    name: z.string().min(1),
-    description: z.string(),
-    shortDescription: z.string().nullable().optional(),
-    path: z.string().min(1),
-    scope: z.enum(["user", "repo", "system", "admin"]),
-    enabled: z.boolean(),
-  })
-  .passthrough();
-const AppServerSkillErrorSchema = z
-  .object({
-    path: z.string().min(1),
-    message: z.string().min(1),
-  })
-  .passthrough();
-const AppServerSkillsListEntrySchema = z
-  .object({
-    cwd: z.string().min(1),
-    skills: z.array(AppServerSkillMetadataSchema),
-    errors: z.array(AppServerSkillErrorSchema),
-  })
-  .passthrough();
-const AppServerSkillsListResponseSchema = z
-  .object({
-    data: z.array(AppServerSkillsListEntrySchema),
-  })
-  .passthrough();
-const AppServerAccountPlanTypeSchema = z.enum([
-  "free",
-  "go",
-  "plus",
-  "pro",
-  "team",
-  "business",
-  "enterprise",
-  "edu",
-  "unknown",
-]);
-const AppServerAccountSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("apiKey"),
-    })
-    .passthrough(),
-  z
-    .object({
-      type: z.literal("chatgpt"),
-      email: z.string(),
-      planType: AppServerAccountPlanTypeSchema,
-    })
-    .passthrough(),
-]);
-const AppServerGetAccountResponseSchema = z
-  .object({
-    account: AppServerAccountSchema.nullable(),
-    requiresOpenaiAuth: z.boolean(),
-  })
-  .passthrough();
-const AppServerGetAuthStatusAuthMethodSchema = z.enum(["apikey", "chatgpt", "chatgptAuthTokens"]);
-const AppServerGetAuthStatusResponseSchema = z
-  .object({
-    authMethod: AppServerGetAuthStatusAuthMethodSchema.nullable().optional(),
-    authToken: z.string().nullable().optional(),
-    requiresOpenaiAuth: z.boolean().nullable().optional(),
-  })
-  .passthrough();
-const AppServerUserInfoResponseSchema = z
-  .object({
-    allegedUserEmail: z.string().nullable().optional(),
-  })
-  .passthrough();
-const AppServerAccountCreditsSnapshotSchema = z
-  .object({
-    balance: z.string().nullable().optional(),
-    hasCredits: z.boolean(),
-    unlimited: z.boolean(),
-  })
-  .passthrough();
-const AppServerAccountRateLimitWindowSchema = z
-  .object({
-    resetsAt: z.number().int().nullable().optional(),
-    usedPercent: z.number().int(),
-    windowDurationMins: z.number().int().nullable().optional(),
-  })
-  .passthrough();
-const AppServerAccountRateLimitSnapshotSchema = z
-  .object({
-    credits: AppServerAccountCreditsSnapshotSchema.nullable().optional(),
-    limitId: z.string().nullable().optional(),
-    limitName: z.string().nullable().optional(),
-    planType: AppServerAccountPlanTypeSchema.nullable().optional(),
-    primary: AppServerAccountRateLimitWindowSchema.nullable().optional(),
-    secondary: AppServerAccountRateLimitWindowSchema.nullable().optional(),
-  })
-  .passthrough();
-const AppServerGetAccountRateLimitsResponseSchema = z
-  .object({
-    rateLimits: AppServerAccountRateLimitSnapshotSchema,
-    rateLimitsByLimitId: z.record(AppServerAccountRateLimitSnapshotSchema).nullable().optional(),
-  })
-  .passthrough();
 const AppServerFeedbackUploadResponseSchema = z
   .object({
     threadId: z.string().min(1),
@@ -924,47 +720,6 @@ const AppServerCommandExecResponseSchema = z
     stderr: z.string(),
   })
   .passthrough();
-const AppServerConfigWriteOverriddenMetadataSchema = z
-  .object({
-    message: z.string(),
-    overridingLayer: JsonValueSchema,
-    effectiveValue: JsonValueSchema,
-  })
-  .passthrough();
-const AppServerConfigWriteResponseSchema = z
-  .object({
-    status: z.enum(["ok", "okOverridden"]),
-    version: z.string().min(1),
-    filePath: z.string().min(1),
-    overriddenMetadata: AppServerConfigWriteOverriddenMetadataSchema.nullable().optional(),
-  })
-  .passthrough();
-const AppServerLoginAccountResponseSchema = z.discriminatedUnion("type", [
-  z
-    .object({
-      type: z.literal("apiKey"),
-    })
-    .passthrough(),
-  z
-    .object({
-      type: z.literal("chatgpt"),
-      loginId: z.string().min(1),
-      authUrl: z.string().min(1),
-    })
-    .passthrough(),
-  z
-    .object({
-      type: z.literal("chatgptAuthTokens"),
-    })
-    .passthrough(),
-]);
-const AppServerCancelLoginAccountResponseSchema = z
-  .object({
-    status: z.enum(["canceled", "notFound"]),
-  })
-  .passthrough();
-const AppServerLogoutAccountResponseSchema = z.object({}).passthrough();
-const AppServerMcpServerRefreshResponseSchema = z.object({}).passthrough();
 const AppServerMcpServerOauthLoginResponseSchema = z
   .object({
     authorizationUrl: z.string().min(1),
@@ -1043,56 +798,28 @@ const AppServerUnarchiveThreadResponseSchema = z
   })
   .passthrough();
 
-function mapAccountRateLimitSnapshot(
-  snapshot: z.infer<typeof AppServerAccountRateLimitSnapshotSchema>,
-): AccountRateLimitSnapshot {
-  return {
-    credits:
-      snapshot.credits === undefined || snapshot.credits === null
-        ? null
-        : {
-            balance: snapshot.credits.balance ?? null,
-            hasCredits: snapshot.credits.hasCredits,
-            unlimited: snapshot.credits.unlimited,
-          },
-    limitId: snapshot.limitId ?? null,
-    limitName: snapshot.limitName ?? null,
-    planType: snapshot.planType ?? null,
-    primary:
-      snapshot.primary === undefined || snapshot.primary === null
-        ? null
-        : {
-            resetsAt: snapshot.primary.resetsAt ?? null,
-            usedPercent: snapshot.primary.usedPercent,
-            windowDurationMins: snapshot.primary.windowDurationMins ?? null,
-          },
-    secondary:
-      snapshot.secondary === undefined || snapshot.secondary === null
-        ? null
-        : {
-            resetsAt: snapshot.secondary.resetsAt ?? null,
-            usedPercent: snapshot.secondary.usedPercent,
-            windowDurationMins: snapshot.secondary.windowDurationMins ?? null,
-          },
-  };
-}
-
 /**
  * Owns typed request/response mapping for Codex app-server RPC methods.
  * Transport concerns stay in `AppServerTransport`; schema enforcement stays here.
  */
 export class AppServerClient {
   private readonly transport: AppServerTransport;
+  private readonly capabilityAccountClient: AppServerCapabilityAccountClient;
+  private readonly capabilityCatalogClient: AppServerCapabilityCatalogClient;
+  private readonly capabilityConfigurationClient: AppServerCapabilityConfigurationClient;
 
   public constructor(
     transportOrOptions: AppServerTransport | ChildProcessAppServerTransportOptions,
   ) {
-    if (isChildProcessAppServerTransportOptions(transportOrOptions)) {
-      this.transport = new ChildProcessAppServerTransport(transportOrOptions);
-      return;
-    }
-
-    this.transport = transportOrOptions;
+    const resolvedTransport = isChildProcessAppServerTransportOptions(transportOrOptions)
+      ? new ChildProcessAppServerTransport(transportOrOptions)
+      : transportOrOptions;
+    this.transport = resolvedTransport;
+    this.capabilityAccountClient = new AppServerCapabilityAccountClient(resolvedTransport);
+    this.capabilityCatalogClient = new AppServerCapabilityCatalogClient(resolvedTransport);
+    this.capabilityConfigurationClient = new AppServerCapabilityConfigurationClient(
+      resolvedTransport,
+    );
   }
 
   public async close(): Promise<void> {
@@ -1199,268 +926,58 @@ export class AppServerClient {
     );
   }
 
-  public async listModels(
-    limit = APP_SERVER_CLIENT_DEFAULT_LIST_MODELS_LIMIT,
-  ): Promise<AppServerListModelsResponse> {
-    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.listModels, {
-      limit,
-    });
-    return parseAppServerResponse(
-      AppServerListModelsResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listModels,
-    );
+  public async listModels(limit?: number): Promise<AppServerListModelsResponse> {
+    return this.capabilityCatalogClient.listModels(limit);
   }
 
   public async listCollaborationModes(): Promise<AppServerCollaborationModeListResponse> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.listCollaborationModes,
-      {},
-    );
-    return parseAppServerResponse(
-      AppServerCollaborationModeListResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listCollaborationModes,
-    );
+    return this.capabilityCatalogClient.listCollaborationModes();
   }
 
   public async readConfig(options?: ReadConfigOptions): Promise<AppServerConfigReadResponse> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.readConfig,
-      buildReadConfigRequestParameters(options),
-    );
-    return parseAppServerResponse(
-      AppServerConfigReadResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readConfig,
-    );
+    return this.capabilityConfigurationClient.readConfig(options);
   }
 
   public async readConfigRequirements(
     options?: ReadConfigRequirementsOptions,
   ): Promise<ReadConfigRequirementsResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.readConfigRequirements,
-      buildReadConfigRequirementsRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerConfigRequirementsReadResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readConfigRequirements,
-    );
-    return {
-      requirements:
-        parsed.requirements === null
-          ? null
-          : {
-              allowedApprovalPolicies: parsed.requirements.allowedApprovalPolicies ?? null,
-              allowedSandboxModes: parsed.requirements.allowedSandboxModes ?? null,
-              allowedWebSearchModes: parsed.requirements.allowedWebSearchModes ?? null,
-              enforceResidency: parsed.requirements.enforceResidency ?? null,
-              network:
-                parsed.requirements.network === undefined || parsed.requirements.network === null
-                  ? null
-                  : {
-                      enabled: parsed.requirements.network.enabled ?? null,
-                      httpPort: parsed.requirements.network.httpPort ?? null,
-                      socksPort: parsed.requirements.network.socksPort ?? null,
-                      allowUpstreamProxy: parsed.requirements.network.allowUpstreamProxy ?? null,
-                      dangerouslyAllowNonLoopbackProxy:
-                        parsed.requirements.network.dangerouslyAllowNonLoopbackProxy ?? null,
-                      dangerouslyAllowNonLoopbackAdmin:
-                        parsed.requirements.network.dangerouslyAllowNonLoopbackAdmin ?? null,
-                      dangerouslyAllowAllUnixSockets:
-                        parsed.requirements.network.dangerouslyAllowAllUnixSockets ?? null,
-                      allowedDomains: parsed.requirements.network.allowedDomains ?? null,
-                      deniedDomains: parsed.requirements.network.deniedDomains ?? null,
-                      allowUnixSockets: parsed.requirements.network.allowUnixSockets ?? null,
-                      allowLocalBinding: parsed.requirements.network.allowLocalBinding ?? null,
-                    },
-            },
-    };
+    return this.capabilityConfigurationClient.readConfigRequirements(options);
   }
 
   public async listExperimentalFeatures(
     options?: ListExperimentalFeaturesOptions,
   ): Promise<ListExperimentalFeaturesResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.listExperimentalFeatures,
-      buildListExperimentalFeaturesRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerExperimentalFeatureListResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listExperimentalFeatures,
-    );
-    return {
-      data: parsed.data.map((feature) => ({
-        name: feature.name,
-        stage: feature.stage,
-        displayName: feature.displayName ?? null,
-        description: feature.description ?? null,
-        announcement: feature.announcement ?? null,
-        enabled: feature.enabled,
-        defaultEnabled: feature.defaultEnabled,
-      })),
-      nextCursor: parsed.nextCursor,
-    };
+    return this.capabilityCatalogClient.listExperimentalFeatures(options);
   }
 
   public async listMcpServerStatuses(
     options?: ListMcpServerStatusesOptions,
   ): Promise<ListMcpServerStatusesResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.listMcpServerStatuses,
-      buildListMcpServerStatusesRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerMcpServerStatusListResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listMcpServerStatuses,
-    );
-    return {
-      data: parsed.data.map((status) => ({
-        name: status.name,
-        authStatus: status.authStatus,
-        toolCount: Object.keys(status.tools).length,
-        resourceCount: status.resources.length,
-        resourceTemplateCount: status.resourceTemplates.length,
-      })),
-      nextCursor: parsed.nextCursor,
-    };
+    return this.capabilityCatalogClient.listMcpServerStatuses(options);
   }
 
   public async listApps(options?: ListAppsOptions): Promise<ListAppsResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.listApps,
-      buildListAppsRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerAppListResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listApps,
-    );
-    return {
-      data: parsed.data.map((appInfo) => ({
-        id: appInfo.id,
-        name: appInfo.name,
-        description: appInfo.description ?? null,
-        logoUrl: appInfo.logoUrl ?? null,
-        logoUrlDark: appInfo.logoUrlDark ?? null,
-        installUrl: appInfo.installUrl ?? null,
-        isAccessible: appInfo.isAccessible ?? false,
-        isEnabled: appInfo.isEnabled ?? true,
-      })),
-      nextCursor: parsed.nextCursor,
-    };
+    return this.capabilityCatalogClient.listApps(options);
   }
 
   public async listSkills(options?: ListSkillsOptions): Promise<ListSkillsResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.listSkills,
-      buildListSkillsRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerSkillsListResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.listSkills,
-    );
-    return {
-      data: parsed.data.map((entry) => ({
-        cwd: entry.cwd,
-        skills: entry.skills.map((skill) => ({
-          name: skill.name,
-          description: skill.description,
-          shortDescription: skill.shortDescription ?? null,
-          path: skill.path,
-          scope: skill.scope,
-          enabled: skill.enabled,
-        })),
-        errors: entry.errors.map((error) => ({
-          path: error.path,
-          message: error.message,
-        })),
-      })),
-    };
+    return this.capabilityCatalogClient.listSkills(options);
   }
 
   public async readAccount(options?: ReadAccountOptions): Promise<ReadAccountResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.readAccount,
-      buildReadAccountRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerGetAccountResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAccount,
-    );
-    return {
-      account:
-        parsed.account === null
-          ? null
-          : parsed.account.type === "apiKey"
-            ? { type: "apiKey" }
-            : {
-                type: "chatgpt",
-                email: parsed.account.email,
-                planType: parsed.account.planType,
-              },
-      requiresOpenaiAuth: parsed.requiresOpenaiAuth,
-    };
+    return this.capabilityAccountClient.readAccount(options);
   }
 
   public async readAuthStatus(options?: ReadAuthStatusOptions): Promise<ReadAuthStatusResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.readAuthStatus,
-      buildReadAuthStatusRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerGetAuthStatusResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAuthStatus,
-    );
-    return {
-      authMethod: parsed.authMethod ?? null,
-      authToken: parsed.authToken ?? null,
-      requiresOpenaiAuth: parsed.requiresOpenaiAuth ?? null,
-    };
+    return this.capabilityAccountClient.readAuthStatus(options);
   }
 
   public async readAccountRateLimits(): Promise<ReadAccountRateLimitsResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.readAccountRateLimits,
-      buildReadAccountRateLimitsRequestParameters(),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerGetAccountRateLimitsResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readAccountRateLimits,
-    );
-    const rateLimitsByLimitIdSource = parsed.rateLimitsByLimitId;
-    return {
-      rateLimits: mapAccountRateLimitSnapshot(parsed.rateLimits),
-      rateLimitsByLimitId:
-        rateLimitsByLimitIdSource === undefined || rateLimitsByLimitIdSource === null
-          ? null
-          : Object.fromEntries(
-              Object.entries(rateLimitsByLimitIdSource).map(([limitId, snapshot]) => [
-                limitId,
-                mapAccountRateLimitSnapshot(snapshot),
-              ]),
-            ),
-    };
+    return this.capabilityAccountClient.readAccountRateLimits();
   }
 
   public async readUserInfo(): Promise<ReadUserInfoResult> {
-    const result = await this.transport.request(APP_SERVER_CLIENT_METHODS.readUserInfo, {});
-    const parsed = parseAppServerResponse(
-      AppServerUserInfoResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.readUserInfo,
-    );
-    return {
-      allegedUserEmail: parsed.allegedUserEmail ?? null,
-    };
+    return this.capabilityAccountClient.readUserInfo();
   }
 
   public async uploadFeedback(options: FeedbackUploadOptions): Promise<FeedbackUploadResult> {
@@ -1575,121 +1092,29 @@ export class AppServerClient {
   }
 
   public async writeConfigBatch(options: ConfigBatchWriteOptions): Promise<ConfigWriteResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.writeConfigBatch,
-      buildConfigBatchWriteRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerConfigWriteResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.writeConfigBatch,
-    );
-    return {
-      status: parsed.status,
-      version: parsed.version,
-      filePath: parsed.filePath,
-      overriddenMetadata:
-        parsed.overriddenMetadata === undefined || parsed.overriddenMetadata === null
-          ? null
-          : {
-              message: parsed.overriddenMetadata.message,
-              overridingLayer: parsed.overriddenMetadata.overridingLayer,
-              effectiveValue: parsed.overriddenMetadata.effectiveValue,
-            },
-    };
+    return this.capabilityConfigurationClient.writeConfigBatch(options);
   }
 
   public async writeConfigValue(options: ConfigWriteValueOptions): Promise<ConfigWriteResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.writeConfigValue,
-      buildConfigValueWriteRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerConfigWriteResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.writeConfigValue,
-    );
-    return {
-      status: parsed.status,
-      version: parsed.version,
-      filePath: parsed.filePath,
-      overriddenMetadata:
-        parsed.overriddenMetadata === undefined || parsed.overriddenMetadata === null
-          ? null
-          : {
-              message: parsed.overriddenMetadata.message,
-              overridingLayer: parsed.overriddenMetadata.overridingLayer,
-              effectiveValue: parsed.overriddenMetadata.effectiveValue,
-            },
-    };
+    return this.capabilityConfigurationClient.writeConfigValue(options);
   }
 
   public async startAccountLogin(options: LoginAccountOptions): Promise<LoginAccountResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.startAccountLogin,
-      buildStartAccountLoginRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerLoginAccountResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.startAccountLogin,
-    );
-    if (parsed.type === "apiKey") {
-      return {
-        type: "apiKey",
-      };
-    }
-    if (parsed.type === "chatgptAuthTokens") {
-      return {
-        type: "chatgptAuthTokens",
-      };
-    }
-    return {
-      type: "chatgpt",
-      loginId: parsed.loginId,
-      authUrl: parsed.authUrl,
-    };
+    return this.capabilityAccountClient.startAccountLogin(options);
   }
 
   public async cancelAccountLogin(
     options: CancelAccountLoginOptions,
   ): Promise<CancelAccountLoginResult> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.cancelAccountLogin,
-      buildCancelAccountLoginRequestParameters(options),
-    );
-    const parsed = parseAppServerResponse(
-      AppServerCancelLoginAccountResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.cancelAccountLogin,
-    );
-    return {
-      status: parsed.status,
-    };
+    return this.capabilityAccountClient.cancelAccountLogin(options);
   }
 
   public async logoutAccount(): Promise<void> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.logoutAccount,
-      buildLogoutAccountRequestParameters(),
-    );
-    parseAppServerResponse(
-      AppServerLogoutAccountResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.logoutAccount,
-    );
+    await this.capabilityAccountClient.logoutAccount();
   }
 
   public async reloadMcpServerConfig(): Promise<void> {
-    const result = await this.transport.request(
-      APP_SERVER_CLIENT_METHODS.reloadMcpServerConfig,
-      buildReloadMcpServerConfigRequestParameters(),
-    );
-    parseAppServerResponse(
-      AppServerMcpServerRefreshResponseSchema,
-      result,
-      APP_SERVER_CLIENT_RESPONSE_CONTEXTS.reloadMcpServerConfig,
-    );
+    await this.capabilityConfigurationClient.reloadMcpServerConfig();
   }
 
   public async startMcpServerOauthLogin(

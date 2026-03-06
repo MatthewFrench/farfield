@@ -64,6 +64,7 @@ const PersistedSelectedThreadSnapshotRecordCollectionSchema = z.array(
 );
 
 export interface SelectedThreadSnapshotCacheStore {
+  readCachedSnapshot(threadId: string): SelectedThreadSnapshotCacheRecord | null;
   readSnapshot(threadId: string): Promise<SelectedThreadSnapshotCacheRecord | null>;
   writeSnapshot(snapshot: SelectedThreadSnapshotCacheRecord): Promise<void>;
   clearSnapshot(threadId: string): Promise<void>;
@@ -117,21 +118,23 @@ export class SelectedThreadSnapshotIndexedDatabaseStore
     this.databaseConnectionPromise = null;
   }
 
+  public readCachedSnapshot(threadId: string): SelectedThreadSnapshotCacheRecord | null {
+    const parsedThreadId = ThreadIdentifierSchema.parse(threadId);
+    const persistedSnapshot = this.inMemorySnapshotByThreadIdentifier.get(parsedThreadId);
+    if (persistedSnapshot === undefined) {
+      return null;
+    }
+    return this.mapPersistedRecordToCacheRecord(persistedSnapshot);
+  }
+
   public async readSnapshot(threadId: string): Promise<SelectedThreadSnapshotCacheRecord | null> {
     const parsedThreadId = ThreadIdentifierSchema.parse(threadId);
+    const cachedSnapshot = this.readCachedSnapshot(parsedThreadId);
+    if (cachedSnapshot !== null) {
+      return cachedSnapshot;
+    }
     if (this.indexedDatabaseFactory === null) {
-      const persistedSnapshot = this.inMemorySnapshotByThreadIdentifier.get(parsedThreadId);
-      if (persistedSnapshot === undefined) {
-        return null;
-      }
-      return SelectedThreadSnapshotCacheRecordSchema.parse({
-        threadId: persistedSnapshot.threadId,
-        liveStateSnapshot: persistedSnapshot.liveStateSnapshot,
-        streamEventsSnapshot: persistedSnapshot.streamEventsSnapshot,
-        streamEventsSinceSequenceUsed: persistedSnapshot.streamEventsSinceSequenceUsed,
-        readThreadSnapshot: persistedSnapshot.readThreadSnapshot,
-        includeTurnsUsedForRead: persistedSnapshot.includeTurnsUsedForRead,
-      });
+      return null;
     }
 
     try {
@@ -148,14 +151,9 @@ export class SelectedThreadSnapshotIndexedDatabaseStore
       }
 
       const parsedRecord = PersistedSelectedThreadSnapshotRecordSchema.parse(rawRecord);
-      return SelectedThreadSnapshotCacheRecordSchema.parse({
-        threadId: parsedRecord.threadId,
-        liveStateSnapshot: parsedRecord.liveStateSnapshot,
-        streamEventsSnapshot: parsedRecord.streamEventsSnapshot,
-        streamEventsSinceSequenceUsed: parsedRecord.streamEventsSinceSequenceUsed,
-        readThreadSnapshot: parsedRecord.readThreadSnapshot,
-        includeTurnsUsedForRead: parsedRecord.includeTurnsUsedForRead,
-      });
+      this.inMemorySnapshotByThreadIdentifier.set(parsedThreadId, parsedRecord);
+      this.evictInMemoryEntriesBeyondLimit();
+      return this.mapPersistedRecordToCacheRecord(parsedRecord);
     } catch (error) {
       throw createSelectedThreadSnapshotStorageError(
         SELECTED_THREAD_SNAPSHOT_READ_OPERATION,
@@ -170,9 +168,9 @@ export class SelectedThreadSnapshotIndexedDatabaseStore
       ...parsedSnapshot,
       persistedAt: this.readCurrentEpochMilliseconds(),
     });
+    this.inMemorySnapshotByThreadIdentifier.set(parsedSnapshot.threadId, persistedSnapshot);
+    this.evictInMemoryEntriesBeyondLimit();
     if (this.indexedDatabaseFactory === null) {
-      this.inMemorySnapshotByThreadIdentifier.set(parsedSnapshot.threadId, persistedSnapshot);
-      this.evictInMemoryEntriesBeyondLimit();
       return;
     }
 
@@ -198,8 +196,8 @@ export class SelectedThreadSnapshotIndexedDatabaseStore
 
   public async clearSnapshot(threadId: string): Promise<void> {
     const parsedThreadId = ThreadIdentifierSchema.parse(threadId);
+    this.inMemorySnapshotByThreadIdentifier.delete(parsedThreadId);
     if (this.indexedDatabaseFactory === null) {
-      this.inMemorySnapshotByThreadIdentifier.delete(parsedThreadId);
       return;
     }
 
@@ -218,6 +216,19 @@ export class SelectedThreadSnapshotIndexedDatabaseStore
         error,
       );
     }
+  }
+
+  private mapPersistedRecordToCacheRecord(
+    persistedRecord: PersistedSelectedThreadSnapshotRecord,
+  ): SelectedThreadSnapshotCacheRecord {
+    return SelectedThreadSnapshotCacheRecordSchema.parse({
+      threadId: persistedRecord.threadId,
+      liveStateSnapshot: persistedRecord.liveStateSnapshot,
+      streamEventsSnapshot: persistedRecord.streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: persistedRecord.streamEventsSinceSequenceUsed,
+      readThreadSnapshot: persistedRecord.readThreadSnapshot,
+      includeTurnsUsedForRead: persistedRecord.includeTurnsUsedForRead,
+    });
   }
 
   private async evictEntriesBeyondLimit(database: IDBDatabase): Promise<void> {

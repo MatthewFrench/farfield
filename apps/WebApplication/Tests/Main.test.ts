@@ -7,6 +7,15 @@ interface GlobalClientCrashReporterOptions {
   readUrl?: () => string | null;
 }
 
+interface WebShellHealthResponse {
+  ok: true;
+  service: "farfield-web-shell";
+  buildId: string;
+  gitCommit: string | null;
+  serviceWorkerVersion: string | null;
+  timestamp: string;
+}
+
 interface ServiceWorkerControllerChangeReloadDecisionInput {
   reloadSuppressed: boolean;
 }
@@ -61,11 +70,22 @@ const mainModuleMocks = vi.hoisted(() => {
     render,
   }));
   const reconcilePushSubscription = vi.fn(async (): Promise<void> => {});
+  const getWebShellHealth = vi.fn(
+    async (): Promise<WebShellHealthResponse> => ({
+      ok: true,
+      service: "farfield-web-shell",
+      buildId: "build-1",
+      gitCommit: "commit-1",
+      serviceWorkerVersion: "sw-1",
+      timestamp: "2026-03-05T00:00:00.000Z",
+    }),
+  );
   const installGlobalClientCrashReporter = vi.fn(
     (_options: GlobalClientCrashReporterOptions): { remove: () => void } => ({
       remove: (): void => {},
     }),
   );
+  const reloadApplicationWindow = vi.fn((): void => {});
   const parseFromLocation = vi.fn(
     (
       _pathname: string,
@@ -97,13 +117,17 @@ const mainModuleMocks = vi.hoisted(() => {
     } {
       return readReloadDecision(input);
     }
+
+    public completePendingReloadDecision(_shouldReload: boolean): void {}
   }
 
   return {
     render,
     createRoot,
     reconcilePushSubscription,
+    getWebShellHealth,
     installGlobalClientCrashReporter,
+    reloadApplicationWindow,
     parseFromLocation,
     serviceWorkerControllerChangeReloadOwnerConstructorArguments,
     readReloadDecision,
@@ -123,8 +147,16 @@ vi.mock("../Source/Features/PushNotifications/DataAccess/PushClientApi", () => (
   reconcilePushSubscription: mainModuleMocks.reconcilePushSubscription,
 }));
 
+vi.mock("../Source/Application/DataAccess/WebShellApi", () => ({
+  getWebShellHealth: mainModuleMocks.getWebShellHealth,
+}));
+
 vi.mock("../Source/Application/Boot/InstallClientErrorReporter", () => ({
   installGlobalClientCrashReporter: mainModuleMocks.installGlobalClientCrashReporter,
+}));
+
+vi.mock("../Source/Application/Boot/ApplicationWindowReloadOwner", () => ({
+  reloadApplicationWindow: mainModuleMocks.reloadApplicationWindow,
 }));
 
 vi.mock("../Source/Application/Boot/ServiceWorkerControllerChangeReloadOwner", () => ({
@@ -223,10 +255,32 @@ async function importMainModule(): Promise<void> {
   await import("../Source/Main");
 }
 
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   vi.useFakeTimers();
+  mainModuleMocks.readReloadDecision.mockImplementation(
+    (_input: ServiceWorkerControllerChangeReloadDecisionInput): { shouldReload: boolean } => ({
+      shouldReload: false,
+    }),
+  );
+  mainModuleMocks.getWebShellHealth.mockImplementation(
+    async (): Promise<WebShellHealthResponse> => ({
+      ok: true,
+      service: "farfield-web-shell",
+      buildId: "build-1",
+      gitCommit: "commit-1",
+      serviceWorkerVersion: "sw-1",
+      timestamp: "2026-03-05T00:00:00.000Z",
+    }),
+  );
+  mainModuleMocks.reloadApplicationWindow.mockImplementation((): void => {});
   standaloneDisplayModeEnabled = false;
   document.documentElement.className = "";
   document.body.innerHTML = "";
@@ -238,6 +292,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("Main bootstrap", () => {
@@ -330,5 +385,143 @@ describe("Main bootstrap", () => {
     expect(mainModuleMocks.serviceWorkerControllerChangeReloadOwnerConstructorArguments).toEqual([
       false,
     ]);
+  });
+
+  it("does not reload on controllerchange when no pending service-worker update was observed", async () => {
+    enqueueApplicationRootElement();
+    mainModuleMocks.readReloadDecision.mockReturnValue({
+      shouldReload: true,
+    });
+    mainModuleMocks.getWebShellHealth
+      .mockResolvedValueOnce({
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: "build-1",
+        gitCommit: "commit-1",
+        serviceWorkerVersion: "sw-1",
+        timestamp: "2026-03-05T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: "build-2",
+        gitCommit: "commit-2",
+        serviceWorkerVersion: "sw-2",
+        timestamp: "2026-03-05T00:00:01.000Z",
+      });
+
+    const serviceWorkerRegistrationEvents = new EventTarget();
+    const serviceWorkerRegistration: ServiceWorkerStartupRegistration = {
+      waiting: null,
+      installing: null,
+      addEventListener: serviceWorkerRegistrationEvents.addEventListener.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+      removeEventListener: serviceWorkerRegistrationEvents.removeEventListener.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+      dispatchEvent: serviceWorkerRegistrationEvents.dispatchEvent.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+    };
+    const registerServiceWorker = vi.fn(
+      async (_scriptUrl: string): Promise<ServiceWorkerStartupRegistration> =>
+        serviceWorkerRegistration,
+    );
+    const serviceWorkerContainerEvents = new EventTarget();
+    const serviceWorkerContainer: ServiceWorkerStartupContainer = {
+      controller: {} as ServiceWorker,
+      register: registerServiceWorker,
+      addEventListener: serviceWorkerContainerEvents.addEventListener.bind(
+        serviceWorkerContainerEvents,
+      ),
+      removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
+        serviceWorkerContainerEvents,
+      ),
+      dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents),
+    };
+
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorkerContainer,
+    });
+
+    await importMainModule();
+    window.dispatchEvent(new Event("load"));
+    await flushMicrotasks();
+
+    serviceWorkerContainer.dispatchEvent(new Event("controllerchange"));
+    await flushMicrotasks();
+
+    expect(mainModuleMocks.reloadApplicationWindow).not.toHaveBeenCalled();
+  });
+
+  it("reloads on controllerchange when a pending service-worker update changed the web-shell version", async () => {
+    enqueueApplicationRootElement();
+    mainModuleMocks.readReloadDecision.mockReturnValue({
+      shouldReload: true,
+    });
+    mainModuleMocks.getWebShellHealth
+      .mockResolvedValueOnce({
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: "build-1",
+        gitCommit: "commit-1",
+        serviceWorkerVersion: "sw-1",
+        timestamp: "2026-03-05T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        service: "farfield-web-shell",
+        buildId: "build-2",
+        gitCommit: "commit-2",
+        serviceWorkerVersion: "sw-2",
+        timestamp: "2026-03-05T00:00:01.000Z",
+      });
+
+    const serviceWorkerRegistrationEvents = new EventTarget();
+    const serviceWorkerRegistration: ServiceWorkerStartupRegistration = {
+      waiting: {} as ServiceWorker,
+      installing: null,
+      addEventListener: serviceWorkerRegistrationEvents.addEventListener.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+      removeEventListener: serviceWorkerRegistrationEvents.removeEventListener.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+      dispatchEvent: serviceWorkerRegistrationEvents.dispatchEvent.bind(
+        serviceWorkerRegistrationEvents,
+      ),
+    };
+    const registerServiceWorker = vi.fn(
+      async (_scriptUrl: string): Promise<ServiceWorkerStartupRegistration> =>
+        serviceWorkerRegistration,
+    );
+    const serviceWorkerContainerEvents = new EventTarget();
+    const serviceWorkerContainer: ServiceWorkerStartupContainer = {
+      controller: {} as ServiceWorker,
+      register: registerServiceWorker,
+      addEventListener: serviceWorkerContainerEvents.addEventListener.bind(
+        serviceWorkerContainerEvents,
+      ),
+      removeEventListener: serviceWorkerContainerEvents.removeEventListener.bind(
+        serviceWorkerContainerEvents,
+      ),
+      dispatchEvent: serviceWorkerContainerEvents.dispatchEvent.bind(serviceWorkerContainerEvents),
+    };
+
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorkerContainer,
+    });
+
+    await importMainModule();
+    window.dispatchEvent(new Event("load"));
+    await flushMicrotasks();
+
+    serviceWorkerContainer.dispatchEvent(new Event("controllerchange"));
+    await flushMicrotasks();
+
+    expect(mainModuleMocks.reloadApplicationWindow).toHaveBeenCalledTimes(1);
   });
 });

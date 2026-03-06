@@ -292,7 +292,11 @@ export function App(): React.JSX.Element {
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
-  const { loadSelectedThreadTracked, applySelectedThreadStreamDelta } = useSelectedThreadLoaders({
+  const {
+    applyCachedSelectedThreadSnapshot,
+    loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta,
+  } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
     agentsById: applicationDerivedState.agentsById,
@@ -331,6 +335,7 @@ export function App(): React.JSX.Element {
     applicationOwnerDependencies,
     runtimeRequestHandlers,
     coreDataLoaders,
+    applyCachedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
     streamEventCards,

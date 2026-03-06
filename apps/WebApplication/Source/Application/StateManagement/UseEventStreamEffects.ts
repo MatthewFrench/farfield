@@ -32,6 +32,11 @@ import {
   readScheduledRefreshExecutionSnapshot,
   shouldRefreshDebugWorkspace,
 } from "./EventStreamScheduledRefreshPolicy";
+import {
+  refreshPendingServerRequestThreadStatuses,
+  shouldRefreshPendingServerRequestThreadStatuses,
+  usePendingServerRequestThreadStatusHydrationEffect,
+} from "./PendingServerRequestThreadStatusRefreshOwner";
 import { readRuntimeNotificationProjection } from "./RuntimeNotificationProjectionParser";
 import { RuntimeNotificationReadObservabilityOwner } from "./RuntimeNotificationReadObservabilityOwner";
 import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReducer";
@@ -344,6 +349,20 @@ async function applyNotificationProjectionRefresh(
       apps: readThreadSidebarAppsSummary(appsResponse),
     }));
   }
+
+  if (
+    shouldRefreshPendingServerRequestThreadStatuses({
+      resetRequired: runtimeNotificationProjection.resetRequired,
+      warningEvents: runtimeNotificationProjection.warningEvents,
+    })
+  ) {
+    await refreshPendingServerRequestThreadStatuses({
+      selectedAgentId: input.input.selectedAgentId,
+      capabilityServerClient: input.input.capabilityServerClient,
+      setThreadRuntimeStatusByThreadIdentifier:
+        input.input.setThreadRuntimeStatusByThreadIdentifier,
+    });
+  }
 }
 
 function useEventStreamConnectionLifecycleEffect(
@@ -547,6 +566,7 @@ export function useEventStreamEffects(input: UseEventStreamEffectsInput): void {
     },
     runtimeWarningBannerPolicyOwnerRef,
   );
+  usePendingServerRequestThreadStatusHydrationEffect(input);
   useThreadSidebarRuntimeHydrationEffect(input);
   useEventStreamConnectionLifecycleEffect(
     input,

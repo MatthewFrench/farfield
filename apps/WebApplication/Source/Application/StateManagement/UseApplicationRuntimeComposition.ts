@@ -115,6 +115,7 @@ export function useApplicationRuntimeComposition(
 
   const shellComposition = useApplicationShellComposition(
     buildApplicationShellCompositionInput(runtimeCompositionContext, {
+      applyCachedSelectedThreadSnapshot: input.applyCachedSelectedThreadSnapshot,
       refreshCoreDataAndSelectedThread,
       pushFeatureComposition,
       chatFeatureComposition,

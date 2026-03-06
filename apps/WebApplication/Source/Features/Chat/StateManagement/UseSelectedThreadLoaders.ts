@@ -6,7 +6,10 @@ import {
   useRef,
 } from "react";
 import { type CapabilityAgentsResponse } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
-import { type SelectedThreadSnapshotCacheStore } from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
+import {
+  type SelectedThreadSnapshotCacheRecord,
+  type SelectedThreadSnapshotCacheStore,
+} from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { type ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
@@ -68,6 +71,7 @@ export interface UseSelectedThreadLoadersInput {
 }
 
 export interface SelectedThreadLoaders {
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   loadSelectedThread: (
     threadId: string,
     options?: LoadSelectedThreadOptions,
@@ -94,6 +98,9 @@ function createSnapshotStateOwnerDependencies(
     setLiveState: input.setLiveState,
     setReadThreadState: input.setReadThreadState,
     setStreamEvents: input.setStreamEvents,
+    persistSelectedThreadSnapshot: (snapshot) => {
+      persistSelectedThreadSnapshot(input.selectedThreadSnapshotCacheStore, snapshot);
+    },
   };
 }
 
@@ -107,6 +114,15 @@ function resolveIncludeTurnsForThreadRead(
 
 function resolveIncludeReadThreadForThreadRead(includeReadThread: boolean | undefined): boolean {
   return includeReadThread ?? DEFAULT_INCLUDE_READ_THREAD;
+}
+
+function persistSelectedThreadSnapshot(
+  selectedThreadSnapshotCacheStore: SelectedThreadSnapshotCacheStore,
+  snapshot: SelectedThreadSnapshotCacheRecord,
+): void {
+  void selectedThreadSnapshotCacheStore.writeSnapshot(snapshot).catch(() => {
+    // Keep snapshot writes non-blocking for selected-thread rendering.
+  });
 }
 
 interface ResolveReadThreadDeltaPreferenceInput {
@@ -148,6 +164,25 @@ export function useSelectedThreadLoaders(
     );
   }
   const snapshotStateOwner = snapshotStateOwnerReference.current;
+
+  const applyCachedSelectedThreadSnapshot = useCallback(
+    (threadId: string): boolean => {
+      const cachedSnapshot = input.selectedThreadSnapshotCacheStore.readCachedSnapshot(threadId);
+      if (cachedSnapshot === null) {
+        return false;
+      }
+      snapshotStateOwner.applySnapshots({
+        threadId: cachedSnapshot.threadId,
+        liveStateSnapshot: cachedSnapshot.liveStateSnapshot,
+        streamEventsSnapshot: cachedSnapshot.streamEventsSnapshot,
+        streamEventsSinceSequenceUsed: cachedSnapshot.streamEventsSinceSequenceUsed,
+        readThreadSnapshot: cachedSnapshot.readThreadSnapshot,
+        includeTurnsUsedForRead: cachedSnapshot.includeTurnsUsedForRead,
+      });
+      return true;
+    },
+    [input.selectedThreadSnapshotCacheStore, snapshotStateOwner],
+  );
 
   const loadSelectedThread = useCallback(
     async (threadId: string, options?: LoadSelectedThreadOptions, signal?: AbortSignal) => {
@@ -217,18 +252,6 @@ export function useSelectedThreadLoaders(
         readThreadSnapshot: snapshot.readThreadSnapshot,
         includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead,
       });
-      void input.selectedThreadSnapshotCacheStore
-        .writeSnapshot({
-          threadId,
-          liveStateSnapshot: snapshot.liveStateSnapshot,
-          streamEventsSnapshot: snapshot.streamEventsSnapshot,
-          streamEventsSinceSequenceUsed: snapshot.streamEventsSinceSequenceUsed,
-          readThreadSnapshot: snapshot.readThreadSnapshot,
-          includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead,
-        })
-        .catch(() => {
-          // Keep snapshot writes non-blocking for selected-thread rendering.
-        });
     },
     [
       input.agentsById,
@@ -284,6 +307,7 @@ export function useSelectedThreadLoaders(
   );
 
   return {
+    applyCachedSelectedThreadSnapshot,
     loadSelectedThread,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,

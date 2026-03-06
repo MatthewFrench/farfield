@@ -40,6 +40,18 @@ interface ThreadListActiveSectionProps {
   properties: ThreadListPaneProperties;
 }
 
+function readShouldShowUnreadIndicator(input: {
+  hasUnread: boolean;
+  threadRuntimeStatus:
+    | ThreadListPaneProperties["threadRuntimeStatusByThreadIdentifier"][string]
+    | undefined;
+}): boolean {
+  if (!input.hasUnread) {
+    return false;
+  }
+  return input.threadRuntimeStatus?.statusType !== "active";
+}
+
 export function ThreadListActiveSection({
   properties,
 }: ThreadListActiveSectionProps): React.JSX.Element {
@@ -152,6 +164,10 @@ export function ThreadListActiveSection({
                         properties.unreadThreadIds[thread.id] === true && !isSelected;
                       const threadRuntimeStatus =
                         properties.threadRuntimeStatusByThreadIdentifier[thread.id];
+                      const shouldShowUnreadIndicator = readShouldShowUnreadIndicator({
+                        hasUnread,
+                        threadRuntimeStatus,
+                      });
                       const shouldRenderThreadRuntimeStatusBadge =
                         threadRuntimeStatus !== undefined &&
                         threadRuntimeStatus.statusType !== "notLoaded";
@@ -238,7 +254,7 @@ export function ThreadListActiveSection({
                                   : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                               }`}
                             >
-                              {hasUnread && (
+                              {shouldShowUnreadIndicator && (
                                 <span
                                   data-testid={`thread-unread-indicator-${thread.id}`}
                                   aria-label="Unread message"
@@ -247,7 +263,9 @@ export function ThreadListActiveSection({
                                 />
                               )}
                               <span
-                                className={`min-w-0 flex-1 leading-4 ${hasUnread ? "pl-3.5" : ""}`}
+                                className={`min-w-0 flex-1 leading-4 ${
+                                  shouldShowUnreadIndicator ? "pl-3.5" : ""
+                                }`}
                               >
                                 <span className="line-clamp-2 break-words">
                                   {ThreadGroupSelectors.threadLabel(thread)}

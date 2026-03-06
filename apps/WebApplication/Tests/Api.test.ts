@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootstrapEventsSession } from "../Source/Application/DataAccess/WebShellApi";
-import {
-  getConfigDefaults,
-  listCollaborationModes,
-} from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import { listCollaborationModes } from "../Source/Features/Capabilities/DataAccess/CapabilityCatalogApi";
+import { getConfigDefaults } from "../Source/Features/Capabilities/DataAccess/CapabilityConfigurationApi";
 import { sendMessage } from "../Source/Features/Chat/DataAccess/ChatApi";
 import {
   clearDebugClientErrors,

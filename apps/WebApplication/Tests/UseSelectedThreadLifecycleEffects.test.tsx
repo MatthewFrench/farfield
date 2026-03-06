@@ -56,6 +56,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
   > = {
     current: null,
   };
+  const applyCachedSelectedThreadSnapshot = vi.fn((_threadId: string): boolean => false);
   const selectedThreadRefreshConcurrencyCoordinator =
     new SelectedThreadRefreshConcurrencyCoordinator();
   const setLiveState = vi.fn<(value: SetStateAction<ChatLiveStateResponse | null>) => void>();
@@ -78,6 +79,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
       selectedThreadIdRef,
       selectedThreadLoadTokenRef,
       loadSelectedThreadRef,
+      applyCachedSelectedThreadSnapshot,
       selectedThreadRefreshConcurrencyCoordinator,
       setLiveState,
       setReadThreadState,
@@ -90,6 +92,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
     selectedThreadIdRef,
     selectedThreadLoadTokenRef,
     loadSelectedThreadRef,
+    applyCachedSelectedThreadSnapshot,
     selectedThreadRefreshConcurrencyCoordinator,
     setLiveState,
     setReadThreadState,
@@ -146,6 +149,30 @@ describe("useSelectedThreadLifecycleEffects", () => {
     expect(lifecycle.handleRuntimeRequestError).not.toHaveBeenCalled();
     expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenCalledWith(true);
     expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it("keeps cached selected-thread state visible while refresh is in flight", async () => {
+    const lifecycle = createLifecycleInput("thread-1");
+    const deferredLoad = createDeferredVoidPromise();
+    lifecycle.applyCachedSelectedThreadSnapshot.mockReturnValue(true);
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => deferredLoad.promise);
+
+    render(<LifecycleHarness input={lifecycle.input} />);
+
+    await waitFor(() => {
+      expect(lifecycle.applyCachedSelectedThreadSnapshot).toHaveBeenCalledWith("thread-1");
+    });
+
+    expect(lifecycle.setLiveState).not.toHaveBeenCalledWith(null);
+    expect(lifecycle.setReadThreadState).not.toHaveBeenCalledWith(null);
+    expect(lifecycle.setStreamEvents).not.toHaveBeenCalledWith([]);
+    expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenCalledWith(false);
+
+    deferredLoad.resolve();
+
+    await waitFor(() => {
+      expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenLastCalledWith(false);
+    });
   });
 
   it("ignores stale read failures after thread selection advances", async () => {

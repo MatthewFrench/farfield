@@ -29,6 +29,9 @@ export interface UseThreadListPanePropertiesInput {
   createThreadForSingleAgent: (projectPath: string) => void;
   createNewThread: (projectPath: string, agentId: AgentId) => void | Promise<void>;
   setSelectedThreadId: (threadId: string) => void;
+  selectedThreadIdRef: { current: string | null };
+  setIsSelectedThreadLoading: (nextIsLoading: boolean) => void;
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   setMobileSidebarOpen: (nextOpen: boolean) => void;
   archiveThread: (threadId: string) => void | Promise<void>;
   forkThread: (threadId: string) => void | Promise<void>;
@@ -74,6 +77,9 @@ export function useThreadListPaneProperties(
     createThreadForSingleAgent,
     createNewThread,
     setSelectedThreadId,
+    selectedThreadIdRef,
+    setIsSelectedThreadLoading,
+    applyCachedSelectedThreadSnapshot,
     setMobileSidebarOpen,
     archiveThread,
     forkThread,
@@ -126,6 +132,9 @@ export function useThreadListPaneProperties(
         void createNewThread(projectPath, agentId);
       },
       onSelectThread: (threadId) => {
+        selectedThreadIdRef.current = threadId;
+        setIsSelectedThreadLoading(true);
+        applyCachedSelectedThreadSnapshot(threadId);
         setSelectedThreadId(threadId);
         setMobileSidebarOpen(false);
       },
@@ -199,13 +208,16 @@ export function useThreadListPaneProperties(
       isCoreLoading,
       isGenerating,
       renderAgentFavicon,
+      applyCachedSelectedThreadSnapshot,
       selectedAgentDescriptor,
       selectedAgentLabel,
       selectedThreadId,
+      selectedThreadIdRef,
       setThreadName,
       setCollapsedArchivedProjectGroups,
       setCollapsedThreadProjectGroups,
       setIsArchivedThreadsOpen,
+      setIsSelectedThreadLoading,
       setMobileSidebarOpen,
       setSelectedThreadId,
       threadListState,

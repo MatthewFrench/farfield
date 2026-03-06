@@ -1,22 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
-  cancelAccountLogin: vi.fn(),
-  getAccount: vi.fn(),
-  getAccountRateLimits: vi.fn(),
-  getConfigRequirements: vi.fn(),
-  getConfigDefaults: vi.fn(),
   getHealth: vi.fn(),
   listApps: vi.fn(),
   listAgents: vi.fn(),
-  listCollaborationModes: vi.fn(),
   listExperimentalFeatures: vi.fn(),
   listMcpServers: vi.fn(),
-  listModels: vi.fn(),
   listSkills: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityAccountApi", () => ({
+  cancelAccountLogin: vi.fn(),
+  getAccount: vi.fn(),
+  getAccountRateLimits: vi.fn(),
   logoutAccount: vi.fn(),
-  reloadMcpServerConfig: vi.fn(),
   startAccountLogin: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCatalogApi", () => ({
+  listCollaborationModes: vi.fn(),
+  listModels: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityConfigurationApi", () => ({
+  getConfigRequirements: vi.fn(),
+  getConfigDefaults: vi.fn(),
+  reloadMcpServerConfig: vi.fn(),
 }));
 
 vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
@@ -84,20 +93,26 @@ import {
   cancelAccountLogin,
   getAccount,
   getAccountRateLimits,
-  getConfigDefaults,
-  getConfigRequirements,
+  logoutAccount,
+  startAccountLogin,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityAccountApi";
+import {
   getHealth,
   listAgents,
   listApps,
-  listCollaborationModes,
   listExperimentalFeatures,
   listMcpServers,
-  listModels,
   listSkills,
-  logoutAccount,
-  reloadMcpServerConfig,
-  startAccountLogin,
 } from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import {
+  listCollaborationModes,
+  listModels,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCatalogApi";
+import {
+  getConfigDefaults,
+  getConfigRequirements,
+  reloadMcpServerConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityConfigurationApi";
 import {
   detectExternalAgentConfig,
   importExternalAgentConfig,

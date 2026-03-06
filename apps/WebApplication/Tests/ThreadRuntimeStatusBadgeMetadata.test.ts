@@ -39,6 +39,17 @@ describe("ThreadRuntimeStatusBadgeMetadata", () => {
     expect(readThreadRuntimeStatusBadgeClasses(status)).toContain("text-amber-300");
   });
 
+  it("returns a pending-server-request title for synthetic pending statuses", () => {
+    expect(
+      readThreadRuntimeStatusBadgeTitle({
+        sequence: -1,
+        statusType: "active",
+        activeFlags: ["waitingOnApproval"],
+        receivedAtMilliseconds: 2_151,
+      }),
+    ).toBe("Runtime status inferred from pending server requests");
+  });
+
   it("returns active/idle/error metadata from status type", () => {
     expect(
       readThreadRuntimeStatusBadgeLabel({

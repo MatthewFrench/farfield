@@ -1,5 +1,5 @@
 import type { IpcFrame } from "@farfield/protocol";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -89,6 +89,10 @@ class InMemorySelectedThreadSnapshotCacheStore implements SelectedThreadSnapshot
     string,
     SelectedThreadSnapshotCacheRecord
   >();
+
+  public readCachedSnapshot(threadId: string): SelectedThreadSnapshotCacheRecord | null {
+    return this.snapshotByThreadIdentifier.get(threadId) ?? null;
+  }
 
   public async readSnapshot(threadId: string): Promise<SelectedThreadSnapshotCacheRecord | null> {
     return this.snapshotByThreadIdentifier.get(threadId) ?? null;
@@ -440,6 +444,77 @@ describe("useSelectedThreadLoaders", () => {
         buildBroadcastEvent("fresh-event-1"),
       ]);
     });
+  });
+
+  it("applies cached selected-thread snapshots synchronously when requested", async () => {
+    const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([]);
+    const selectedThreadSnapshotCacheStore = createSelectedThreadSnapshotCacheStore();
+    await selectedThreadSnapshotCacheStore.writeSnapshot({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", ["cached-turn-1"]),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("cached-event-1")],
+        nextSequence: 1,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: buildReadThreadSnapshot("thread-1", ["cached-turn-1"]),
+      includeTurnsUsedForRead: true,
+    });
+    const selectedThreadIdRef = { current: "thread-1" };
+    const modeSelectionStateResolver = new ModeSelectionStateResolver();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
+      current: null,
+    };
+
+    render(
+      <SelectedThreadLoadersHarness
+        threads={[buildThreadListItem("thread-1")]}
+        selectedAgentId="codex"
+        appDefaultModel="gpt-5.3-codex"
+        appDefaultReasoningEffort="medium"
+        selectedThreadIdRef={selectedThreadIdRef}
+        pendingThreadMaterializationCoordinator={new PendingThreadMaterializationCoordinator()}
+        conversationSyncSignatureBuilder={conversationSyncSignatureBuilder}
+        selectedThreadDataRefreshCoordinator={selectedThreadDataRefreshCoordinator}
+        selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
+        readThreadStateMerger={new ReadThreadStateMerger()}
+        chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={selectedThreadSnapshotCacheStore}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.apply-cache",
+        )}
+        onSnapshot={(snapshot) => {
+          snapshotReference.current = snapshot;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(snapshotReference.current).not.toBeNull();
+    });
+    const loadersSnapshot = readLoadersSnapshot(snapshotReference);
+
+    let didApplyCachedSnapshot = false;
+    void act(() => {
+      didApplyCachedSnapshot =
+        loadersSnapshot.loaders.applyCachedSelectedThreadSnapshot("thread-1");
+    });
+
+    expect(didApplyCachedSnapshot).toBe(true);
+    expect(snapshotReference.current?.streamEvents).toEqual([
+      buildBroadcastEvent("cached-event-1"),
+    ]);
+    expect(snapshotReference.current?.readThreadState?.thread.turns).toHaveLength(1);
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls).toHaveLength(0);
   });
 
   it("defaults includeReadThread to true when no options are provided", async () => {

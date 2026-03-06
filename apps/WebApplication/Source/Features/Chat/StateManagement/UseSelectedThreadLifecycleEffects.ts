@@ -27,6 +27,7 @@ export interface UseSelectedThreadLifecycleEffectsInput {
   loadSelectedThreadRef: MutableRefObject<
     ((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null
   >;
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   setLiveState: Dispatch<SetStateAction<ChatLiveStateResponse | null>>;
   setReadThreadState: Dispatch<SetStateAction<ChatReadThreadResponse | null>>;
@@ -128,6 +129,7 @@ export function useSelectedThreadLifecycleEffects(
     selectedThreadLoadTokenRef.current += 1;
     const loadToken = selectedThreadLoadTokenRef.current;
     const selectedThreadIdRef = input.selectedThreadIdRef;
+    selectedThreadIdRef.current = input.selectedThreadId;
 
     if (input.selectedThreadId === null || input.selectedThreadId.length === 0) {
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
@@ -138,11 +140,13 @@ export function useSelectedThreadLifecycleEffects(
       return;
     }
     const selectedThreadIdentifier = input.selectedThreadId;
-
-    input.setLiveState(null);
-    input.setReadThreadState(null);
-    input.setStreamEvents([]);
-    input.setIsSelectedThreadLoading(true);
+    const cachedSnapshotApplied = input.applyCachedSelectedThreadSnapshot(selectedThreadIdentifier);
+    if (!cachedSnapshotApplied) {
+      input.setLiveState(null);
+      input.setReadThreadState(null);
+      input.setStreamEvents([]);
+    }
+    input.setIsSelectedThreadLoading(!cachedSnapshotApplied);
 
     const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
     if (!loadSelectedThreadFunction) {
@@ -177,6 +181,7 @@ export function useSelectedThreadLifecycleEffects(
   }, [
     input.handleRuntimeRequestError,
     input.loadSelectedThreadRef,
+    input.applyCachedSelectedThreadSnapshot,
     input.selectedThreadId,
     input.selectedThreadIdRef,
     input.selectedThreadLoadTokenRef,

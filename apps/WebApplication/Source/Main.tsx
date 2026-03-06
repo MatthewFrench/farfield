@@ -3,8 +3,14 @@ import { createRoot } from "react-dom/client";
 import { z } from "zod";
 import { App } from "./App";
 import "./Index.css";
+import { reloadApplicationWindow } from "./Application/Boot/ApplicationWindowReloadOwner";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
 import { ServiceWorkerControllerChangeReloadOwner } from "./Application/Boot/ServiceWorkerControllerChangeReloadOwner";
+import {
+  ServiceWorkerReloadEligibilityOwner,
+  type WebShellVersionSnapshot,
+} from "./Application/Boot/ServiceWorkerReloadEligibilityOwner";
+import { getWebShellHealth } from "./Application/DataAccess/WebShellApi";
 import { ApplicationRouteStateMapper } from "./Application/DomainModel/ApplicationRouteStateMapper";
 import { reconcilePushSubscription } from "./Features/PushNotifications/DataAccess/PushClientApi";
 
@@ -218,6 +224,19 @@ function notifyServiceWorkerUpdateAvailable(): void {
   window.dispatchEvent(new Event(SERVICE_WORKER_UPDATE_EVENT_NAME));
 }
 
+async function readWebShellVersionSnapshot(): Promise<WebShellVersionSnapshot | null> {
+  try {
+    const healthResponse = await getWebShellHealth();
+    return {
+      buildId: healthResponse.buildId,
+      gitCommit: healthResponse.gitCommit,
+      serviceWorkerVersion: healthResponse.serviceWorkerVersion,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function reconcilePushSubscriptionOnStartup(): void {
   void reconcilePushSubscription().catch(() => {
     // Startup should continue even if push subscription reconciliation fails.
@@ -231,16 +250,29 @@ function installServiceWorkerStartupRegistration(): void {
     return;
   }
 
+  const initialWebShellVersionSnapshotPromise = readWebShellVersionSnapshot();
+
   window.addEventListener("load", () => {
     const serviceWorkerControllerChangeReloadOwner = new ServiceWorkerControllerChangeReloadOwner(
       serviceWorkerContainer.controller !== null,
     );
+    const serviceWorkerReloadEligibilityOwner = new ServiceWorkerReloadEligibilityOwner(null);
+    let hasPendingServiceWorkerUpdate = false;
+
+    void initialWebShellVersionSnapshotPromise.then((initialVersionSnapshot) => {
+      serviceWorkerReloadEligibilityOwner.setInitialVersionSnapshot(initialVersionSnapshot);
+    });
 
     void serviceWorkerContainer
       .register(SERVICE_WORKER_SCRIPT_PATH)
       .then((registration) => {
-        if (registration.waiting && serviceWorkerContainer.controller) {
+        const markPendingServiceWorkerUpdate = (): void => {
+          hasPendingServiceWorkerUpdate = true;
           notifyServiceWorkerUpdateAvailable();
+        };
+
+        if (registration.waiting && serviceWorkerContainer.controller) {
+          markPendingServiceWorkerUpdate();
         }
 
         registration.addEventListener("updatefound", () => {
@@ -251,19 +283,33 @@ function installServiceWorkerStartupRegistration(): void {
 
           installing.addEventListener("statechange", () => {
             if (installing.state === "installed" && serviceWorkerContainer.controller) {
-              notifyServiceWorkerUpdateAvailable();
+              markPendingServiceWorkerUpdate();
             }
           });
         });
 
         serviceWorkerContainer.addEventListener("controllerchange", () => {
-          const reloadDecision = serviceWorkerControllerChangeReloadOwner.readDecision({
-            reloadSuppressed: isServiceWorkerReloadSuppressed(),
-          });
-          if (!reloadDecision.shouldReload) {
-            return;
-          }
-          window.location.reload();
+          void (async () => {
+            const reloadDecision = serviceWorkerControllerChangeReloadOwner.readDecision({
+              reloadSuppressed: isServiceWorkerReloadSuppressed(),
+            });
+            if (!reloadDecision.shouldReload) {
+              return;
+            }
+
+            const currentVersionSnapshot = await readWebShellVersionSnapshot();
+            const shouldReload = serviceWorkerReloadEligibilityOwner.readShouldReload({
+              hasPendingUpdate: hasPendingServiceWorkerUpdate,
+              nextVersionSnapshot: currentVersionSnapshot,
+            });
+            serviceWorkerControllerChangeReloadOwner.completePendingReloadDecision(shouldReload);
+            if (!shouldReload) {
+              return;
+            }
+
+            publishUpdatingDevelopmentBootStatus();
+            reloadApplicationWindow();
+          })();
         });
 
         reconcilePushSubscriptionOnStartup();

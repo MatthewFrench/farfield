@@ -67,6 +67,7 @@ interface ShellCompositionFixture {
   ) => React.ReactNode;
   formatDateValue: (value: number | string | null | undefined) => string;
   loadCoreDataTracked: () => Promise<void>;
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   loadSelectedThreadTracked: (threadId: string) => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   buildActionRequestOptions: (actionName: string) => {
@@ -209,6 +210,7 @@ function createShellCompositionFixture(): ShellCompositionFixture {
     renderAgentFavicon: vi.fn(() => null),
     formatDateValue: vi.fn(() => "formatted"),
     loadCoreDataTracked: vi.fn(async (): Promise<void> => {}),
+    applyCachedSelectedThreadSnapshot: vi.fn((_threadId: string): boolean => false),
     loadSelectedThreadTracked: vi.fn(async (_threadId: string): Promise<void> => {}),
     refreshCoreDataAndSelectedThread: vi.fn(async (): Promise<void> => {}),
     buildActionRequestOptions: vi.fn((actionName: string) => ({
@@ -324,6 +326,7 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     renderAgentFavicon: properties.fixture.renderAgentFavicon,
     formatDateValue: properties.fixture.formatDateValue,
     loadCoreDataTracked: properties.fixture.loadCoreDataTracked,
+    applyCachedSelectedThreadSnapshot: properties.fixture.applyCachedSelectedThreadSnapshot,
     loadSelectedThreadTracked: properties.fixture.loadSelectedThreadTracked,
     refreshCoreDataAndSelectedThread: properties.fixture.refreshCoreDataAndSelectedThread,
     buildActionRequestOptions: properties.fixture.buildActionRequestOptions,
@@ -424,6 +427,7 @@ describe("useApplicationShellComposition", () => {
       expect.objectContaining({
         createNewThread: threadActionHandlersFixture.createNewThread,
         createThreadForSingleAgent: threadActionHandlersFixture.createThreadForSingleAgent,
+        applyCachedSelectedThreadSnapshot: fixture.applyCachedSelectedThreadSnapshot,
         archiveThread: threadActionHandlersFixture.runArchiveThread,
         forkThread: threadActionHandlersFixture.runForkThread,
         rollbackThread: threadActionHandlersFixture.runRollbackThread,
@@ -433,6 +437,9 @@ describe("useApplicationShellComposition", () => {
         startThreadReview: threadActionHandlersFixture.runStartThreadReview,
         setThreadName: threadActionHandlersFixture.runSetThreadName,
         unarchiveThread: threadActionHandlersFixture.runUnarchiveThread,
+        setIsSelectedThreadLoading:
+          runtimeHarnessSnapshot.applicationShellState.setIsSelectedThreadLoading,
+        selectedThreadIdRef: runtimeHarnessSnapshot.applicationShellState.selectedThreadIdRef,
         threadRuntimeStatusByThreadIdentifier:
           runtimeHarnessSnapshot.applicationShellState.threadRuntimeStatusByThreadIdentifier,
         formatDate: fixture.formatDateValue,
@@ -502,6 +509,9 @@ describe("useApplicationShellComposition", () => {
       "/workspace/example",
       "codex",
     );
+    runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onSelectThread(
+      "thread-select",
+    );
     runtimeHarnessSnapshot.shellComposition.threadListPaneProperties.onArchiveThread(
       "thread-archive",
     );
@@ -532,6 +542,10 @@ describe("useApplicationShellComposition", () => {
     expect(threadActionHandlersFixture.createNewThread).toHaveBeenCalledWith(
       "/workspace/example",
       "codex",
+    );
+    expect(fixture.applyCachedSelectedThreadSnapshot).toHaveBeenCalledWith("thread-select");
+    expect(runtimeHarnessSnapshot.applicationShellState.selectedThreadIdRef.current).toBe(
+      "thread-select",
     );
     expect(threadActionHandlersFixture.runArchiveThread).toHaveBeenCalledWith("thread-archive");
     expect(threadActionHandlersFixture.runForkThread).toHaveBeenCalledWith("thread-fork");

@@ -27,6 +27,7 @@ export interface UseApplicationRuntimeCompositionInput {
   applicationOwnerDependencies: ApplicationOwnerDependencies<CoreDataCapabilitySnapshot>;
   runtimeRequestHandlers: ApplicationRuntimeRequestHandlers;
   coreDataLoaders: CoreDataLoaders;
+  applyCachedSelectedThreadSnapshot: SelectedThreadLoaders["applyCachedSelectedThreadSnapshot"];
   loadSelectedThreadTracked: SelectedThreadLoaders["loadSelectedThreadTracked"];
   applySelectedThreadStreamDelta: SelectedThreadLoaders["applySelectedThreadStreamDelta"];
   streamEventCards: React.JSX.Element[];

@@ -196,6 +196,7 @@ import { ThreadDisplayNamePreferenceStore } from "../Source/Features/Threads/Dat
 interface RuntimeHarnessSnapshot {
   applicationShellState: ApplicationShellState;
   coreDataLoaders: CoreDataLoaders;
+  applyCachedSelectedThreadSnapshot: SelectedThreadLoaders["applyCachedSelectedThreadSnapshot"];
   loadSelectedThreadTracked: SelectedThreadLoaders["loadSelectedThreadTracked"];
   applySelectedThreadStreamDelta: SelectedThreadLoaders["applySelectedThreadStreamDelta"];
   runtimeRequestHandlers: ApplicationRuntimeRequestHandlers;
@@ -411,7 +412,11 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     handleRuntimeRequestError: runtimeRequestHandlers.handleRuntimeRequestError,
   });
 
-  const { loadSelectedThreadTracked, applySelectedThreadStreamDelta } = useSelectedThreadLoaders({
+  const {
+    applyCachedSelectedThreadSnapshot,
+    loadSelectedThreadTracked,
+    applySelectedThreadStreamDelta,
+  } = useSelectedThreadLoaders({
     threads: applicationShellState.threads,
     selectedAgentId: applicationShellState.selectedAgentId,
     agentsById: applicationDerivedState.agentsById,
@@ -454,6 +459,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     applicationOwnerDependencies,
     runtimeRequestHandlers,
     coreDataLoaders,
+    applyCachedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
     streamEventCards,
@@ -464,6 +470,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
   latestRuntimeHarnessSnapshot = {
     applicationShellState,
     coreDataLoaders,
+    applyCachedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
     runtimeRequestHandlers,

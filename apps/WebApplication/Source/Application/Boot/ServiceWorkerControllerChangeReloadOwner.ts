@@ -10,11 +10,13 @@ export interface ServiceWorkerControllerChangeReloadDecisionInput {
 export type ServiceWorkerControllerChangeReloadLifecyclePhase =
   | "awaiting-first-controller-adoption"
   | "ready-for-controller-change-reload"
+  | "reload-check-pending"
   | "reload-already-requested";
 
 export type ServiceWorkerControllerChangeReloadDecisionReason =
   | "first-controller-adoption"
   | "reload-suppressed"
+  | "reload-check-pending"
   | "reload-already-requested"
   | "reload-required";
 
@@ -27,6 +29,8 @@ const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_AWAITING_FIRST_CONTROLLER_ADOPTION:
   "awaiting-first-controller-adoption";
 const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD: ServiceWorkerControllerChangeReloadLifecyclePhase =
   "ready-for-controller-change-reload";
+const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_CHECK_PENDING: ServiceWorkerControllerChangeReloadLifecyclePhase =
+  "reload-check-pending";
 const SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED: ServiceWorkerControllerChangeReloadLifecyclePhase =
   "reload-already-requested";
 
@@ -39,6 +43,11 @@ const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_SUPPRESSED: ServiceWorkerCo
   {
     shouldReload: false,
     reason: "reload-suppressed",
+  };
+const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_PENDING: ServiceWorkerControllerChangeReloadDecision =
+  {
+    shouldReload: false,
+    reason: "reload-check-pending",
   };
 const SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_ALREADY_REQUESTED: ServiceWorkerControllerChangeReloadDecision =
   {
@@ -76,11 +85,24 @@ export class ServiceWorkerControllerChangeReloadOwner {
       return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_SUPPRESSED;
     }
 
+    if (this.lifecyclePhase === SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_CHECK_PENDING) {
+      return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_PENDING;
+    }
+
     if (this.lifecyclePhase === SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED) {
       return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_SKIP_ALREADY_REQUESTED;
     }
 
-    this.lifecyclePhase = SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED;
+    this.lifecyclePhase = SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_CHECK_PENDING;
     return SERVICE_WORKER_CONTROLLER_RELOAD_DECISION_TRIGGER_RELOAD;
+  }
+
+  public completePendingReloadDecision(shouldReload: boolean): void {
+    if (this.lifecyclePhase !== SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_CHECK_PENDING) {
+      return;
+    }
+    this.lifecyclePhase = shouldReload
+      ? SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_RELOAD_ALREADY_REQUESTED
+      : SERVICE_WORKER_CONTROLLER_RELOAD_PHASE_READY_FOR_CONTROLLER_CHANGE_RELOAD;
   }
 }

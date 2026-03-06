@@ -56,6 +56,7 @@ export interface UseApplicationShellCompositionInput {
   renderAgentFavicon: ThreadListPaneProperties["renderAgentFavicon"];
   formatDateValue: ThreadListPaneProperties["formatDate"];
   loadCoreDataTracked: () => Promise<void>;
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   loadSelectedThreadTracked: (threadId: string) => Promise<void>;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   buildActionRequestOptions: (actionName: string) => {
@@ -180,7 +181,10 @@ function buildThreadListPanePropertiesInput(
     createThreadForSingleAgent: threadActionHandlers.createThreadForSingleAgent,
     createNewThread: threadActionHandlers.createNewThread,
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
+    selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
+    setIsSelectedThreadLoading: applicationShellState.setIsSelectedThreadLoading,
     setMobileSidebarOpen: applicationShellState.setMobileSidebarOpen,
+    applyCachedSelectedThreadSnapshot: input.applyCachedSelectedThreadSnapshot,
     archiveThread: threadActionHandlers.runArchiveThread,
     forkThread: threadActionHandlers.runForkThread,
     rollbackThread: threadActionHandlers.runRollbackThread,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ServiceWorkerControllerChangeReloadOwner } from "@/Application/Boot/ServiceWorkerControllerChangeReloadOwner";
 
 describe("ServiceWorkerControllerChangeReloadOwner", () => {
-  it("skips reload on first controller adoption and reloads on later controller changes", () => {
+  it("skips reload on first controller adoption and allows verification on later controller changes", () => {
     const owner = new ServiceWorkerControllerChangeReloadOwner(false);
 
     const firstDecision = owner.readDecision({ reloadSuppressed: false });
@@ -15,15 +15,23 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
 
     const thirdDecision = owner.readDecision({ reloadSuppressed: false });
     expect(thirdDecision.shouldReload).toBe(false);
-    expect(thirdDecision.reason).toBe("reload-already-requested");
+    expect(thirdDecision.reason).toBe("reload-check-pending");
+
+    owner.completePendingReloadDecision(false);
+
+    const fourthDecision = owner.readDecision({ reloadSuppressed: false });
+    expect(fourthDecision.shouldReload).toBe(true);
+    expect(fourthDecision.reason).toBe("reload-required");
   });
 
-  it("reloads immediately when a controller already exists and no suppression is active", () => {
+  it("marks reload as consumed only after verification confirms a reload", () => {
     const owner = new ServiceWorkerControllerChangeReloadOwner(true);
 
     const firstDecision = owner.readDecision({ reloadSuppressed: false });
     expect(firstDecision.shouldReload).toBe(true);
     expect(firstDecision.reason).toBe("reload-required");
+
+    owner.completePendingReloadDecision(true);
 
     const secondDecision = owner.readDecision({ reloadSuppressed: false });
     expect(secondDecision.shouldReload).toBe(false);
@@ -42,6 +50,8 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
     });
     expect(unsuppressedDecision.shouldReload).toBe(true);
     expect(unsuppressedDecision.reason).toBe("reload-required");
+
+    owner.completePendingReloadDecision(true);
   });
 
   it("does not consume the one reload while suppression remains active across rapid controller changes", () => {
@@ -68,6 +78,8 @@ describe("ServiceWorkerControllerChangeReloadOwner", () => {
     });
     expect(unsuppressedDecision.shouldReload).toBe(true);
     expect(unsuppressedDecision.reason).toBe("reload-required");
+
+    owner.completePendingReloadDecision(true);
   });
 
   it("keeps first-adoption skip deterministic even when suppression is active during adoption", () => {

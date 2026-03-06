@@ -246,6 +246,10 @@ export function useApplicationDerivedState(
     [conversationState, pendingUserInputRequestSelector],
   );
 
+  const immediateTurns = conversationState?.turns ?? [];
+  const lastTurn = immediateTurns[immediateTurns.length - 1];
+  const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
+
   const deferredConversationState = useDeferredValue(conversationState);
 
   const runningTerminalCount = useMemo(
@@ -377,16 +381,14 @@ export function useApplicationDerivedState(
     [appDefaultModel, modelOptions],
   );
 
-  const turns = deferredConversationState?.turns ?? [];
-  const lastTurn = turns[turns.length - 1];
-  const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
+  const turns = immediateTurns;
 
   const { threadListState, chatSurfaceState, errorBannerDetails } = readSurfaceDerivation({
     selectedThreadId,
     isCoreLoading,
     isSelectedThreadLoading,
     threadCount: threads.length,
-    turnCount: turns.length,
+    turnCount: immediateTurns.length,
     errorMessage,
   });
 

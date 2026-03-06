@@ -17,6 +17,8 @@ const THREAD_RUNTIME_STATUS_BADGE_CLASSES_NOT_LOADED =
 const THREAD_RUNTIME_STATUS_BADGE_CLASSES_SYSTEM_ERROR =
   "bg-rose-500/15 text-rose-300 border border-rose-400/30";
 const THREAD_RUNTIME_STATUS_TITLE_NOT_OBSERVED = "Runtime status has not been observed yet";
+const THREAD_RUNTIME_STATUS_TITLE_PENDING_SERVER_REQUEST =
+  "Runtime status inferred from pending server requests";
 
 function isAwaitingApproval(status: ThreadRuntimeStatusSnapshot): boolean {
   return status.activeFlags.includes("waitingOnApproval");
@@ -84,6 +86,9 @@ export function readThreadRuntimeStatusBadgeTitle(
 ): string {
   if (status === undefined) {
     return THREAD_RUNTIME_STATUS_TITLE_NOT_OBSERVED;
+  }
+  if (status.sequence < 0) {
+    return THREAD_RUNTIME_STATUS_TITLE_PENDING_SERVER_REQUEST;
   }
   return `Runtime status at sequence ${String(status.sequence)}`;
 }

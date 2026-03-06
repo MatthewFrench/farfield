@@ -1,4 +1,5 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, startTransition } from "react";
+import { type SelectedThreadSnapshotCacheRecord } from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import {
@@ -30,6 +31,8 @@ export interface ApplySnapshotsToStateInput {
   includeTurnsUsedForRead: boolean;
 }
 
+type SnapshotStateApplicationMode = "immediate" | "transition";
+
 export interface SelectedThreadSnapshotStateOwnerDependencies {
   appDefaultModel: string;
   appDefaultReasoningEffort: string;
@@ -41,6 +44,7 @@ export interface SelectedThreadSnapshotStateOwnerDependencies {
   setLiveState: Dispatch<SetStateAction<LiveStateResponse | null>>;
   setReadThreadState: Dispatch<SetStateAction<ReadThreadResponse | null>>;
   setStreamEvents: Dispatch<SetStateAction<StreamEventsResponse["events"]>>;
+  persistSelectedThreadSnapshot: (snapshot: SelectedThreadSnapshotCacheRecord) => void;
 }
 
 function normalizeOptionalThreadDisplayName(value: string | null | undefined): string | undefined {
@@ -85,6 +89,7 @@ function hasTurnsInSelectedThreadSnapshots(
 export class SelectedThreadSnapshotStateOwner {
   private deps: SelectedThreadSnapshotStateOwnerDependencies;
   private readonly streamEventsSinceSequenceByThreadId = new Map<string, number>();
+  private readonly latestSnapshotByThreadId = new Map<string, SelectedThreadSnapshotCacheRecord>();
   private lastAppliedThreadId: string | null = null;
 
   public constructor(dependencies: SelectedThreadSnapshotStateOwnerDependencies) {
@@ -103,7 +108,10 @@ export class SelectedThreadSnapshotStateOwner {
     return Boolean(signal?.aborted) || this.deps.selectedThreadIdRef.current !== threadId;
   }
 
-  public applySnapshots(snapshotInput: ApplySnapshotsToStateInput): void {
+  public applySnapshots(
+    snapshotInput: ApplySnapshotsToStateInput,
+    mode: SnapshotStateApplicationMode = "immediate",
+  ): void {
     const expectedSinceSequence = this.readStreamEventsSinceSequenceForRead(snapshotInput.threadId);
     const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
       snapshotInput.liveStateSnapshot,
@@ -125,10 +133,101 @@ export class SelectedThreadSnapshotStateOwner {
       streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
       streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
     });
+    const persistedSnapshot = this.buildPersistedSnapshot(snapshotInput);
+    this.latestSnapshotByThreadId.set(snapshotInput.threadId, persistedSnapshot);
     this.writeStreamEventsSinceSequence(snapshotInput.threadId, nextSinceSequence);
     this.lastAppliedThreadId = snapshotInput.threadId;
+    this.deps.persistSelectedThreadSnapshot(persistedSnapshot);
+    this.applySnapshotState(snapshotInput, expectedSinceSequence, mode);
+  }
 
-    startTransition(() => {
+  public applySelectedThreadStreamDelta(
+    streamDeltaInput: ApplySelectedThreadStreamDeltaInput,
+  ): void {
+    if (this.deps.selectedThreadIdRef.current !== streamDeltaInput.threadId) {
+      return;
+    }
+
+    this.applySnapshots(
+      {
+        threadId: streamDeltaInput.threadId,
+        liveStateSnapshot: streamDeltaInput.liveStateSnapshot,
+        streamEventsSnapshot: streamDeltaInput.streamEventsSnapshot,
+        streamEventsSinceSequenceUsed: streamDeltaInput.streamEventsSinceSequenceUsed,
+        readThreadSnapshot: null,
+        includeTurnsUsedForRead: false,
+      },
+      "transition",
+    );
+  }
+
+  private readStreamEventsSinceSequenceForRead(threadId: string): number | null {
+    if (this.lastAppliedThreadId !== threadId) {
+      return null;
+    }
+    return this.streamEventsSinceSequenceByThreadId.get(threadId) ?? null;
+  }
+
+  private writeStreamEventsSinceSequence(threadId: string, sinceSequence: number | null): void {
+    if (sinceSequence === null) {
+      this.streamEventsSinceSequenceByThreadId.delete(threadId);
+      return;
+    }
+    this.streamEventsSinceSequenceByThreadId.set(threadId, sinceSequence);
+  }
+
+  private resolveNextStreamEventsSinceSequence(input: {
+    expectedSinceSequence: number | null;
+    streamEventsSnapshot: StreamEventsResponse;
+    streamEventsSinceSequenceUsed: number | null;
+  }): number | null {
+    const { expectedSinceSequence, streamEventsSnapshot, streamEventsSinceSequenceUsed } = input;
+    if (
+      streamEventsSinceSequenceUsed !== null &&
+      !streamEventsSnapshot.resetRequired &&
+      streamEventsSinceSequenceUsed !== expectedSinceSequence
+    ) {
+      return expectedSinceSequence;
+    }
+
+    if (streamEventsSnapshot.nextSequence === 0) {
+      return null;
+    }
+
+    if (streamEventsSnapshot.resetRequired || streamEventsSnapshot.events.length > 0) {
+      return streamEventsSnapshot.nextSequence - 1;
+    }
+
+    return expectedSinceSequence;
+  }
+
+  private buildPersistedSnapshot(
+    snapshotInput: ApplySnapshotsToStateInput,
+  ): SelectedThreadSnapshotCacheRecord {
+    const existingSnapshot = this.latestSnapshotByThreadId.get(snapshotInput.threadId) ?? null;
+    const readThreadSnapshot =
+      snapshotInput.readThreadSnapshot ?? existingSnapshot?.readThreadSnapshot ?? null;
+    const includeTurnsUsedForRead =
+      snapshotInput.readThreadSnapshot !== null
+        ? snapshotInput.includeTurnsUsedForRead
+        : (existingSnapshot?.includeTurnsUsedForRead ?? false);
+
+    return {
+      threadId: snapshotInput.threadId,
+      liveStateSnapshot: snapshotInput.liveStateSnapshot,
+      streamEventsSnapshot: snapshotInput.streamEventsSnapshot,
+      streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
+      readThreadSnapshot,
+      includeTurnsUsedForRead,
+    };
+  }
+
+  private applySnapshotState(
+    snapshotInput: ApplySnapshotsToStateInput,
+    expectedSinceSequence: number | null,
+    mode: SnapshotStateApplicationMode,
+  ): void {
+    const applyStateUpdates = (): void => {
       this.deps.setLiveState((previousLiveState) => {
         if (
           this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
@@ -183,63 +282,12 @@ export class SelectedThreadSnapshotStateOwner {
           expectedSinceSequence,
         }),
       );
-    });
-  }
+    };
 
-  public applySelectedThreadStreamDelta(
-    streamDeltaInput: ApplySelectedThreadStreamDeltaInput,
-  ): void {
-    if (this.deps.selectedThreadIdRef.current !== streamDeltaInput.threadId) {
+    if (mode === "transition") {
+      startTransition(applyStateUpdates);
       return;
     }
-
-    this.applySnapshots({
-      threadId: streamDeltaInput.threadId,
-      liveStateSnapshot: streamDeltaInput.liveStateSnapshot,
-      streamEventsSnapshot: streamDeltaInput.streamEventsSnapshot,
-      streamEventsSinceSequenceUsed: streamDeltaInput.streamEventsSinceSequenceUsed,
-      readThreadSnapshot: null,
-      includeTurnsUsedForRead: false,
-    });
-  }
-
-  private readStreamEventsSinceSequenceForRead(threadId: string): number | null {
-    if (this.lastAppliedThreadId !== threadId) {
-      return null;
-    }
-    return this.streamEventsSinceSequenceByThreadId.get(threadId) ?? null;
-  }
-
-  private writeStreamEventsSinceSequence(threadId: string, sinceSequence: number | null): void {
-    if (sinceSequence === null) {
-      this.streamEventsSinceSequenceByThreadId.delete(threadId);
-      return;
-    }
-    this.streamEventsSinceSequenceByThreadId.set(threadId, sinceSequence);
-  }
-
-  private resolveNextStreamEventsSinceSequence(input: {
-    expectedSinceSequence: number | null;
-    streamEventsSnapshot: StreamEventsResponse;
-    streamEventsSinceSequenceUsed: number | null;
-  }): number | null {
-    const { expectedSinceSequence, streamEventsSnapshot, streamEventsSinceSequenceUsed } = input;
-    if (
-      streamEventsSinceSequenceUsed !== null &&
-      !streamEventsSnapshot.resetRequired &&
-      streamEventsSinceSequenceUsed !== expectedSinceSequence
-    ) {
-      return expectedSinceSequence;
-    }
-
-    if (streamEventsSnapshot.nextSequence === 0) {
-      return null;
-    }
-
-    if (streamEventsSnapshot.resetRequired || streamEventsSnapshot.events.length > 0) {
-      return streamEventsSnapshot.nextSequence - 1;
-    }
-
-    return expectedSinceSequence;
+    applyStateUpdates();
   }
 }

@@ -198,6 +198,7 @@ export function buildSelectedThreadLifecycleEffectsInput(
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
+    applyCachedSelectedThreadSnapshot: context.input.applyCachedSelectedThreadSnapshot,
     selectedThreadRefreshConcurrencyCoordinator:
       applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
     setLiveState: applicationShellState.setLiveState,
@@ -446,6 +447,7 @@ export function buildApplicationSynchronizationEffectsInput(
 }
 
 interface BuildApplicationShellCompositionInputDependencies {
+  applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   refreshCoreDataAndSelectedThread: () => Promise<void>;
   pushFeatureComposition: ApplicationPushFeatureComposition;
   chatFeatureComposition: ApplicationChatFeatureComposition;
@@ -468,6 +470,7 @@ export function buildApplicationShellCompositionInput(
     formatDateValue: input.formatDateValue,
     loadCoreDataTracked: coreDataLoaders.loadCoreDataTracked,
     loadSelectedThreadTracked: input.loadSelectedThreadTracked,
+    applyCachedSelectedThreadSnapshot: dependencies.applyCachedSelectedThreadSnapshot,
     refreshCoreDataAndSelectedThread: dependencies.refreshCoreDataAndSelectedThread,
     buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
     reportTrackedUserInterfaceError: runtimeRequestHandlers.reportTrackedUserInterfaceError,

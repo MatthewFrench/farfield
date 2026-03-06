@@ -6,6 +6,7 @@ import {
   type ChatReadThreadResponse,
   type ChatStreamEventsResponse,
 } from "@/Features/Chat/DataAccess/ChatServerClient";
+import { type SelectedThreadSnapshotCacheRecord } from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
 import { ReadThreadStateMerger } from "@/Features/Chat/StateManagement/ReadThreadStateMerger";
@@ -22,6 +23,7 @@ interface SnapshotOwnerHarness {
   selectedThreadIdRef: MutableRefObject<string | null>;
   readStreamEvents: () => ChatStreamEventsResponse["events"];
   readPersistedThreadDisplayName: () => string | null;
+  readPersistedSnapshots: () => SelectedThreadSnapshotCacheRecord[];
 }
 
 const originalLocalStorage = window.localStorage;
@@ -152,6 +154,7 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
   let liveState: ChatLiveStateResponse | null = null;
   let readThreadState: ChatReadThreadResponse | null = null;
   let streamEvents: ChatStreamEventsResponse["events"] = [];
+  const persistedSnapshots: SelectedThreadSnapshotCacheRecord[] = [];
 
   const threadDisplayNamePreferenceStore = new ThreadDisplayNamePreferenceStore(
     `test.selected-thread-snapshot.display-name.${initialSelectedThreadId}`,
@@ -187,6 +190,9 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
         streamEvents = nextState;
       },
     ),
+    persistSelectedThreadSnapshot: (snapshot) => {
+      persistedSnapshots.push(snapshot);
+    },
   });
 
   return {
@@ -195,6 +201,7 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
     readStreamEvents: () => streamEvents,
     readPersistedThreadDisplayName: () =>
       threadDisplayNamePreferenceStore.readThreadDisplayName(initialSelectedThreadId),
+    readPersistedSnapshots: () => persistedSnapshots,
   };
 }
 
@@ -300,5 +307,54 @@ describe("SelectedThreadSnapshotStateOwner", () => {
     });
 
     expect(harness.readPersistedThreadDisplayName()).toBe("Configure Caddy for Farfield site");
+  });
+
+  it("persists merged selected-thread snapshots on delta-only updates", () => {
+    const harness = createHarness("thread-1");
+
+    harness.owner.applySnapshots({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Initial title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("event-1")],
+        nextSequence: 2,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: {
+        ok: true,
+        agentId: "codex",
+        thread: {
+          ...buildConversationState("thread-1"),
+          turns: [
+            {
+              id: "turn-1",
+              status: "completed",
+              items: [],
+            },
+          ],
+        },
+      },
+      includeTurnsUsedForRead: true,
+    });
+
+    harness.owner.applySelectedThreadStreamDelta({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Updated title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("event-2")],
+        nextSequence: 3,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: 1,
+    });
+
+    const latestPersistedSnapshot = harness.readPersistedSnapshots().at(-1);
+    expect(latestPersistedSnapshot?.readThreadSnapshot?.thread.turns).toHaveLength(1);
+    expect(latestPersistedSnapshot?.streamEventsSnapshot.events).toEqual([
+      buildBroadcastEvent("event-2"),
+    ]);
   });
 });
