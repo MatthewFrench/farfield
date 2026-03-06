@@ -562,11 +562,11 @@ describe("useApplicationShellViewProperties", () => {
 
     headerProperties.onOpenMobileSidebar();
     expect(fixture.setMobileSidebarOpenSpy).toHaveBeenCalledWith(true);
-    expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("chat");
+    expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
 
     headerProperties.onOpenDesktopSidebar();
     expect(fixture.setDesktopSidebarOpenSpy).toHaveBeenCalledWith(true);
-    expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("chat");
+    expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
 
     settingsProperties.onRefreshData();
     expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);

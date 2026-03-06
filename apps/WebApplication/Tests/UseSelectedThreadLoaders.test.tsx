@@ -154,6 +154,8 @@ function buildThreadListItem(threadId: string): ThreadListItem {
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_000,
     agentId: "codex",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   };
 }
 

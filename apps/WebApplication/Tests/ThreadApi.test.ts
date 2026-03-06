@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("ThreadApi", () => {
-  it("maps unread and project-removal signals to strict thread contracts", async () => {
+  it("parses projected Farfield thread-list items", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
@@ -39,14 +39,16 @@ describe("ThreadApi", () => {
           {
             id: "thread_1",
             preview: "hello",
+            displayName: "Configure Caddy",
+            lastUserMessage: "Update the reverse proxy config",
+            latestActivityIsUserMessage: true,
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             hasUnreadTurn: true,
             isLoadedInMemory: true,
-            projectState: "removed",
+            isProjectRemoved: true,
           },
         ],
         nextCursor: null,
@@ -55,12 +57,15 @@ describe("ThreadApi", () => {
 
     const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
 
+    expect(result.data[0]?.displayName).toBe("Configure Caddy");
+    expect(result.data[0]?.lastUserMessage).toBe("Update the reverse proxy config");
+    expect(result.data[0]?.latestActivityIsUserMessage).toBe(true);
     expect(result.data[0]?.hasUnreadTurn).toBe(true);
     expect(result.data[0]?.isLoadedInMemory).toBe(true);
     expect(result.data[0]?.isProjectRemoved).toBe(true);
   });
 
-  it("maps threadName and title wire fields to displayName", async () => {
+  it("rejects raw adapter name fields in thread-list payloads", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
@@ -72,7 +77,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
           },
           {
@@ -82,7 +86,6 @@ describe("ThreadApi", () => {
             createdAt: 125,
             updatedAt: 126,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
           },
         ],
@@ -90,13 +93,10 @@ describe("ThreadApi", () => {
       }),
     );
 
-    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
-
-    expect(result.data[0]?.displayName).toBe("Name from threadName");
-    expect(result.data[1]?.displayName).toBe("Name from title");
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/threadName|title/);
   });
 
-  it("maps lastUserMessage and latest-activity ownership from turns", async () => {
+  it("rejects raw turn payloads in thread-list responses", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
@@ -107,7 +107,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             turns: [
               {
@@ -143,7 +142,6 @@ describe("ThreadApi", () => {
             createdAt: 130,
             updatedAt: 131,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             turns: [
               {
@@ -168,45 +166,29 @@ describe("ThreadApi", () => {
       }),
     );
 
-    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
-
-    expect(result.data[0]?.lastUserMessage).toBe("latest user ask");
-    expect(result.data[0]?.latestActivityIsUserMessage).toBe(true);
-    expect(result.data[1]?.lastUserMessage).toBe("user question");
-    expect(result.data[1]?.latestActivityIsUserMessage).toBe(false);
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/turns/);
   });
 
-  it("rejects malformed userMessage turn items in thread list payloads", async () => {
+  it("rejects raw adapter project-removal fields in thread-list payloads", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
         data: [
           {
-            id: "thread_bad_user_message",
+            id: "thread_project_removed",
             preview: "preview",
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
-            turns: [
-              {
-                id: "turn_1",
-                items: [
-                  {
-                    id: "item_1",
-                    type: "userMessage",
-                  },
-                ],
-              },
-            ],
+            projectRemoved: true,
           },
         ],
         nextCursor: null,
       }),
     );
 
-    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/content/);
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/projectRemoved/);
   });
 
   it("rejects thread list payloads when hasUnreadTurn is not a boolean", async () => {
@@ -220,7 +202,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             hasUnreadTurn: "yes",
           },
@@ -243,7 +224,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             isLoadedInMemory: "yes",
           },
@@ -255,7 +235,7 @@ describe("ThreadApi", () => {
     await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(/isLoadedInMemory/);
   });
 
-  it("rejects thread list payloads when projectState is invalid", async () => {
+  it("rejects unexpected project-state fields in thread-list payloads", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
@@ -266,7 +246,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
             projectState: "deleted",
           },
@@ -289,7 +268,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
           },
         ],
@@ -327,7 +305,6 @@ describe("ThreadApi", () => {
             createdAt: 123,
             updatedAt: 124,
             cwd: "/tmp/workspace",
-            source: "opencode",
             agentId: "codex",
           },
         ],
@@ -354,7 +331,7 @@ describe("ThreadApi", () => {
     });
   });
 
-  it("treats removed and projectRemoved wire flags as project-removal signals", async () => {
+  it("rejects legacy removal flags in thread-list payloads", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
         ok: true,
@@ -366,7 +343,6 @@ describe("ThreadApi", () => {
             updatedAt: 11,
             cwd: "/tmp/workspace",
             agentId: "codex",
-            source: "opencode",
             removed: true,
           },
           {
@@ -376,7 +352,6 @@ describe("ThreadApi", () => {
             updatedAt: 13,
             cwd: "/tmp/workspace",
             agentId: "codex",
-            source: "opencode",
             projectRemoved: true,
           },
           {
@@ -386,7 +361,6 @@ describe("ThreadApi", () => {
             updatedAt: 15,
             cwd: "/tmp/workspace",
             agentId: "codex",
-            source: "opencode",
             projectState: "active",
           },
         ],
@@ -394,11 +368,9 @@ describe("ThreadApi", () => {
       }),
     );
 
-    const result = await listThreads(DEFAULT_LIST_THREADS_OPTIONS);
-
-    expect(result.data[0]?.isProjectRemoved).toBe(true);
-    expect(result.data[1]?.isProjectRemoved).toBe(true);
-    expect(result.data[2]?.isProjectRemoved).toBe(false);
+    await expect(listThreads(DEFAULT_LIST_THREADS_OPTIONS)).rejects.toThrow(
+      /removed|projectRemoved|projectState/,
+    );
   });
 
   it("posts archive and unarchive mutations through encoded thread member routes", async () => {

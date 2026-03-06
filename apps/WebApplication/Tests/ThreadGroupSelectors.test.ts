@@ -16,9 +16,6 @@ interface ThreadFixtureInput {
   path?: string | null;
   hasUnreadTurn?: boolean | null;
   latestActivityIsUserMessage?: boolean;
-  removed?: boolean;
-  projectRemoved?: boolean;
-  projectState?: "active" | "removed";
   isProjectRemoved?: boolean;
   agentId?: ThreadListItem["agentId"];
 }
@@ -43,12 +40,9 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
     updatedAt: input.updatedAt ?? 100,
     cwd: input.cwd,
     path: input.path,
-    hasUnreadTurn: input.hasUnreadTurn,
+    hasUnreadTurn: input.hasUnreadTurn ?? null,
     latestActivityIsUserMessage: input.latestActivityIsUserMessage,
-    removed: input.removed,
-    projectRemoved: input.projectRemoved,
-    projectState: input.projectState,
-    isProjectRemoved: input.isProjectRemoved,
+    isProjectRemoved: input.isProjectRemoved ?? false,
     agentId: input.agentId ?? "codex",
   };
 }
@@ -198,7 +192,7 @@ describe("ThreadGroupSelectors", () => {
         path: "C:/workspace/alpha////",
         updatedAt: 15,
         createdAt: 7,
-        projectState: "removed",
+        isProjectRemoved: true,
       }),
       buildThread({
         id: "thread-beta",

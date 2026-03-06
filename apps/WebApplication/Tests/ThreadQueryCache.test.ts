@@ -14,6 +14,8 @@ function buildThreadListResponse(threadIdentifier: string): ThreadListResponse {
         cwd: "/tmp/thread-query-cache",
         path: "/tmp/thread-query-cache",
         agentId: "codex",
+        hasUnreadTurn: null,
+        isProjectRemoved: false,
       },
     ],
     nextCursor: null,

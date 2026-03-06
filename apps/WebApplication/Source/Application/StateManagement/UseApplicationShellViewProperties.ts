@@ -276,11 +276,7 @@ function invokeAsyncOwnerAction(action: AsyncOwnerAction): void {
   void action();
 }
 
-function openSidebarWithChatTab(
-  setActiveTab: UseApplicationShellViewPropertiesInput["setActiveTab"],
-  setSidebarOpen: (nextOpen: boolean) => void,
-): void {
-  setActiveTab(CHAT_TAB);
+function openSidebar(setSidebarOpen: (nextOpen: boolean) => void): void {
   setSidebarOpen(SIDEBAR_OPEN_STATE);
 }
 
@@ -356,10 +352,10 @@ function buildApplicationHeaderBarProperties(
     runtimeWarningSummary: input.threadSidebarRuntimeSummary.warning,
     runtimeModelRerouteSummary: input.threadSidebarRuntimeSummary.modelReroute,
     onOpenMobileSidebar: () => {
-      openSidebarWithChatTab(input.setActiveTab, input.setMobileSidebarOpen);
+      openSidebar(input.setMobileSidebarOpen);
     },
     onOpenDesktopSidebar: () => {
-      openSidebarWithChatTab(input.setActiveTab, input.setDesktopSidebarOpen);
+      openSidebar(input.setDesktopSidebarOpen);
     },
     onToggleSettingsTab: () => {
       input.setActiveTab(getNextActiveTabWhenTogglingSettings(input.activeTab));

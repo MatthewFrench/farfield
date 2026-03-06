@@ -1,67 +1,17 @@
+import {
+  FarfieldThreadListItemSchema,
+  FarfieldThreadListResponseSchema,
+  FarfieldThreadListSyncMetadataSchema,
+} from "@farfield/protocol";
 import { z } from "zod";
-import { type AgentId, AgentIdSchema } from "@/Shared/Contracts/ApiContracts";
 
-export interface ThreadListItem {
-  id: string;
-  preview: string;
-  displayName?: string | undefined;
-  lastUserMessage?: string | undefined;
-  latestActivityIsUserMessage?: boolean | undefined;
-  createdAt: number;
-  updatedAt: number;
-  cwd?: string | undefined;
-  path?: string | null | undefined;
-  agentId: AgentId;
-  source?: string | undefined;
-  removed?: boolean | undefined;
-  projectRemoved?: boolean | undefined;
-  projectState?: "active" | "removed" | undefined;
-  isProjectRemoved?: boolean | undefined;
-  hasUnreadTurn?: boolean | null | undefined;
-  isLoadedInMemory?: boolean | undefined;
-}
+export const ThreadListItemSchema = FarfieldThreadListItemSchema;
+export type ThreadListItem = z.infer<typeof ThreadListItemSchema>;
 
-export const ThreadListItemSchema = z
-  .object({
-    id: z.string().min(1),
-    preview: z.string(),
-    displayName: z.string().optional(),
-    lastUserMessage: z.string().optional(),
-    latestActivityIsUserMessage: z.boolean().optional(),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-    cwd: z.string().optional(),
-    path: z.string().nullable().optional(),
-    agentId: AgentIdSchema,
-    source: z.string().optional(),
-    removed: z.boolean().optional(),
-    projectRemoved: z.boolean().optional(),
-    projectState: z.enum(["active", "removed"]).optional(),
-    isProjectRemoved: z.boolean().optional(),
-    hasUnreadTurn: z.boolean().nullable().optional(),
-    isLoadedInMemory: z.boolean().optional(),
-  })
-  .strict();
-
-export const ThreadListSyncMetadataSchema = z
-  .object({
-    mode: z.enum(["full", "delta"]),
-    sinceUpdatedAt: z.number().int().nonnegative().nullable(),
-    snapshotUpdatedAt: z.number().int().nonnegative(),
-  })
-  .strict();
+export const ThreadListSyncMetadataSchema = FarfieldThreadListSyncMetadataSchema;
 export type ThreadListSyncMetadata = z.infer<typeof ThreadListSyncMetadataSchema>;
 
-export const ThreadListResponseSchema = z
-  .object({
-    data: z.array(ThreadListItemSchema),
-    nextCursor: z.string().nullable(),
-    pages: z.number().int().nonnegative().optional(),
-    truncated: z.boolean().optional(),
-    orderedThreadIds: z.array(z.string().min(1)).optional(),
-    sync: ThreadListSyncMetadataSchema.optional(),
-  })
-  .strict();
+export const ThreadListResponseSchema = FarfieldThreadListResponseSchema;
 export type ThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
 
 export interface ThreadProjectGroup {

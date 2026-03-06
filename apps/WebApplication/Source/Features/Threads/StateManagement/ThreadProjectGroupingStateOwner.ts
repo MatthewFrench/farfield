@@ -36,7 +36,6 @@ export interface ThreadProjectGroupingComputationStats {
 const PROJECT_KEY_PREFIX = "project:";
 const UNKNOWN_PROJECT_KEY = `${PROJECT_KEY_PREFIX}unknown`;
 const UNKNOWN_PROJECT_LABEL = "No project";
-const REMOVED_PROJECT_STATE = "removed";
 const WINDOWS_PATH_SEPARATOR = "\\";
 const PROJECT_PATH_SEPARATOR = "/";
 const TRAILING_PROJECT_PATH_SEPARATOR_PATTERN = /\/+$/;
@@ -118,14 +117,7 @@ function buildProjectGroupLabel(projectPath: string | null): string {
 }
 
 function readThreadProjectRemovedState(thread: ThreadListItem): boolean {
-  if (thread.isProjectRemoved !== undefined) {
-    return thread.isProjectRemoved;
-  }
-  return (
-    thread.projectRemoved === true ||
-    thread.removed === true ||
-    thread.projectState === REMOVED_PROJECT_STATE
-  );
+  return thread.isProjectRemoved === true;
 }
 
 function compareThreadRecordsByUpdatedAt(
@@ -162,16 +154,15 @@ function readThreadSignatureValue(thread: ThreadListItem): string {
     String(thread.updatedAt),
     String(thread.createdAt),
     thread.displayName ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
+    thread.lastUserMessage ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     thread.preview,
     thread.agentId,
-    thread.source ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     thread.cwd ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     thread.path ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     String(thread.isProjectRemoved ?? false),
-    String(thread.projectRemoved ?? false),
-    String(thread.removed ?? false),
-    thread.projectState ?? THREAD_SIGNATURE_EMPTY_PATH_SEGMENT,
     String(thread.hasUnreadTurn ?? false),
+    String(thread.latestActivityIsUserMessage ?? false),
+    String(thread.isLoadedInMemory ?? false),
   ].join(THREAD_SIGNATURE_SEGMENT_DELIMITER);
 }
 

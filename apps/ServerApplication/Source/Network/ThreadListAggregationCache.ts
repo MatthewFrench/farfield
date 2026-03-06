@@ -1,14 +1,8 @@
-import type { AppServerListThreadsResponse } from "@farfield/protocol";
+import type { FarfieldThreadListItem } from "@farfield/protocol";
 import type { AgentId } from "../Agents/Types.js";
 
 export type ThreadListSortKey = "created_at" | "updated_at";
-export type ThreadListItemWithAgentId = AppServerListThreadsResponse["data"][number] & {
-  agentId: AgentId;
-  isLoadedInMemory?: boolean;
-  threadName?: string | null;
-  title?: string | null;
-  name?: string | null;
-};
+export type ThreadListItemWithAgentId = FarfieldThreadListItem;
 
 export interface ThreadListAggregationQuery {
   enabledAgentIds: AgentId[];

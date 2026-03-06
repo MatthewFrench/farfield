@@ -10,6 +10,8 @@ function buildThread(threadId: string, agentId: AgentId): ThreadListItem {
     createdAt: 1,
     updatedAt: 2,
     agentId,
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   };
 }
 

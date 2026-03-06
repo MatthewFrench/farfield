@@ -16,6 +16,8 @@ const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
     cwd: "/Users/example/alpha",
     path: "/Users/example/alpha",
     agentId: "codex",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   },
   {
     id: "thread_active_two",
@@ -25,6 +27,8 @@ const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
     cwd: "/Users/example/beta",
     path: "/Users/example/beta",
     agentId: "codex",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   },
 ];
 
@@ -37,6 +41,8 @@ const ARCHIVED_THREAD_ITEMS: ThreadListItem[] = [
     cwd: "/Users/example/archive",
     path: "/Users/example/archive",
     agentId: "codex",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   },
 ];
 

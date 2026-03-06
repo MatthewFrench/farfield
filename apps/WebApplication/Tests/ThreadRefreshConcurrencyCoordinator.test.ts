@@ -14,6 +14,8 @@ function buildThreadListResponse(threadIdentifier: string): ThreadListResponse {
         cwd: "/tmp/thread-refresh",
         path: "/tmp/thread-refresh",
         agentId: "codex",
+        hasUnreadTurn: null,
+        isProjectRemoved: false,
       },
     ],
     nextCursor: null,

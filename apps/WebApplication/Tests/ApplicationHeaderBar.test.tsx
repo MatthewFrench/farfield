@@ -93,7 +93,7 @@ describe("ApplicationHeaderBar", () => {
     expect(onToggleSettingsTab).not.toHaveBeenCalled();
   });
 
-  it("closes settings tab when opening mobile sidebar from settings view", () => {
+  it("opens mobile sidebar without toggling settings tab from settings view", () => {
     const onOpenMobileSidebar = vi.fn();
     const onToggleSettingsTab = vi.fn();
 
@@ -106,10 +106,10 @@ describe("ApplicationHeaderBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Threads" }));
 
     expect(onOpenMobileSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
+    expect(onToggleSettingsTab).not.toHaveBeenCalled();
   });
 
-  it("closes settings tab when opening desktop sidebar from settings view", () => {
+  it("opens desktop sidebar without toggling settings tab from settings view", () => {
     const onOpenDesktopSidebar = vi.fn();
     const onToggleSettingsTab = vi.fn();
 
@@ -123,7 +123,7 @@ describe("ApplicationHeaderBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
 
     expect(onOpenDesktopSidebar).toHaveBeenCalledTimes(1);
-    expect(onToggleSettingsTab).toHaveBeenCalledTimes(1);
+    expect(onToggleSettingsTab).not.toHaveBeenCalled();
   });
 
   it("opens desktop sidebar without toggling settings tab from chat view", () => {

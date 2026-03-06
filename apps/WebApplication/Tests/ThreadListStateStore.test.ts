@@ -21,6 +21,8 @@ function buildThread(input: ThreadFixtureInput): ThreadListItem {
     cwd: input.cwd ?? "/tmp/thread-state-store",
     path: input.path ?? "/tmp/thread-state-store",
     agentId: input.agentId ?? "codex",
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   };
 }
 

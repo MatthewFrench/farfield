@@ -20,6 +20,8 @@ function buildThread(input: {
     cwd: input.cwd,
     path: input.path,
     agentId: input.agentId,
+    hasUnreadTurn: null,
+    isProjectRemoved: false,
   };
 }
 

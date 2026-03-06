@@ -29,6 +29,7 @@ function createThreadListItem(input: {
     cwd: input.projectPath,
     agentId: input.agentId ?? "codex",
     hasUnreadTurn: false,
+    isProjectRemoved: false,
   };
 }
 

@@ -22,7 +22,6 @@ const THREAD_LABEL_PREFIX = "thread ";
 const PROJECT_KEY_PREFIX = "project:";
 const UNKNOWN_PROJECT_KEY = `${PROJECT_KEY_PREFIX}unknown`;
 const UNKNOWN_PROJECT_LABEL = "No project";
-const REMOVED_PROJECT_STATE = "removed";
 const UNKNOWN_UNREAD_SIGNAL = null;
 const CODEX_AGENT_IDENTIFIER = "codex";
 const WINDOWS_PATH_SEPARATOR = "\\";
@@ -260,15 +259,7 @@ export class ThreadGroupSelectors {
   }
 
   private static threadProjectIsMarkedRemoved(thread: ThreadListItem): boolean {
-    if (thread.isProjectRemoved !== undefined) {
-      return thread.isProjectRemoved;
-    }
-
-    return (
-      thread.projectRemoved === true ||
-      thread.removed === true ||
-      thread.projectState === REMOVED_PROJECT_STATE
-    );
+    return thread.isProjectRemoved === true;
   }
 
   private static readThreadHasUnreadTurnSignal(

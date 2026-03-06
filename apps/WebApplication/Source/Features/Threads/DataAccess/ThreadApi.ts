@@ -1,5 +1,4 @@
 import {
-  AppServerListThreadsResponseSchema,
   AppServerReadThreadResponseSchema,
   AppServerStartThreadResponseSchema,
 } from "@farfield/protocol";
@@ -15,9 +14,9 @@ import {
   requestInitWithOptions,
 } from "@/Shared/Transport/FarfieldHttpTransport";
 import {
-  OptionalThreadListTurnsSchema,
-  readThreadUserMessageProjectionFromTurns,
-} from "./ThreadLastUserMessageMapper";
+  type ThreadListResponse as DomainThreadListResponse,
+  ThreadListResponseSchema as DomainThreadListResponseSchema,
+} from "../DomainModel/ThreadGroupTypes";
 
 /**
  * Owns thread endpoint boundary parsing and wire-to-contract normalization for thread data access.
@@ -34,8 +33,6 @@ const LIST_THREADS_SINCE_UPDATED_AT_QUERY_KEY = "sinceUpdatedAt";
 const READ_THREAD_INCLUDE_TURNS_QUERY_KEY = "includeTurns";
 const BOOLEAN_TRUE_QUERY_VALUE = "true";
 const BOOLEAN_FALSE_QUERY_VALUE = "false";
-const THREAD_PROJECT_STATE_ACTIVE = "active";
-const THREAD_PROJECT_STATE_REMOVED = "removed";
 const THREAD_ARCHIVE_ROUTE_SEGMENT = "archive";
 const THREAD_UNARCHIVE_ROUTE_SEGMENT = "unarchive";
 const THREAD_FORK_ROUTE_SEGMENT = "fork";
@@ -47,143 +44,12 @@ const THREAD_REVIEW_ROUTE_SEGMENT = "review";
 const HTTP_POST_METHOD = "POST";
 const APPLICATION_JSON_CONTENT_TYPE_HEADER_NAME = "Content-Type";
 const APPLICATION_JSON_CONTENT_TYPE = "application/json";
-const NO_UNREAD_TURN_SIGNAL = null;
 const THREAD_NAME_MAXIMUM_LENGTH = 120;
 
-const ThreadProjectStateSchema = z.enum([
-  THREAD_PROJECT_STATE_ACTIVE,
-  THREAD_PROJECT_STATE_REMOVED,
-]);
-const OptionalThreadListCursorSchema = z
-  .union([z.string(), z.null(), z.undefined()])
-  .transform((value) => value ?? null);
-const OptionalThreadListItemPathSchema = z.union([z.string(), z.null(), z.undefined()]);
-const OptionalThreadDisplayNameSchema = z.union([z.string(), z.null(), z.undefined()]);
 const OptionalThreadListSinceUpdatedAtSchema = z
   .union([z.number().int().nonnegative(), z.undefined()])
   .transform((value) => value ?? undefined);
-
-// Thread-list responses come from heterogeneous adapters; parse permissive wire payloads once,
-// then immediately normalize to a strict app-owned contract used by thread state owners.
-const ThreadListItemWireSchema = AppServerListThreadsResponseSchema.shape.data.element.and(
-  z
-    .object({
-      agentId: AgentIdSchema,
-      source: z.string().optional(),
-      removed: z.boolean().optional(),
-      projectRemoved: z.boolean().optional(),
-      projectState: ThreadProjectStateSchema.optional(),
-      hasUnreadTurn: z.boolean().optional(),
-      isLoadedInMemory: z.boolean().optional(),
-      title: z.union([z.string(), z.null()]).optional(),
-      threadName: z.union([z.string(), z.null()]).optional(),
-      name: z.union([z.string(), z.null()]).optional(),
-      turns: OptionalThreadListTurnsSchema,
-    })
-    .passthrough(),
-);
-
-const ThreadListItemContractSchema = z
-  .object({
-    id: z.string().min(1),
-    preview: z.string(),
-    displayName: z.string().optional(),
-    lastUserMessage: z.string().optional(),
-    latestActivityIsUserMessage: z.boolean().optional(),
-    createdAt: z.number().int().nonnegative(),
-    updatedAt: z.number().int().nonnegative(),
-    cwd: z.string().optional(),
-    path: z.string().nullable().optional(),
-    agentId: AgentIdSchema,
-    source: z.string().optional(),
-    hasUnreadTurn: z.union([z.boolean(), z.null()]),
-    isLoadedInMemory: z.boolean().optional(),
-    isProjectRemoved: z.boolean(),
-  })
-  .strict();
-type ThreadListItemWire = z.infer<typeof ThreadListItemWireSchema>;
-type ThreadListItemContract = z.infer<typeof ThreadListItemContractSchema>;
-
-function readThreadHasUnreadTurnSignal(value: boolean | undefined): boolean | null {
-  return value ?? NO_UNREAD_TURN_SIGNAL;
-}
-
-function normalizeOptionalThreadDisplayName(value: string | null | undefined): string | undefined {
-  const parsedValue = OptionalThreadDisplayNameSchema.parse(value);
-  if (parsedValue === undefined || parsedValue === null) {
-    return undefined;
-  }
-  const trimmedValue = parsedValue.trim();
-  if (trimmedValue.length === 0) {
-    return undefined;
-  }
-  return trimmedValue;
-}
-
-function readThreadDisplayName(value: ThreadListItemWire): string | undefined {
-  const parsedThreadName = normalizeOptionalThreadDisplayName(value.threadName);
-  if (parsedThreadName !== undefined) {
-    return parsedThreadName;
-  }
-  const parsedTitle = normalizeOptionalThreadDisplayName(value.title);
-  if (parsedTitle !== undefined) {
-    return parsedTitle;
-  }
-  return normalizeOptionalThreadDisplayName(value.name);
-}
-
-// Legacy adapters expose project removal with multiple fields; treat any explicit removal signal as removed.
-function readThreadProjectRemovedState(value: ThreadListItemWire): boolean {
-  return (
-    value.projectRemoved === true ||
-    value.removed === true ||
-    value.projectState === THREAD_PROJECT_STATE_REMOVED
-  );
-}
-
-function mapThreadListItemWireToContract(value: ThreadListItemWire): ThreadListItemContract {
-  const threadUserMessageProjection = readThreadUserMessageProjectionFromTurns(value.turns);
-  return {
-    id: value.id,
-    preview: value.preview,
-    displayName: readThreadDisplayName(value),
-    lastUserMessage: threadUserMessageProjection.lastUserMessage,
-    latestActivityIsUserMessage: threadUserMessageProjection.latestActivityIsUserMessage,
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
-    cwd: value.cwd,
-    path: OptionalThreadListItemPathSchema.parse(value.path),
-    agentId: value.agentId,
-    source: value.source,
-    hasUnreadTurn: readThreadHasUnreadTurnSignal(value.hasUnreadTurn),
-    isLoadedInMemory: value.isLoadedInMemory,
-    isProjectRemoved: readThreadProjectRemovedState(value),
-  };
-}
-
-const ThreadListItemSchema = ThreadListItemWireSchema.transform(
-  mapThreadListItemWireToContract,
-).pipe(ThreadListItemContractSchema);
-
-const ThreadListSyncMetadataSchema = z
-  .object({
-    mode: z.enum(["full", "delta"]),
-    sinceUpdatedAt: z.number().int().nonnegative().nullable(),
-    snapshotUpdatedAt: z.number().int().nonnegative(),
-  })
-  .strict();
-
-const ThreadListResponseSchema = z
-  .object({
-    data: z.array(ThreadListItemSchema),
-    nextCursor: OptionalThreadListCursorSchema,
-    pages: z.number().int().nonnegative().optional(),
-    truncated: z.boolean().optional(),
-    orderedThreadIds: z.array(z.string().min(1)).optional(),
-    sync: ThreadListSyncMetadataSchema.optional(),
-  })
-  .strict();
-export type ApiThreadListResponse = z.infer<typeof ThreadListResponseSchema>;
+export type ApiThreadListResponse = DomainThreadListResponse;
 
 export interface ApiListThreadsOptions extends ApiRequestOptions {
   limit: number;
@@ -201,7 +67,7 @@ const ThreadListEnvelopeSchema = z
   .object({
     ok: z.literal(true),
   })
-  .merge(ThreadListResponseSchema)
+  .merge(DomainThreadListResponseSchema)
   .strict()
   .transform(({ ok: _ok, ...threadListResponse }) => threadListResponse);
 

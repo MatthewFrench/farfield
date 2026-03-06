@@ -126,19 +126,6 @@ function readRuntimeWarningBannerClassName(summary: ThreadRuntimeWarningSummary)
   return "text-[11px] text-amber-500";
 }
 
-function buildSidebarOpenHandler(
-  onOpenSidebar: () => void,
-  activeTab: ApplicationHeaderBarTab,
-  onToggleSettingsTab: () => void,
-): () => void {
-  return () => {
-    onOpenSidebar();
-    if (activeTab === DEBUG_TAB) {
-      onToggleSettingsTab();
-    }
-  };
-}
-
 function readHeaderContainerClassName(activeTab: ApplicationHeaderBarTab): string {
   return `flex items-center justify-between px-3 h-14 shrink-0 gap-2 ${
     activeTab === CHAT_TAB
@@ -162,23 +149,12 @@ export function ApplicationHeaderBar({
   onToggleSettingsTab,
   renderAgentFavicon,
 }: ApplicationHeaderBarProps): React.JSX.Element {
-  const handleOpenMobileSidebar = buildSidebarOpenHandler(
-    onOpenMobileSidebar,
-    activeTab,
-    onToggleSettingsTab,
-  );
-  const handleOpenDesktopSidebar = buildSidebarOpenHandler(
-    onOpenDesktopSidebar,
-    activeTab,
-    onToggleSettingsTab,
-  );
-
   return (
     <header className={readHeaderContainerClassName(activeTab)}>
       <div className="flex items-center gap-2 min-w-0">
         <div className="md:hidden">
           <HeaderIconButton
-            onClick={handleOpenMobileSidebar}
+            onClick={onOpenMobileSidebar}
             title="Threads"
             testId="sidebar-toggle-open"
           >
@@ -188,7 +164,7 @@ export function ApplicationHeaderBar({
         {!desktopSidebarOpen && (
           <div className="hidden md:block">
             <HeaderIconButton
-              onClick={handleOpenDesktopSidebar}
+              onClick={onOpenDesktopSidebar}
               title="Show sidebar"
               testId="sidebar-toggle-open"
             >

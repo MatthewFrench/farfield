@@ -578,7 +578,7 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
-  it("returns canonical threadName values in list payloads", async () => {
+  it("projects canonical display names into the thread-list payload", async () => {
     let capturedBody: object | null = null;
     const firstThread = {
       id: "thread_with_name",
@@ -617,11 +617,13 @@ describe("handleThreadCollectionRoutes", () => {
       data: [
         {
           id: "thread_without_name",
-          threadName: "Can you help me set up a caddy reverse proxy...",
+          preview: "Can you help me set up a caddy reverse proxy...",
+          displayName: undefined,
         },
         {
           id: "thread_with_name",
-          threadName: "Configure Caddy for Farfield site",
+          preview: "preview should not win",
+          displayName: "Configure Caddy for Farfield site",
         },
       ],
     });

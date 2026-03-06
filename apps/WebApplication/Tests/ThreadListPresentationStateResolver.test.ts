@@ -16,8 +16,8 @@ function buildThread(input: {
     cwd: input.cwd,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
-    source: "opencode",
     agentId: "codex",
+    hasUnreadTurn: null,
     isProjectRemoved: input.isProjectRemoved ?? false,
   };
 }

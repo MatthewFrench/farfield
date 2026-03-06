@@ -2,6 +2,7 @@ export * from "./AppServer.js";
 export * from "./Common.js";
 export * from "./Contracts/Thread/CollaborationModeContracts.js";
 export * from "./Contracts/Thread/ConversationStateContracts.js";
+export * from "./Contracts/Thread/FarfieldThreadListContracts.js";
 export * from "./Contracts/Thread/StreamStateContracts.js";
 export * from "./Contracts/Thread/TurnInputContracts.js";
 export * from "./Contracts/Thread/TurnItemContracts.js";

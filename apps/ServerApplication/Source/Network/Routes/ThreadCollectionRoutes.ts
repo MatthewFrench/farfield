@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type {
   AgentAdapter,
   AgentCreateThreadInput,
@@ -12,6 +11,7 @@ import type {
   ThreadListItemWithAgentId,
   ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
+import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
 import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 import {
   type ThreadCollectionRouteDependencies,
@@ -49,15 +49,6 @@ const ThreadCollectionRouteLogEventByName = {
   agentListLoadedThreadsFailed: "agent-list-loaded-threads-failed",
   threadListAggregationCacheRead: "thread-list-aggregation-cache-read",
 } as const;
-const OptionalThreadNameSourceSchema = z.union([z.string(), z.null(), z.undefined()]);
-const ThreadNamePayloadSchema = z
-  .object({
-    preview: z.string(),
-    threadName: OptionalThreadNameSourceSchema,
-    title: OptionalThreadNameSourceSchema,
-    name: OptionalThreadNameSourceSchema,
-  })
-  .passthrough();
 
 const ThreadCollectionRouteDefaultSortKey: ThreadListSortKey = "updated_at";
 const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
@@ -439,15 +430,13 @@ async function loadThreadListSnapshot(input: {
         adapterResult.loadedThreadIdentifierSet !== null
           ? adapterResult.loadedThreadIdentifierSet.has(thread.id)
           : undefined;
-      const threadWithAgentId: ThreadListItemWithAgentId = {
-        ...thread,
-        agentId: adapterResult.adapter.id,
-        ...(isLoadedInMemory !== undefined ? { isLoadedInMemory } : {}),
-      };
-      mergedData.push({
-        ...threadWithAgentId,
-        threadName: readCanonicalThreadName(threadWithAgentId),
-      });
+      const projectedThreadListItem: ThreadListItemWithAgentId =
+        projectThreadListItemFromAgentThreadListItem({
+          thread,
+          agentId: adapterResult.adapter.id,
+          isLoadedInMemory,
+        });
+      mergedData.push(projectedThreadListItem);
     }
   }
 
@@ -499,28 +488,6 @@ async function loadAdapterLoadedThreadIdentifierSet(input: {
 
 function mapLoadedThreadIdentifierSet(loadedThreads: AgentListLoadedThreadsResult): Set<string> {
   return new Set(loadedThreads.data);
-}
-
-function normalizeOptionalThreadName(value: string | null | undefined): string | undefined {
-  const parsedThreadName = OptionalThreadNameSourceSchema.parse(value);
-  if (parsedThreadName === null || parsedThreadName === undefined) {
-    return undefined;
-  }
-  const trimmedThreadName = parsedThreadName.trim();
-  if (trimmedThreadName.length === 0) {
-    return undefined;
-  }
-  return trimmedThreadName;
-}
-
-function readCanonicalThreadName(thread: ThreadListItemWithAgentId): string {
-  const parsedThreadNamePayload = ThreadNamePayloadSchema.parse(thread);
-  return (
-    normalizeOptionalThreadName(parsedThreadNamePayload.threadName) ??
-    normalizeOptionalThreadName(parsedThreadNamePayload.title) ??
-    normalizeOptionalThreadName(parsedThreadNamePayload.name) ??
-    parsedThreadNamePayload.preview
-  );
 }
 
 function buildThreadListPage(input: {

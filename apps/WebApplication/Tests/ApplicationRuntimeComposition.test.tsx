@@ -622,7 +622,8 @@ describe("useApplicationRuntimeComposition", () => {
           createdAt: 2,
           updatedAt: 2,
           agentId: "codex",
-          source: "opencode",
+          hasUnreadTurn: null,
+          isProjectRemoved: false,
         },
         {
           id: "thread-1",
@@ -630,7 +631,8 @@ describe("useApplicationRuntimeComposition", () => {
           createdAt: 1,
           updatedAt: 1,
           agentId: "codex",
-          source: "opencode",
+          hasUnreadTurn: null,
+          isProjectRemoved: false,
         },
       ]);
     });
