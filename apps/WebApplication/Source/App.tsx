@@ -256,6 +256,7 @@ export function App(): React.JSX.Element {
     debugServerClient: applicationOwnerDependencies.debugServerClient,
     debugWorkspaceDataReader: applicationOwnerDependencies.debugWorkspaceDataReader,
     debugWorkspaceStateStore: applicationOwnerDependencies.debugWorkspaceStateStore,
+    deferredResourceCacheOwner: applicationOwnerDependencies.deferredResourceCacheOwner,
     coreDataRefreshConcurrencyCoordinator:
       applicationOwnerDependencies.coreDataRefreshConcurrencyCoordinator,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,

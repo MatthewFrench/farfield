@@ -16,6 +16,7 @@ import {
   ArchivedThreadLoader,
   type ArchivedThreadLoaderDependencies,
 } from "./ArchivedThreadLoader";
+import { CoreDataDeferredResourceCacheOwner } from "./CoreDataDeferredResourceCacheOwner";
 import { CoreDataRefreshConcurrencyCoordinator } from "./CoreDataRefreshConcurrencyCoordinator";
 import type {
   CoreDataAgentDescriptor,
@@ -92,6 +93,7 @@ function createStartupLoaderDependencies(
     setSelectedAgentId: input.setSelectedAgentId,
     setSelectedThreadId: input.setSelectedThreadId,
     setSelectedModeKey: input.setSelectedModeKey,
+    deferredResourceCacheOwner: input.deferredResourceCacheOwner,
     ensureApiSessionBootstrapped: input.ensureApiSessionBootstrapped,
     buildActionRequestOptions: input.buildActionRequestOptions,
     readInitialModeKey: input.readInitialModeKey,
@@ -126,6 +128,7 @@ export interface UseCoreDataLoadersInput {
   debugServerClient: DebugServerClient;
   debugWorkspaceDataReader: DebugWorkspaceDataReader;
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
+  deferredResourceCacheOwner: CoreDataDeferredResourceCacheOwner;
   coreDataRefreshConcurrencyCoordinator: CoreDataRefreshConcurrencyCoordinator;
   selectedThreadIdRef: MutableRefObject<string | null>;
   activeTabRef: MutableRefObject<"chat" | "debug">;

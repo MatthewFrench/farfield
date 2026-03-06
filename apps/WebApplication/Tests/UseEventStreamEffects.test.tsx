@@ -541,6 +541,7 @@ function createBaseInput(
   return {
     debugHistoryLimit: DEBUG_HISTORY_LIMIT,
     debugErrorListLimit: DEBUG_ERROR_LIST_LIMIT,
+    isSidebarVisible: false,
     ensureApiSessionBootstrapped: vi.fn(async () => true),
     eventRefreshScheduler: new EventRefreshScheduler(IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS),
     eventStreamConnectionCoordinator,

@@ -15,6 +15,7 @@ import {
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
+import { CoreDataDeferredResourceCacheOwner } from "./CoreDataDeferredResourceCacheOwner";
 import type {
   CoreDataAgentDescriptor,
   CoreDataCapabilitySnapshot,
@@ -52,6 +53,7 @@ const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
 const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
 const STARTUP_CRITICAL_THREAD_READ_FROM_CACHE = true;
 const STARTUP_THREAD_REVALIDATION_READ_FROM_CACHE = false;
+const STARTUP_DEFERRED_THREAD_REVALIDATION_MIN_INTERVAL_MILLISECONDS = 15_000;
 const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
 type Health = CoreDataHealthResponse;
@@ -112,6 +114,7 @@ export interface CoreDataStartupLoaderDependencies {
   debugServerClient: DebugServerClient;
   debugWorkspaceDataReader: DebugWorkspaceDataReader;
   debugWorkspaceStateStore: DebugWorkspaceStateStore;
+  deferredResourceCacheOwner: CoreDataDeferredResourceCacheOwner;
   selectedThreadIdRef: MutableRefObject<string | null>;
   activeTabRef: MutableRefObject<"chat" | "debug">;
   unreadThreadIdsRef: MutableRefObject<Record<string, true>>;
@@ -248,6 +251,7 @@ function applyDeferredStartupSnapshotResult<ResultValue>(input: {
 export class CoreDataStartupLoader {
   private deps: CoreDataStartupLoaderDependencies;
   private deferredStartupSequence = 0;
+  private lastDeferredThreadRevalidationAtEpochMilliseconds = 0;
 
   public constructor(dependencies: CoreDataStartupLoaderDependencies) {
     this.deps = dependencies;
@@ -331,10 +335,14 @@ export class CoreDataStartupLoader {
       applySnapshotState,
       reportDeferredStartupFailure,
     });
-    if (nextActiveThreadState.loadedFromCache) {
+    if (
+      nextActiveThreadState.loadedFromCache &&
+      this.shouldRunDeferredThreadRevalidation(Date.now())
+    ) {
       const startupDeferredThreadRevalidateRequest = this.deps.buildActionRequestOptions(
         STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
       );
+      this.lastDeferredThreadRevalidationAtEpochMilliseconds = Date.now();
       // Keep cache-first responsiveness but revalidate active threads in the background so
       // external updates (for example event-stream-driven updates) still converge quickly.
       void this.runDeferredThreadRevalidation(
@@ -354,6 +362,13 @@ export class CoreDataStartupLoader {
 
   private isDeferredStartupReadStale(deferredStartupSequence: number): boolean {
     return this.deferredStartupSequence !== deferredStartupSequence;
+  }
+
+  private shouldRunDeferredThreadRevalidation(nowEpochMilliseconds: number): boolean {
+    return (
+      nowEpochMilliseconds - this.lastDeferredThreadRevalidationAtEpochMilliseconds >=
+      STARTUP_DEFERRED_THREAD_REVALIDATION_MIN_INTERVAL_MILLISECONDS
+    );
   }
 
   private scheduleDeferredStartupReads(input: {
@@ -422,6 +437,8 @@ export class CoreDataStartupLoader {
       : Promise.resolve<DebugWorkspaceDataSnapshot | null>(null);
 
     // Deferred startup reads are intentionally parallel so non-critical hydration stays bounded by the slowest read.
+    const freshHealthSnapshot = this.deps.deferredResourceCacheOwner.readHealthIfFresh(now);
+    const freshAgentsSnapshot = this.deps.deferredResourceCacheOwner.readAgentsIfFresh(now);
     const [
       nextHealthResult,
       nextAgentsResult,
@@ -429,10 +446,22 @@ export class CoreDataStartupLoader {
       nextTraceStatusResult,
       nextDebugWorkspaceDataResult,
     ] = await Promise.allSettled([
-      this.deps.capabilityServerClient.readHealthStatus(
-        startupDeferredHealthRequest.requestOptions,
-      ),
-      this.deps.capabilityServerClient.listAgents(startupDeferredAgentsRequest.requestOptions),
+      freshHealthSnapshot !== null
+        ? Promise.resolve(freshHealthSnapshot)
+        : this.deps.capabilityServerClient
+            .readHealthStatus(startupDeferredHealthRequest.requestOptions)
+            .then((nextHealth) => {
+              this.deps.deferredResourceCacheOwner.writeHealth(nextHealth, now);
+              return nextHealth;
+            }),
+      freshAgentsSnapshot !== null
+        ? Promise.resolve(freshAgentsSnapshot)
+        : this.deps.capabilityServerClient
+            .listAgents(startupDeferredAgentsRequest.requestOptions)
+            .then((nextAgents) => {
+              this.deps.deferredResourceCacheOwner.writeAgents(nextAgents, now);
+              return nextAgents;
+            }),
       capabilitiesPromise,
       shouldLoadDebugWorkspaceData
         ? this.deps.debugServerClient.readTraceStatus(

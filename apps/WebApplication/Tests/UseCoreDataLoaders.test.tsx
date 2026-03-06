@@ -1,12 +1,14 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { type Dispatch, type SetStateAction, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CoreDataDeferredResourceCacheOwner } from "../Source/Application/StateManagement/CoreDataDeferredResourceCacheOwner";
 import { CoreDataRefreshConcurrencyCoordinator } from "../Source/Application/StateManagement/CoreDataRefreshConcurrencyCoordinator";
 import {
   STARTUP_CRITICAL_THREADS_OPERATION,
   STARTUP_DEFERRED_AGENTS_OPERATION,
   STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
   STARTUP_DEFERRED_HEALTH_OPERATION,
+  STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
 } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
 import {
   type CoreDataCapabilitySnapshot,
@@ -243,6 +245,7 @@ function createHarness(activeTab: "chat" | "debug" = "chat"): CoreDataLoadersTes
     debugServerClient,
     debugWorkspaceDataReader,
     debugWorkspaceStateStore: new DebugWorkspaceStateStore(),
+    deferredResourceCacheOwner: new CoreDataDeferredResourceCacheOwner(),
     coreDataRefreshConcurrencyCoordinator: new CoreDataRefreshConcurrencyCoordinator(),
     selectedThreadIdRef: { current: "thread-1" },
     activeTabRef: { current: activeTab },
@@ -422,6 +425,49 @@ describe("useCoreDataLoaders", () => {
     });
 
     expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throttles deferred thread revalidation when cached active threads are still fresh", async () => {
+    const harness = createHarness("chat");
+    const cachedActiveThreadState: LoadActiveThreadStateResult = {
+      ...ACTIVE_THREAD_STATE,
+      loadedFromCache: true,
+    };
+    const loadActiveThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadActiveThreadState")
+      .mockResolvedValue(cachedActiveThreadState);
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockResolvedValue(HEALTH_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
+      COLLABORATION_MODES_RESPONSE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(3);
+    expect(
+      harness.actionLog.filter(
+        (actionName) => actionName === STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
+      ),
+    ).toEqual([STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION]);
   });
 
   it("does not report deferred startup request-cancellation errors", async () => {

@@ -23,7 +23,7 @@ export function readSelectedThreadLabel(input: SelectedThreadLabelInput): string
 
 export function readThreadListState(input: ThreadListStateInput): ApplicationThreadListState {
   const { isCoreLoading, threadCount } = input;
-  if (isCoreLoading) {
+  if (isCoreLoading && threadCount === 0) {
     return "loading";
   }
   if (threadCount === 0) {

@@ -150,6 +150,7 @@ function useRuntimeWarningThreadSwitchEffect(
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
+  isSidebarVisible: boolean;
   ensureApiSessionBootstrapped: () => Promise<boolean>;
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;

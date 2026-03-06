@@ -274,3 +274,86 @@ Interpretation:
 1. The single-viewport render change helped WebKit substantially too.
 2. WebKit is still worse than Chromium for worst-case sidebar stall duration.
 3. The dominant remaining WebKit hotspot is sidebar runtime summary work, especially apps and account rate-limit fetches.
+
+## 2026-03-06 Follow-Up: Sidebar Visibility Gating And Deferred Refresh Throttling
+
+Changes under test:
+
+1. Cache and visibility-gate the network-derived sidebar runtime summary slices.
+2. Keep the thread list visually `ready` while cached rows are shown during background core refresh.
+3. Throttle deferred thread-list revalidation after cached core-data reads.
+
+Commands used:
+
+```bash
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile:webkit
+```
+
+### Chromium Mobile Sidebar Repeated Profile After Change
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/browser-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `20`
+3. Total freeze duration: `6184ms`
+4. Max freeze duration: `668ms`
+5. Max long-task duration: `399ms`
+
+Top request paths:
+
+1. `/api/threads?limit=80&archived=false&all=true&maxPages=20&sortKey=updated_at`
+   - count `19`
+   - total `7126ms`
+   - max `1309ms`
+2. `/api/notifications/events?limit=80&agentId=codex`
+   - count `1`
+   - total `87ms`
+3. `/api/health`
+   - count `1`
+   - total `85ms`
+
+Interpretation:
+
+1. The request mix is much cleaner than the original baseline and the earlier single-viewport rerun.
+2. Chromium still is not acceptable, but the remaining dominant cost is now clearly `/api/threads`.
+3. Health, agents, apps, and account rate-limit traffic are no longer the main Chromium problem during sidebar interaction.
+4. This strengthens the case for a cheaper thread-list change-detection path or a more aggressive client-side thread-list freshness policy.
+
+### WebKit Mobile Sidebar Repeated Profile After Change
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/webkit-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `2`
+3. Total freeze duration: `5098ms`
+4. Max freeze duration: `4296ms`
+5. Max long-task duration: `0ms`
+6. Max sidebar iteration readiness: `6012ms`
+
+Top request paths:
+
+1. `/api/threads?limit=80&archived=false&all=true&maxPages=20&sortKey=updated_at`
+   - count `5`
+   - total `853ms`
+   - max `411ms`
+2. `/api/apps?limit=100`
+   - count `1`
+   - total `372ms`
+3. `/api/account/rate-limits?agentId=codex`
+   - count `1`
+   - total `290ms`
+
+Interpretation:
+
+1. The sidebar runtime summary traffic is much less severe than the original WebKit baseline.
+2. WebKit still has large freeze windows, but the apps and rate-limit requests are no longer the catastrophic 15s-scale events seen in the first baseline.
+3. As with Chromium, the remaining dominant work is now the thread-list path itself.

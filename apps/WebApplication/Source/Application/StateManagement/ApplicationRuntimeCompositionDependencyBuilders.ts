@@ -227,6 +227,9 @@ export function buildEventStreamEffectsInput(
   return {
     debugHistoryLimit: input.debugHistoryLimit,
     debugErrorListLimit: input.debugErrorListLimit,
+    isSidebarVisible: applicationShellState.isMobileLayout
+      ? applicationShellState.mobileSidebarOpen
+      : applicationShellState.desktopSidebarOpen,
     ensureApiSessionBootstrapped: runtimeRequestHandlers.ensureApiSessionBootstrapped,
     eventRefreshScheduler: applicationOwnerDependencies.eventRefreshScheduler,
     eventStreamConnectionCoordinator: applicationOwnerDependencies.eventStreamConnectionCoordinator,

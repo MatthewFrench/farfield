@@ -1,9 +1,10 @@
-import { type Dispatch, type SetStateAction, useEffect } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
 import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
+import { ThreadSidebarRuntimeSummaryNetworkCacheOwner } from "./ThreadSidebarRuntimeSummaryNetworkCacheOwner";
 import {
   readThreadSidebarAccountSummary,
   readThreadSidebarAppsSummary,
@@ -14,19 +15,41 @@ const SIDEBAR_APPS_LIST_LIMIT = 100;
 const SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION = "refresh-sidebar-runtime-summary";
 const EMPTY_RUNTIME_SUMMARY_REFRESH_ERROR_MESSAGE = "Unknown sidebar runtime summary refresh error";
 
-interface RefreshThreadSidebarRuntimeSummaryInput {
+interface ThreadSidebarRuntimeSummaryNetworkSnapshot {
+  account: ThreadSidebarRuntimeSummary["account"];
+  rateLimits: ThreadSidebarRuntimeSummary["rateLimits"];
+  apps: ThreadSidebarRuntimeSummary["apps"];
+}
+
+interface ReadThreadSidebarRuntimeSummaryNetworkSnapshotInput {
   selectedAgentId: AgentId;
   canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
   canListApps: boolean;
   capabilityServerClient: CapabilityServerClient;
-  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
   shouldCancel: () => boolean;
 }
 
-async function refreshThreadSidebarRuntimeSummary(
-  input: RefreshThreadSidebarRuntimeSummaryInput,
-): Promise<void> {
+function applyNetworkSnapshotToSidebarRuntimeSummary(
+  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>,
+  snapshot: ThreadSidebarRuntimeSummaryNetworkSnapshot,
+): void {
+  setThreadSidebarRuntimeSummary((previousSummary) => ({
+    ...previousSummary,
+    account: snapshot.account,
+    rateLimits: snapshot.rateLimits,
+    apps: snapshot.apps,
+  }));
+}
+
+async function readThreadSidebarRuntimeSummaryNetworkSnapshot(
+  input: ReadThreadSidebarRuntimeSummaryNetworkSnapshotInput,
+): Promise<ThreadSidebarRuntimeSummaryNetworkSnapshot> {
+  const nextSnapshot: ThreadSidebarRuntimeSummaryNetworkSnapshot = {
+    account: null,
+    rateLimits: null,
+    apps: null,
+  };
   const refreshOperations: Promise<void>[] = [];
 
   if (input.canReadAccount) {
@@ -37,10 +60,7 @@ async function refreshThreadSidebarRuntimeSummary(
       if (input.shouldCancel()) {
         return;
       }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-        ...previousSummary,
-        account: readThreadSidebarAccountSummary(accountResponse),
-      }));
+      nextSnapshot.account = readThreadSidebarAccountSummary(accountResponse);
     };
     refreshOperations.push(refreshAccountSummary());
   }
@@ -53,10 +73,7 @@ async function refreshThreadSidebarRuntimeSummary(
       if (input.shouldCancel()) {
         return;
       }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-        ...previousSummary,
-        rateLimits: readThreadSidebarRateLimitSummary(rateLimitsResponse),
-      }));
+      nextSnapshot.rateLimits = readThreadSidebarRateLimitSummary(rateLimitsResponse);
     };
     refreshOperations.push(refreshRateLimitsSummary());
   }
@@ -69,22 +86,21 @@ async function refreshThreadSidebarRuntimeSummary(
       if (input.shouldCancel()) {
         return;
       }
-      input.setThreadSidebarRuntimeSummary((previousSummary) => ({
-        ...previousSummary,
-        apps: readThreadSidebarAppsSummary(appsResponse),
-      }));
+      nextSnapshot.apps = readThreadSidebarAppsSummary(appsResponse);
     };
     refreshOperations.push(refreshAppsSummary());
   }
 
   if (refreshOperations.length === 0) {
-    return;
+    return nextSnapshot;
   }
 
   await Promise.all(refreshOperations);
+  return nextSnapshot;
 }
 
 export interface UseThreadSidebarRuntimeHydrationEffectInput {
+  isSidebarVisible: boolean;
   selectedAgentId: AgentId;
   canReadAccount: boolean;
   canReadAccountRateLimits: boolean;
@@ -104,20 +120,51 @@ function createSidebarRuntimeSummaryRefreshError<ErrorType>(error: ErrorType): E
 export function useThreadSidebarRuntimeHydrationEffect(
   input: UseThreadSidebarRuntimeHydrationEffectInput,
 ): void {
+  const networkSnapshotCacheOwnerReference =
+    useRef<ThreadSidebarRuntimeSummaryNetworkCacheOwner | null>(null);
+  if (networkSnapshotCacheOwnerReference.current === null) {
+    networkSnapshotCacheOwnerReference.current = new ThreadSidebarRuntimeSummaryNetworkCacheOwner();
+  }
+  const networkSnapshotCacheOwner = networkSnapshotCacheOwnerReference.current;
+
   useEffect(() => {
+    if (!input.isSidebarVisible) {
+      return;
+    }
+
     let shouldCancelRefresh = false;
+    const cachedSnapshot = networkSnapshotCacheOwner.readSnapshot(input.selectedAgentId);
+    if (cachedSnapshot !== null) {
+      applyNetworkSnapshotToSidebarRuntimeSummary(
+        input.setThreadSidebarRuntimeSummary,
+        cachedSnapshot,
+      );
+    }
+    const freshCachedSnapshot = networkSnapshotCacheOwner.readSnapshotIfFresh(
+      input.selectedAgentId,
+    );
+    if (freshCachedSnapshot !== null) {
+      return;
+    }
 
     const hydrateThreadSidebarRuntimeSummary = async (): Promise<void> => {
       try {
-        await refreshThreadSidebarRuntimeSummary({
+        const nextSnapshot = await readThreadSidebarRuntimeSummaryNetworkSnapshot({
           selectedAgentId: input.selectedAgentId,
           canReadAccount: input.canReadAccount,
           canReadAccountRateLimits: input.canReadAccountRateLimits,
           canListApps: input.canListApps,
           capabilityServerClient: input.capabilityServerClient,
-          setThreadSidebarRuntimeSummary: input.setThreadSidebarRuntimeSummary,
           shouldCancel: () => shouldCancelRefresh,
         });
+        if (shouldCancelRefresh) {
+          return;
+        }
+        networkSnapshotCacheOwner.writeSnapshot(input.selectedAgentId, nextSnapshot);
+        applyNetworkSnapshotToSidebarRuntimeSummary(
+          input.setThreadSidebarRuntimeSummary,
+          nextSnapshot,
+        );
       } catch (error) {
         if (shouldCancelRefresh) {
           return;
@@ -134,6 +181,7 @@ export function useThreadSidebarRuntimeHydrationEffect(
       shouldCancelRefresh = true;
     };
   }, [
+    input.isSidebarVisible,
     input.selectedAgentId,
     input.canReadAccount,
     input.canReadAccountRateLimits,
@@ -141,5 +189,6 @@ export function useThreadSidebarRuntimeHydrationEffect(
     input.capabilityServerClient,
     input.setThreadSidebarRuntimeSummary,
     input.handleRuntimeRequestError,
+    networkSnapshotCacheOwner,
   ]);
 }

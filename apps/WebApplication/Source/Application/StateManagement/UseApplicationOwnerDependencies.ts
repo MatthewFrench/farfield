@@ -3,6 +3,7 @@ import { WebShellSessionBootstrapClient } from "@/Application/DataAccess/WebShel
 import { ApiAuthenticationErrorClassifier } from "@/Application/DomainModel/ApiAuthenticationErrorClassifier";
 import { DateValueFormatter } from "@/Application/DomainModel/DateValueFormatter";
 import { ApiSessionBootstrapCoordinator } from "@/Application/StateManagement/ApiSessionBootstrapCoordinator";
+import { CoreDataDeferredResourceCacheOwner } from "@/Application/StateManagement/CoreDataDeferredResourceCacheOwner";
 import { CoreDataRefreshConcurrencyCoordinator } from "@/Application/StateManagement/CoreDataRefreshConcurrencyCoordinator";
 import { EventRefreshScheduler } from "@/Application/StateManagement/EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "@/Application/StateManagement/EventStreamConnectionCoordinator";
@@ -103,6 +104,7 @@ export interface ApplicationOwnerDependencies<
   webShellSessionBootstrapClient: WebShellSessionBootstrapClient;
   apiSessionBootstrapCoordinator: ApiSessionBootstrapCoordinator;
   coreDataRefreshConcurrencyCoordinator: CoreDataRefreshConcurrencyCoordinator;
+  deferredResourceCacheOwner: CoreDataDeferredResourceCacheOwner;
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
@@ -256,6 +258,7 @@ export function useApplicationOwnerDependencies<
   const coreDataRefreshConcurrencyCoordinator = useStableOwner(
     () => new CoreDataRefreshConcurrencyCoordinator(),
   );
+  const deferredResourceCacheOwner = useStableOwner(() => new CoreDataDeferredResourceCacheOwner());
   const eventStreamRefreshDecisionEngine = useMemo<EventStreamRefreshDecisionReader>(() => {
     if (eventStreamRefreshDecisionExecutionMode === "worker") {
       return new EventStreamRefreshDecisionWorkerOwner({
@@ -477,6 +480,7 @@ export function useApplicationOwnerDependencies<
     webShellSessionBootstrapClient,
     apiSessionBootstrapCoordinator,
     coreDataRefreshConcurrencyCoordinator,
+    deferredResourceCacheOwner,
     eventStreamRefreshDecisionEngine,
     eventRefreshScheduler,
     eventStreamConnectionCoordinator,
