@@ -5,6 +5,7 @@ import { App } from "./App";
 import "./Index.css";
 import { reloadApplicationWindow } from "./Application/Boot/ApplicationWindowReloadOwner";
 import { installGlobalClientCrashReporter } from "./Application/Boot/InstallClientErrorReporter";
+import { installGlobalClientPerformanceFreezeProbe } from "./Application/Boot/InstallClientPerformanceFreezeProbe";
 import { ServiceWorkerControllerChangeReloadOwner } from "./Application/Boot/ServiceWorkerControllerChangeReloadOwner";
 import {
   ServiceWorkerReloadEligibilityOwner,
@@ -160,6 +161,9 @@ function installBootstrapWindowOwners(): void {
       ).threadId,
     readUrl: () => window.location.pathname + window.location.search,
   });
+  if (import.meta.env.DEV) {
+    installGlobalClientPerformanceFreezeProbe();
+  }
 }
 
 installBootstrapWindowOwners();

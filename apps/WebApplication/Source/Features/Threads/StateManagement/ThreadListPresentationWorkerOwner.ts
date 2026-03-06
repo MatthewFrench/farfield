@@ -1,3 +1,8 @@
+import {
+  beginGlobalPerformanceOperation,
+  type ClientPerformanceOperationToken,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 import type {
   ThreadListPresentationStateInput,
   ThreadListPresentationStateResult,
@@ -11,6 +16,7 @@ import {
 interface PendingThreadListPresentationRequest {
   resolve: (state: ThreadListPresentationStateResult) => void;
   reject: (error: Error) => void;
+  operationToken: ClientPerformanceOperationToken | null;
 }
 
 export interface ThreadListPresentationMessageWorker {
@@ -85,9 +91,22 @@ export class ThreadListPresentationWorkerOwner implements ThreadListPresentation
       requestId: requestIdentifier,
       input,
     };
+    const operationToken = beginGlobalPerformanceOperation(
+      "thread-list-presentation-worker-roundtrip",
+      {
+        requestId: requestIdentifier,
+        activeThreadCount: input.threads.length,
+        archivedThreadCount: input.archivedThreads.length,
+        hasSelectedThreadIdentifier: input.selectedThreadIdentifier !== null,
+      },
+    );
 
     return new Promise<ThreadListPresentationStateResult>((resolve, reject) => {
-      this.pendingRequests.set(requestIdentifier, { resolve, reject });
+      this.pendingRequests.set(requestIdentifier, {
+        resolve,
+        reject,
+        operationToken,
+      });
       this.worker.postMessage(request);
     });
   }
@@ -113,6 +132,7 @@ export class ThreadListPresentationWorkerOwner implements ThreadListPresentation
             `${WORKER_INVALID_RESPONSE_ERROR_MESSAGE_PREFIX}: ${parsedResponseResult.error.message}`,
           ),
         ),
+        "failed",
       );
       return;
     }
@@ -132,6 +152,11 @@ export class ThreadListPresentationWorkerOwner implements ThreadListPresentation
     response: ThreadListPresentationWorkerResponse,
   ): void {
     if (response.kind === "success") {
+      completeGlobalPerformanceOperation(pendingRequest.operationToken, "succeeded", {
+        requestId: response.requestId,
+        activeProjectGroupCount: response.result.activeProjectGroups.length,
+        archivedProjectGroupCount: response.result.archivedProjectGroups.length,
+      });
       pendingRequest.resolve({
         selectedThread: response.result.selectedThread,
         activeProjectGroups: response.result.activeProjectGroups,
@@ -141,6 +166,10 @@ export class ThreadListPresentationWorkerOwner implements ThreadListPresentation
       });
       return;
     }
+    completeGlobalPerformanceOperation(pendingRequest.operationToken, "failed", {
+      requestId: response.requestId,
+      reason: response.reason,
+    });
     pendingRequest.reject(
       new Error(
         buildWorkerResponseErrorMessage(
@@ -151,11 +180,17 @@ export class ThreadListPresentationWorkerOwner implements ThreadListPresentation
   }
 
   private handleWorkerError(_: Event): void {
-    this.rejectPendingRequests(new Error(buildWorkerResponseErrorMessage(WORKER_ERROR_MESSAGE)));
+    this.rejectPendingRequests(
+      new Error(buildWorkerResponseErrorMessage(WORKER_ERROR_MESSAGE)),
+      "failed",
+    );
   }
 
-  private rejectPendingRequests(error: Error): void {
+  private rejectPendingRequests(error: Error, outcome: "failed" | "canceled" = "canceled"): void {
     for (const pendingRequest of this.pendingRequests.values()) {
+      completeGlobalPerformanceOperation(pendingRequest.operationToken, outcome, {
+        message: error.message,
+      });
       pendingRequest.reject(error);
     }
     this.pendingRequests.clear();

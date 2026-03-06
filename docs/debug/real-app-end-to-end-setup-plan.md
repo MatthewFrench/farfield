@@ -137,11 +137,17 @@ A clean run means:
 ## Proposed Command Surface
 
 - `pnpm end-to-end:real:install`
-  - Installs Playwright browser dependency (`chromium`) locally.
+  - Installs Playwright browser dependencies (`chromium`, `webkit`) locally.
 - `pnpm end-to-end:real:run`
   - Headless run of real-app scenarios against already-running app.
+- `pnpm end-to-end:real:run:webkit`
+  - Headless run of real-app scenarios against already-running app using Playwright WebKit with a mobile device profile.
 - `pnpm end-to-end:real:safe-run`
   - Headless real-app run with pre/post thread snapshot guard that fails if any pre-existing thread disappears.
+- `pnpm end-to-end:real:mobile-freeze-profile`
+  - Repeated mobile sidebar open/close profiling against Chromium mobile emulation with freeze artifacts.
+- `pnpm end-to-end:real:mobile-freeze-profile:webkit`
+  - Repeated mobile sidebar open/close profiling against WebKit mobile emulation with freeze artifacts.
 - `pnpm end-to-end:real:ui`
   - Playwright UI mode for local iteration.
 - `pnpm end-to-end:real:debug -- --grep "thread-open"`

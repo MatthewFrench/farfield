@@ -1,4 +1,12 @@
-import type { Page } from "@playwright/test";
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  type FarfieldClientPerformanceCompletedOperation,
+  type FarfieldClientPerformanceFreezeWindow,
+  type FarfieldClientPerformanceProbeSnapshot,
+  FarfieldClientPerformanceProbeSnapshotSchema,
+} from "@farfield/protocol";
+import type { Page, TestInfo } from "@playwright/test";
 import { z } from "zod";
 
 const PerformanceBudgetModeSchema = z.enum(["fail", "warn"]);
@@ -13,6 +21,63 @@ const PerformanceProbeSnapshotSchema = z
     cumulativeLayoutShift: z.number().nonnegative(),
     longTaskCount: z.number().int().nonnegative(),
     longTaskTotalDurationMilliseconds: z.number().nonnegative(),
+  })
+  .strict();
+
+const FreezeProfileOperationOverlapSchema = z
+  .object({
+    sequence: z.number().int().nonnegative(),
+    name: z.string().min(1),
+    durationMilliseconds: z.number().nonnegative(),
+    outcome: z.enum(["succeeded", "failed", "canceled"]),
+  })
+  .strict();
+
+const FreezeProfileIncidentSchema = z
+  .object({
+    freezeWindow: z
+      .object({
+        sequence: z.number().int().nonnegative(),
+        startedAtEpochMilliseconds: z.number().int().nonnegative(),
+        completedAtEpochMilliseconds: z.number().int().nonnegative(),
+        startedAtHighResolutionMilliseconds: z.number().nonnegative(),
+        completedAtHighResolutionMilliseconds: z.number().nonnegative(),
+        durationMilliseconds: z.number().nonnegative(),
+      })
+      .strict(),
+    overlappingOperations: z.array(FreezeProfileOperationOverlapSchema),
+    overlappingLongTaskCount: z.number().int().nonnegative(),
+    overlappingLongTaskTotalDurationMilliseconds: z.number().nonnegative(),
+  })
+  .strict();
+
+const FreezeProfileOperationAggregateSchema = z
+  .object({
+    name: z.string().min(1),
+    count: z.number().int().nonnegative(),
+    totalDurationMilliseconds: z.number().nonnegative(),
+    maxDurationMilliseconds: z.number().nonnegative(),
+  })
+  .strict();
+
+const FreezeProfileReportSchema = z
+  .object({
+    freezeCount: z.number().int().nonnegative(),
+    totalFreezeDurationMilliseconds: z.number().nonnegative(),
+    maximumFreezeDurationMilliseconds: z.number().nonnegative(),
+    maximumLongTaskDurationMilliseconds: z.number().nonnegative(),
+    incidents: z.array(FreezeProfileIncidentSchema),
+    overlappingOperationAggregates: z.array(FreezeProfileOperationAggregateSchema),
+  })
+  .strict();
+
+const FreezeProfileArtifactSchema = z
+  .object({
+    label: z.string().min(1),
+    recordedAt: z.string().datetime(),
+    snapshot: FarfieldClientPerformanceProbeSnapshotSchema,
+    report: FreezeProfileReportSchema,
+    artifactPath: z.string().min(1),
   })
   .strict();
 
@@ -34,6 +99,36 @@ export interface PerformanceProbeSnapshot {
   longTaskTotalDurationMilliseconds: number;
 }
 
+export interface FreezeProfileOperationOverlap {
+  sequence: number;
+  name: string;
+  durationMilliseconds: number;
+  outcome: FarfieldClientPerformanceCompletedOperation["outcome"];
+}
+
+export interface FreezeProfileIncident {
+  freezeWindow: FarfieldClientPerformanceFreezeWindow;
+  overlappingOperations: FreezeProfileOperationOverlap[];
+  overlappingLongTaskCount: number;
+  overlappingLongTaskTotalDurationMilliseconds: number;
+}
+
+export interface FreezeProfileOperationAggregate {
+  name: string;
+  count: number;
+  totalDurationMilliseconds: number;
+  maxDurationMilliseconds: number;
+}
+
+export interface FreezeProfileReport {
+  freezeCount: number;
+  totalFreezeDurationMilliseconds: number;
+  maximumFreezeDurationMilliseconds: number;
+  maximumLongTaskDurationMilliseconds: number;
+  incidents: FreezeProfileIncident[];
+  overlappingOperationAggregates: FreezeProfileOperationAggregate[];
+}
+
 export interface RenderPerformanceBudgetInput {
   label: string;
   snapshot: PerformanceProbeSnapshot;
@@ -47,6 +142,15 @@ export interface ReadinessBudgetInput {
   label: string;
   elapsedMilliseconds: number;
   maximumMilliseconds: number;
+}
+
+export interface FreezeProfileBudgetInput {
+  label: string;
+  report: FreezeProfileReport;
+  maximumFreezeCount: number;
+  maximumFreezeDurationMilliseconds: number;
+  maximumTotalFreezeDurationMilliseconds: number;
+  maximumLongTaskDurationMilliseconds: number;
 }
 
 function assertWithinMaximumBudget(input: {
@@ -75,6 +179,30 @@ function formatMetricValue(value: number | null): string {
     return "n/a";
   }
   return String(Math.round(value));
+}
+
+function sanitizeLabel(value: string): string {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+
+  return sanitized.length > 0 ? sanitized : "performance";
+}
+
+function rangesOverlap(input: {
+  leftStartedAtHighResolutionMilliseconds: number;
+  leftCompletedAtHighResolutionMilliseconds: number;
+  rightStartedAtHighResolutionMilliseconds: number;
+  rightCompletedAtHighResolutionMilliseconds: number;
+}): boolean {
+  return (
+    input.leftStartedAtHighResolutionMilliseconds <
+      input.rightCompletedAtHighResolutionMilliseconds &&
+    input.rightStartedAtHighResolutionMilliseconds < input.leftCompletedAtHighResolutionMilliseconds
+  );
 }
 
 export async function installPerformanceProbe(page: Page): Promise<void> {
@@ -258,6 +386,49 @@ export async function readPerformanceProbeSnapshot(page: Page): Promise<Performa
   return PerformanceProbeSnapshotSchema.parse(rawSnapshot);
 }
 
+export async function readClientPerformanceProbeSnapshot(
+  page: Page,
+): Promise<FarfieldClientPerformanceProbeSnapshot> {
+  const rawSnapshot = await page.evaluate(() => {
+    interface WindowWithClientPerformanceFreezeProbeOwner extends Window {
+      __farfieldClientPerformanceFreezeProbeOwner?: {
+        readSnapshot: () => FarfieldClientPerformanceProbeSnapshot;
+      };
+    }
+
+    const typedWindow = window as WindowWithClientPerformanceFreezeProbeOwner;
+    const owner = typedWindow.__farfieldClientPerformanceFreezeProbeOwner;
+    if (owner === undefined) {
+      return {
+        installedAtEpochMilliseconds: 0,
+        freezeThresholdMilliseconds: 0,
+        instantEvents: [],
+        inFlightOperations: [],
+        completedOperations: [],
+        longTasks: [],
+        freezeWindows: [],
+      };
+    }
+
+    return owner.readSnapshot();
+  });
+
+  return FarfieldClientPerformanceProbeSnapshotSchema.parse(rawSnapshot);
+}
+
+export async function resetClientPerformanceProbeSnapshot(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    interface WindowWithClientPerformanceFreezeProbeOwner extends Window {
+      __farfieldClientPerformanceFreezeProbeOwner?: {
+        resetRecordedEntries: () => void;
+      };
+    }
+
+    const typedWindow = window as WindowWithClientPerformanceFreezeProbeOwner;
+    typedWindow.__farfieldClientPerformanceFreezeProbeOwner?.resetRecordedEntries();
+  });
+}
+
 export async function measureElapsedMilliseconds(action: () => Promise<void>): Promise<number> {
   const startedAtMilliseconds = Date.now();
   await action();
@@ -302,6 +473,167 @@ export function assertRenderPerformanceBudget(input: RenderPerformanceBudgetInpu
   }
 }
 
+export function buildFreezeProfileReport(
+  snapshot: FarfieldClientPerformanceProbeSnapshot,
+): FreezeProfileReport {
+  const incidents = snapshot.freezeWindows
+    .map<FreezeProfileIncident>((freezeWindow) => {
+      const overlappingOperations = snapshot.completedOperations
+        .filter((operation) =>
+          rangesOverlap({
+            leftStartedAtHighResolutionMilliseconds:
+              freezeWindow.startedAtHighResolutionMilliseconds,
+            leftCompletedAtHighResolutionMilliseconds:
+              freezeWindow.completedAtHighResolutionMilliseconds,
+            rightStartedAtHighResolutionMilliseconds: operation.startedAtHighResolutionMilliseconds,
+            rightCompletedAtHighResolutionMilliseconds:
+              operation.completedAtHighResolutionMilliseconds,
+          }),
+        )
+        .map<FreezeProfileOperationOverlap>((operation) => ({
+          sequence: operation.sequence,
+          name: operation.name,
+          durationMilliseconds: operation.durationMilliseconds,
+          outcome: operation.outcome,
+        }))
+        .sort((left, right) => right.durationMilliseconds - left.durationMilliseconds);
+
+      const overlappingLongTasks = snapshot.longTasks.filter((longTask) =>
+        rangesOverlap({
+          leftStartedAtHighResolutionMilliseconds: freezeWindow.startedAtHighResolutionMilliseconds,
+          leftCompletedAtHighResolutionMilliseconds:
+            freezeWindow.completedAtHighResolutionMilliseconds,
+          rightStartedAtHighResolutionMilliseconds: longTask.startedAtHighResolutionMilliseconds,
+          rightCompletedAtHighResolutionMilliseconds:
+            longTask.completedAtHighResolutionMilliseconds,
+        }),
+      );
+
+      return {
+        freezeWindow,
+        overlappingOperations,
+        overlappingLongTaskCount: overlappingLongTasks.length,
+        overlappingLongTaskTotalDurationMilliseconds: overlappingLongTasks.reduce(
+          (totalDurationMilliseconds, longTask) =>
+            totalDurationMilliseconds + longTask.durationMilliseconds,
+          0,
+        ),
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.freezeWindow.durationMilliseconds - left.freezeWindow.durationMilliseconds,
+    );
+
+  const overlappingOperationAggregateMap = new Map<string, FreezeProfileOperationAggregate>();
+  for (const incident of incidents) {
+    for (const operation of incident.overlappingOperations) {
+      const existingAggregate = overlappingOperationAggregateMap.get(operation.name);
+      if (existingAggregate === undefined) {
+        overlappingOperationAggregateMap.set(operation.name, {
+          name: operation.name,
+          count: 1,
+          totalDurationMilliseconds: operation.durationMilliseconds,
+          maxDurationMilliseconds: operation.durationMilliseconds,
+        });
+        continue;
+      }
+
+      overlappingOperationAggregateMap.set(operation.name, {
+        name: existingAggregate.name,
+        count: existingAggregate.count + 1,
+        totalDurationMilliseconds:
+          existingAggregate.totalDurationMilliseconds + operation.durationMilliseconds,
+        maxDurationMilliseconds: Math.max(
+          existingAggregate.maxDurationMilliseconds,
+          operation.durationMilliseconds,
+        ),
+      });
+    }
+  }
+
+  return FreezeProfileReportSchema.parse({
+    freezeCount: snapshot.freezeWindows.length,
+    totalFreezeDurationMilliseconds: snapshot.freezeWindows.reduce(
+      (totalDurationMilliseconds, freezeWindow) =>
+        totalDurationMilliseconds + freezeWindow.durationMilliseconds,
+      0,
+    ),
+    maximumFreezeDurationMilliseconds: snapshot.freezeWindows.reduce(
+      (maximumDurationMilliseconds, freezeWindow) =>
+        Math.max(maximumDurationMilliseconds, freezeWindow.durationMilliseconds),
+      0,
+    ),
+    maximumLongTaskDurationMilliseconds: snapshot.longTasks.reduce(
+      (maximumDurationMilliseconds, longTask) =>
+        Math.max(maximumDurationMilliseconds, longTask.durationMilliseconds),
+      0,
+    ),
+    incidents,
+    overlappingOperationAggregates: [...overlappingOperationAggregateMap.values()].sort(
+      (left, right) => right.totalDurationMilliseconds - left.totalDurationMilliseconds,
+    ),
+  });
+}
+
+export function assertFreezeProfileBudget(input: FreezeProfileBudgetInput): void {
+  assertWithinMaximumBudget({
+    label: input.label,
+    metric: "freezeCount",
+    observedValue: input.report.freezeCount,
+    maximumValue: input.maximumFreezeCount,
+  });
+  assertWithinMaximumBudget({
+    label: input.label,
+    metric: "maximumFreezeDurationMs",
+    observedValue: input.report.maximumFreezeDurationMilliseconds,
+    maximumValue: input.maximumFreezeDurationMilliseconds,
+  });
+  assertWithinMaximumBudget({
+    label: input.label,
+    metric: "totalFreezeDurationMs",
+    observedValue: input.report.totalFreezeDurationMilliseconds,
+    maximumValue: input.maximumTotalFreezeDurationMilliseconds,
+  });
+  assertWithinMaximumBudget({
+    label: input.label,
+    metric: "maximumLongTaskDurationMs",
+    observedValue: input.report.maximumLongTaskDurationMilliseconds,
+    maximumValue: input.maximumLongTaskDurationMilliseconds,
+  });
+}
+
+export async function writeFreezeProfileArtifact(input: {
+  testInfo: TestInfo;
+  label: string;
+  snapshot: FarfieldClientPerformanceProbeSnapshot;
+  report: FreezeProfileReport;
+}): Promise<string> {
+  const outputDirectory = path.join(process.cwd(), ".runtime", "end-to-end-performance");
+  await fs.mkdir(outputDirectory, { recursive: true });
+
+  const artifactFileName = `${sanitizeLabel(input.label)}.json`;
+  const artifactPath = path.join(outputDirectory, artifactFileName);
+  const artifact = FreezeProfileArtifactSchema.parse({
+    label: input.label,
+    recordedAt: new Date().toISOString(),
+    snapshot: input.snapshot,
+    report: input.report,
+    artifactPath,
+  });
+  const encoded = `${JSON.stringify(artifact, null, 2)}\n`;
+
+  await fs.writeFile(artifactPath, encoded, "utf8");
+  await fs.writeFile(path.join(outputDirectory, "latest.json"), encoded, "utf8");
+  await input.testInfo.attach(`${sanitizeLabel(input.label)}-freeze-profile`, {
+    body: Buffer.from(encoded, "utf8"),
+    contentType: "application/json",
+  });
+
+  process.stdout.write(`[end-to-end-performance] freeze artifact ${artifactPath}\n`);
+  return artifactPath;
+}
+
 export function logPerformanceProbeSnapshot(
   label: string,
   snapshot: PerformanceProbeSnapshot,
@@ -316,5 +648,21 @@ export function logPerformanceProbeSnapshot(
     )} cls=${snapshot.cumulativeLayoutShift.toFixed(4)} longTasks=${String(
       snapshot.longTaskCount,
     )} longTaskDurationMs=${Math.round(snapshot.longTaskTotalDurationMilliseconds)}\n`,
+  );
+}
+
+export function logFreezeProfileReport(label: string, report: FreezeProfileReport): void {
+  const longestIncident = report.incidents[0] ?? null;
+  const topOperation = report.overlappingOperationAggregates[0] ?? null;
+  process.stdout.write(
+    `[end-to-end-performance] ${label} freeze: count=${String(
+      report.freezeCount,
+    )} totalFreezeMs=${Math.round(report.totalFreezeDurationMilliseconds)} maxFreezeMs=${Math.round(
+      report.maximumFreezeDurationMilliseconds,
+    )} maxLongTaskMs=${Math.round(report.maximumLongTaskDurationMilliseconds)} topOperation=${
+      topOperation
+        ? `${topOperation.name}:${Math.round(topOperation.totalDurationMilliseconds)}`
+        : "n/a"
+    } topFreezeOperationCount=${String(longestIncident?.overlappingOperations.length ?? 0)}\n`,
   );
 }

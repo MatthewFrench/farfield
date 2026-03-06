@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import { Input } from "@/Components/UserInterface/Input";
 import { ThreadListSearchFilter } from "@/Features/Threads/DomainModel/ThreadListSearchFilter";
@@ -7,6 +7,7 @@ import { ThreadListActiveSection } from "@/Features/Threads/UserInterface/Thread
 import { ThreadListArchivedSection } from "@/Features/Threads/UserInterface/ThreadListArchivedSection";
 import { ThreadListEmptyState } from "@/Features/Threads/UserInterface/ThreadListEmptyState";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
+import { recordGlobalPerformanceInstantEvent } from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 
 export type {
   ThreadListPaneAgentDescriptor,
@@ -68,6 +69,16 @@ export function ThreadListPane(properties: ThreadListPaneProperties): React.JSX.
         archivedSectionThreadCount: filteredArchivedThreadCount,
       }
     : properties;
+
+  useEffect(() => {
+    recordGlobalPerformanceInstantEvent("thread-list-pane-committed", {
+      activeThreadCount: sectionProperties.threads.length,
+      activeProjectGroupCount: sectionProperties.activeProjectGroups.length,
+      archivedProjectGroupCount: sectionProperties.archivedProjectGroups.length,
+      hasSearchQuery,
+      archivedThreadsOpen: sectionProperties.isArchivedThreadsOpen,
+    });
+  });
 
   return (
     <div className="relative flex-1 min-h-0">

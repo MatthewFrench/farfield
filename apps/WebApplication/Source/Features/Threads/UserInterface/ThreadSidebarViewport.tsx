@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { recordGlobalPerformanceInstantEvent } from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 import { ThreadSidebarPanel, type ThreadSidebarPanelProps } from "./ThreadSidebarPanel";
 
 interface ThreadSidebarViewportProps extends Omit<ThreadSidebarPanelProps, "viewport"> {
@@ -39,8 +40,11 @@ export function ThreadSidebarViewport({
   useEffect(() => {
     if (isOpen) {
       setHasOpened(true);
+      recordGlobalPerformanceInstantEvent("sidebar-viewport-visible", {
+        viewport,
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, viewport]);
 
   if (!hasOpened) {
     return <></>;

@@ -28,6 +28,7 @@ import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/S
 import { type SettingsWorkspacePaneProps } from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
 import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadSidebarPanelHealthState } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
+import { recordGlobalPerformanceInstantEvent } from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 
 interface SendPushTestNotificationFromSettingsInput {
   threadId: string;
@@ -276,7 +277,15 @@ function invokeAsyncOwnerAction(action: AsyncOwnerAction): void {
   void action();
 }
 
-function openSidebar(setSidebarOpen: (nextOpen: boolean) => void): void {
+function openSidebar(
+  setSidebarOpen: (nextOpen: boolean) => void,
+  target: "mobile" | "desktop",
+  activeTab: ApplicationHeaderBarProps["activeTab"],
+): void {
+  recordGlobalPerformanceInstantEvent("sidebar-toggle-open-requested", {
+    target,
+    activeTab,
+  });
   setSidebarOpen(SIDEBAR_OPEN_STATE);
 }
 
@@ -352,10 +361,10 @@ function buildApplicationHeaderBarProperties(
     runtimeWarningSummary: input.threadSidebarRuntimeSummary.warning,
     runtimeModelRerouteSummary: input.threadSidebarRuntimeSummary.modelReroute,
     onOpenMobileSidebar: () => {
-      openSidebar(input.setMobileSidebarOpen);
+      openSidebar(input.setMobileSidebarOpen, "mobile", input.activeTab);
     },
     onOpenDesktopSidebar: () => {
-      openSidebar(input.setDesktopSidebarOpen);
+      openSidebar(input.setDesktopSidebarOpen, "desktop", input.activeTab);
     },
     onToggleSettingsTab: () => {
       input.setActiveTab(getNextActiveTabWhenTogglingSettings(input.activeTab));

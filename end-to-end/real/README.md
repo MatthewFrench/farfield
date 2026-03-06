@@ -41,11 +41,15 @@ pnpm smoke:app
 ```bash
 pnpm end-to-end:real:install
 pnpm end-to-end:real:run
+pnpm end-to-end:real:run:webkit
 pnpm end-to-end:real:safe-run
+pnpm end-to-end:real:mobile-freeze-profile
+pnpm end-to-end:real:mobile-freeze-profile:webkit
 pnpm end-to-end:real:manual:guard
 pnpm end-to-end:real:manual:session
 pnpm end-to-end:real:ui
 pnpm end-to-end:real:debug -- --grep "thread"
+pnpm end-to-end:real:debug:webkit -- --grep "mobile sidebar"
 pnpm verify:end-to-end:real
 pnpm stress:stream-burst
 ```
@@ -69,6 +73,40 @@ Use this for fast triage while iterating:
 ```bash
 tail -f .runtime/end-to-end-sentinel/latest.ndjson
 ```
+
+Freeze-profile artifacts are written to:
+
+- `.runtime/end-to-end-performance/<label>.json`
+- `.runtime/end-to-end-performance/latest.json`
+
+Use the dedicated mobile freeze run for repeated sidebar open/close profiling:
+
+```bash
+pnpm end-to-end:real:mobile-freeze-profile
+```
+
+Safari-like mobile automation is available through Playwright WebKit with an iPhone device profile:
+
+```bash
+pnpm end-to-end:real:run:webkit
+pnpm end-to-end:real:mobile-freeze-profile:webkit
+pnpm end-to-end:real:debug:webkit -- --grep "mobile sidebar"
+```
+
+Use the default Chromium mobile profile for fast iteration and the WebKit path when you need a closer Safari-like signal before moving to iOS Simulator or a real device.
+
+Runtime knobs for the mobile freeze profile:
+
+- `E2E_REAL_MOBILE_SIDEBAR_PROFILE_ITERATIONS` (default `16`)
+- `E2E_REAL_MOBILE_SIDEBAR_READY_BUDGET_MS` (default `12000`)
+- `E2E_REAL_MOBILE_SIDEBAR_MAX_FREEZE_COUNT` (default `20`)
+- `E2E_REAL_MOBILE_SIDEBAR_MAX_FREEZE_DURATION_MS` (default `600`)
+- `E2E_REAL_MOBILE_SIDEBAR_MAX_TOTAL_FREEZE_DURATION_MS` (default `2500`)
+- `E2E_REAL_MOBILE_SIDEBAR_MAX_LONG_TASK_DURATION_MS` (default `400`)
+
+For a full workflow and live mobile investigation notes, see:
+
+- `docs/debug/mobile-freeze-profiling.md`
 
 ## Manual MCP smoke
 
