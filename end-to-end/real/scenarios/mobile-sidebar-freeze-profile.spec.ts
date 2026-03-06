@@ -75,6 +75,9 @@ function readMaximumIterationDuration(iterationDurationsMilliseconds: number[]):
 }
 
 test("mobile sidebar freeze profile", async ({ page, sentinel }, testInfo) => {
+  const browserLabel = testInfo.project.use.browserName ?? "browser";
+  const scenarioLabel = `${browserLabel}-mobile-sidebar-freeze-profile`;
+
   await page.setViewportSize({ width: 390, height: 844 });
   await installPerformanceProbe(page);
 
@@ -107,14 +110,14 @@ test("mobile sidebar freeze profile", async ({ page, sentinel }, testInfo) => {
   }
 
   const renderPerformanceSnapshot = await readPerformanceProbeSnapshot(page);
-  logPerformanceProbeSnapshot("mobile-sidebar-freeze-profile", renderPerformanceSnapshot);
+  logPerformanceProbeSnapshot(scenarioLabel, renderPerformanceSnapshot);
 
   const freezeSnapshot = await readClientPerformanceProbeSnapshot(page);
   const freezeProfileReport = buildFreezeProfileReport(freezeSnapshot);
-  logFreezeProfileReport("mobile-sidebar-freeze-profile", freezeProfileReport);
+  logFreezeProfileReport(scenarioLabel, freezeProfileReport);
   await writeFreezeProfileArtifact({
     testInfo,
-    label: "mobile-sidebar-freeze-profile",
+    label: scenarioLabel,
     snapshot: freezeSnapshot,
     report: freezeProfileReport,
   });
@@ -125,7 +128,7 @@ test("mobile sidebar freeze profile", async ({ page, sentinel }, testInfo) => {
     maximumMilliseconds: MOBILE_SIDEBAR_READY_BUDGET_MILLISECONDS,
   });
   assertFreezeProfileBudget({
-    label: "mobile-sidebar-freeze-profile",
+    label: scenarioLabel,
     report: freezeProfileReport,
     maximumFreezeCount: MOBILE_SIDEBAR_MAX_FREEZE_COUNT,
     maximumFreezeDurationMilliseconds: MOBILE_SIDEBAR_MAX_FREEZE_DURATION_MILLISECONDS,

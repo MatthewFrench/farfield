@@ -1,26 +1,22 @@
 import {
-  AppServerListThreadsResponseSchema,
-  AppServerStartThreadResponseSchema
+  AppServerStartThreadResponseSchema,
+  FarfieldThreadListResponseSchema,
 } from "@farfield/protocol";
-import type {
-  APIRequestContext,
-  Page,
-  Request
-} from "@playwright/test";
+import type { APIRequestContext, Page, Request } from "@playwright/test";
 import { z } from "zod";
 
 const ThreadListEnvelopeSchema = z
   .object({
-    ok: z.literal(true)
+    ok: z.literal(true),
   })
-  .merge(AppServerListThreadsResponseSchema)
+  .merge(FarfieldThreadListResponseSchema)
   .strict();
 
 const CreateThreadEnvelopeSchema = z
   .object({
     ok: z.literal(true),
     threadId: z.string().min(1),
-    agentId: z.enum(["codex", "opencode"])
+    agentId: z.enum(["codex", "opencode"]),
   })
   .merge(AppServerStartThreadResponseSchema)
   .passthrough();
@@ -28,14 +24,14 @@ const CreateThreadEnvelopeSchema = z
 const ArchiveThreadEnvelopeSchema = z
   .object({
     ok: z.literal(true),
-    threadId: z.string().min(1)
+    threadId: z.string().min(1),
   })
   .strict();
 
 const ApiErrorEnvelopeSchema = z
   .object({
     ok: z.literal(false),
-    error: z.string().min(1)
+    error: z.string().min(1),
   })
   .strict();
 const THREAD_BASELINE_FETCH_MAXIMUM_ATTEMPTS = 12;
@@ -43,9 +39,9 @@ const THREAD_BASELINE_FETCH_RETRY_DELAY_MILLISECONDS = 500;
 
 function isManagedThreadAlreadyGone(errorMessage: string): boolean {
   return (
-    /no rollout found for thread id/i.test(errorMessage)
-    || /thread .* is not registered/i.test(errorMessage)
-    || /thread not loaded in app-server/i.test(errorMessage)
+    /no rollout found for thread id/i.test(errorMessage) ||
+    /thread .* is not registered/i.test(errorMessage) ||
+    /thread not loaded in app-server/i.test(errorMessage)
   );
 }
 
@@ -116,7 +112,7 @@ export class RealAppStateIsolationGuard {
 
     if (method === "POST" && pathname === "/api/threads") {
       this.violations.push(
-        "POST /api/threads from browser is not allowed in real end-to-end tests. Use guard.createManagedThread() so thread lifecycle is isolated."
+        "POST /api/threads from browser is not allowed in real end-to-end tests. Use guard.createManagedThread() so thread lifecycle is isolated.",
       );
       return;
     }
@@ -136,13 +132,13 @@ export class RealAppStateIsolationGuard {
 
     if (this.baselineThreadIds.has(threadId)) {
       this.violations.push(
-        `Mutation request POST ${pathname} targeted pre-existing thread ${threadId}`
+        `Mutation request POST ${pathname} targeted pre-existing thread ${threadId}`,
       );
       return;
     }
 
     this.violations.push(
-      `Mutation request POST ${pathname} targeted unmanaged thread ${threadId}. Register thread through guard.createManagedThread() before mutating it.`
+      `Mutation request POST ${pathname} targeted unmanaged thread ${threadId}. Register thread through guard.createManagedThread() before mutating it.`,
     );
   };
 
@@ -183,13 +179,13 @@ export class RealAppStateIsolationGuard {
       data: {
         ...(input?.agentId ? { agentId: input.agentId } : {}),
         ...(input?.cwd ? { cwd: input.cwd } : {}),
-        ephemeral: true
-      }
+        ephemeral: true,
+      },
     });
 
     if (!response.ok()) {
       throw new Error(
-        `Managed thread create failed: POST /api/threads -> HTTP ${String(response.status())}`
+        `Managed thread create failed: POST /api/threads -> HTTP ${String(response.status())}`,
       );
     }
 
@@ -208,9 +204,7 @@ export class RealAppStateIsolationGuard {
       return `${String(index + 1)}. ${violation}`;
     });
 
-    throw new Error(
-      `Real app state isolation violations detected:\n${formatted.join("\n")}`
-    );
+    throw new Error(`Real app state isolation violations detected:\n${formatted.join("\n")}`);
   }
 
   private async fetchThreadIds(): Promise<string[]> {
@@ -223,7 +217,7 @@ export class RealAppStateIsolationGuard {
 
       try {
         const response = await this.request.get(
-          "/api/threads?limit=200&archived=false&all=true&maxPages=20"
+          "/api/threads?limit=200&archived=false&all=true&maxPages=20",
         );
         if (response.ok()) {
           const payload = await response.json();
@@ -234,13 +228,13 @@ export class RealAppStateIsolationGuard {
         const statusCode = response.status();
         if (isFinalAttempt || !shouldRetryThreadBaselineFetch(statusCode)) {
           throw new Error(
-            `Thread baseline fetch failed: GET /api/threads -> HTTP ${String(statusCode)}`
+            `Thread baseline fetch failed: GET /api/threads -> HTTP ${String(statusCode)}`,
           );
         }
       } catch (error) {
         if (isFinalAttempt) {
           throw new Error(
-            `Thread baseline fetch failed: GET /api/threads -> ${readErrorMessage(error)}`
+            `Thread baseline fetch failed: GET /api/threads -> ${readErrorMessage(error)}`,
           );
         }
       }
@@ -256,7 +250,7 @@ export class RealAppStateIsolationGuard {
 
     for (const threadId of threadIds) {
       const response = await this.request.post(
-        `/api/threads/${encodeURIComponent(threadId)}/archive`
+        `/api/threads/${encodeURIComponent(threadId)}/archive`,
       );
       const payload = await response.json();
 
@@ -266,7 +260,7 @@ export class RealAppStateIsolationGuard {
           continue;
         }
         this.violations.push(
-          `Managed thread cleanup failed: POST /api/threads/${threadId}/archive -> HTTP ${String(response.status())}`
+          `Managed thread cleanup failed: POST /api/threads/${threadId}/archive -> HTTP ${String(response.status())}`,
         );
         continue;
       }
@@ -274,7 +268,7 @@ export class RealAppStateIsolationGuard {
       const parsed = ArchiveThreadEnvelopeSchema.parse(payload);
       if (parsed.threadId !== threadId) {
         this.violations.push(
-          `Managed thread cleanup returned mismatched threadId: expected ${threadId}, got ${parsed.threadId}`
+          `Managed thread cleanup returned mismatched threadId: expected ${threadId}, got ${parsed.threadId}`,
         );
       }
     }
