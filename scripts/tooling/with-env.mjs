@@ -58,6 +58,7 @@ const INHERITED_ENVIRONMENT_PREFIXES = [
   "CADDY_",
   "CODEX_",
   "DEBUG_",
+  "E2E_REAL_",
   "FARFIELD_",
   "GITHUB_",
   "IOS_",
@@ -127,8 +128,8 @@ const inheritedEnvironment = buildInheritedEnvironment(process.env);
 const child = spawn(commandText, {
   cwd,
   env: {
-    ...inheritedEnvironment,
-    ...loadedEnvironment
+    ...loadedEnvironment,
+    ...inheritedEnvironment
   },
   shell: true,
   stdio: "inherit"
