@@ -17,6 +17,7 @@ import {
 const SIDEBAR_APPS_LIST_LIMIT = 100;
 const SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION = "refresh-sidebar-runtime-summary";
 const EMPTY_RUNTIME_SUMMARY_REFRESH_ERROR_MESSAGE = "Unknown sidebar runtime summary refresh error";
+const SIDEBAR_RUNTIME_SUMMARY_IDLE_LOAD_TIMEOUT_MILLISECONDS = 5_000;
 const threadSidebarRuntimeSummaryNetworkCacheOwner =
   new ThreadSidebarRuntimeSummaryNetworkCacheOwner();
 
@@ -148,6 +149,9 @@ export function useThreadSidebarRuntimeHydrationEffect(
       canReadAccountRateLimits: input.canReadAccountRateLimits,
       canListApps: input.canListApps,
     });
+    if (!requiredCoverage.account && !requiredCoverage.rateLimits && !requiredCoverage.apps) {
+      return;
+    }
     const cachedSnapshot = threadSidebarRuntimeSummaryNetworkCacheOwner.readSnapshot(
       input.selectedAgentId,
     );
@@ -198,9 +202,35 @@ export function useThreadSidebarRuntimeHydrationEffect(
       }
     };
 
-    void hydrateThreadSidebarRuntimeSummary();
+    const requestIdleCallbackFunction = window.requestIdleCallback;
+    const cancelIdleCallbackFunction = window.cancelIdleCallback;
+    let refreshTimer: number | null = null;
+    let idleCallbackIdentifier: number | null = null;
+    if (
+      typeof requestIdleCallbackFunction === "function" &&
+      typeof cancelIdleCallbackFunction === "function"
+    ) {
+      idleCallbackIdentifier = requestIdleCallbackFunction(
+        () => {
+          void hydrateThreadSidebarRuntimeSummary();
+        },
+        {
+          timeout: SIDEBAR_RUNTIME_SUMMARY_IDLE_LOAD_TIMEOUT_MILLISECONDS,
+        },
+      );
+    } else {
+      refreshTimer = window.setTimeout(() => {
+        void hydrateThreadSidebarRuntimeSummary();
+      }, SIDEBAR_RUNTIME_SUMMARY_IDLE_LOAD_TIMEOUT_MILLISECONDS);
+    }
     return () => {
       shouldCancelRefresh = true;
+      if (refreshTimer !== null) {
+        window.clearTimeout(refreshTimer);
+      }
+      if (idleCallbackIdentifier !== null) {
+        cancelIdleCallbackFunction(idleCallbackIdentifier);
+      }
     };
   }, [
     input.isSidebarVisible,

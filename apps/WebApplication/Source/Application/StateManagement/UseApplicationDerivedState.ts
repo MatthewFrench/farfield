@@ -40,6 +40,9 @@ import { useThreadListPresentationDerivedState } from "./UseThreadListPresentati
 
 const DEFAULT_SELECTED_AGENT_LABEL = "Agent";
 const MINIMUM_VISIBLE_CHAT_ITEM_INDEX = 0;
+const EMPTY_TURNS: ApplicationDerivedState["turns"] = [];
+const EMPTY_DEBUG_HISTORY_ENTRY_LIST_ITEMS: ApplicationDerivedState["debugHistoryEntryListItems"] =
+  [];
 
 function readRecentTraceSummaries(
   traceStatus: UseApplicationDerivedStateInput["traceStatus"],
@@ -58,6 +61,9 @@ function readRecentTraceSummaries(
 function readDebugHistoryEntryListItems(
   history: UseApplicationDerivedStateInput["history"],
 ): ApplicationDerivedState["debugHistoryEntryListItems"] {
+  if (history.length === 0) {
+    return EMPTY_DEBUG_HISTORY_ENTRY_LIST_ITEMS;
+  }
   return history.map((historyEntry) => ({
     id: historyEntry.id,
     at: historyEntry.at,
@@ -246,7 +252,7 @@ export function useApplicationDerivedState(
     [conversationState, pendingUserInputRequestSelector],
   );
 
-  const immediateTurns = conversationState?.turns ?? [];
+  const immediateTurns = conversationState?.turns ?? EMPTY_TURNS;
   const lastTurn = immediateTurns[immediateTurns.length - 1];
   const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
 
@@ -297,7 +303,10 @@ export function useApplicationDerivedState(
 
   const recentTraceSummaries = useMemo(() => readRecentTraceSummaries(traceStatus), [traceStatus]);
 
-  const debugHistoryEntryListItems = readDebugHistoryEntryListItems(history);
+  const debugHistoryEntryListItems = useMemo(
+    () => readDebugHistoryEntryListItems(history),
+    [history],
+  );
 
   const activeAgentLabel = readActiveAgentLabel({
     activeAgentDescriptor,

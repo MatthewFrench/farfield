@@ -639,3 +639,68 @@ Interpretation:
 1. The duplicate sidebar work is now largely gone on WebKit too.
 2. The remaining WebKit problem is no longer repeated app work; it is a smaller number of larger browser-visible stalls.
 3. The next high-value investigation should target the remaining commit or animation churn around sidebar open rather than broad request duplication.
+
+## 2026-03-06 Investigation Note: Sidebar Render-Cause Sampling
+
+Changes under test:
+
+1. Add explicit `changedFields` and sampled stable-parent-rerender counts to the sidebar pane commit marker.
+2. Isolate active thread rows behind a memoized row owner.
+3. Split the sidebar runtime footer into its own owner component.
+
+Command used:
+
+```bash
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile
+```
+
+Observed findings:
+
+1. `thread-list-active-section-committed` fired `2` times in the latest Chromium run.
+2. `thread-list-pane-committed` fired `21` times after sampling.
+3. All sampled pane rerenders after the initial render reported:
+   - `changedFields: ["stable-props-parent-rerender"]`
+
+Interpretation:
+
+1. The active-row subtree is no longer the main rerender source.
+2. The remaining churn is in the pane wrapper or its parent composition path.
+3. The next render investigation should focus on why the pane parent still rerenders with a stable snapshot.
+
+## 2026-03-06 Thread-Open Repeated Profile
+
+Changes under test:
+
+1. Add a repeated mobile thread-open freeze profile that alternates between the first two available threads.
+2. Reuse the same unsubscribe-route stub as the existing thread-open scenario.
+
+Command used:
+
+```bash
+E2E_REAL_MOBILE_THREAD_OPEN_PROFILE_ITERATIONS=2 \
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn \
+node scripts/tooling/with-env.mjs "bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts end-to-end/real/scenarios/thread-open-freeze-profile.spec.ts --timeout 30000"
+```
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/browser-mobile-thread-open-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `2`
+2. Freeze count: `1`
+3. Total freeze duration: `150ms`
+4. Max freeze duration: `150ms`
+5. Max long-task duration: `167ms`
+6. LCP: `2208ms`
+
+Top overlapping operation:
+
+1. `http-request`
+   - total overlap about `130ms`
+
+Interpretation:
+
+1. Repeated thread selection/open is materially healthier than repeated sidebar open.
+2. The sidebar remains the dominant mobile interaction problem.

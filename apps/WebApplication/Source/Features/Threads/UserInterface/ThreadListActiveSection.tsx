@@ -1,20 +1,5 @@
-import {
-  Archive,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Loader2,
-  Minimize2,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  Undo2,
-  X,
-} from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import {
   DropdownMenu,
@@ -22,19 +7,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/UserInterface/DropdownMenu";
-import { Input } from "@/Components/UserInterface/Input";
 import { ThreadGroupSelectors } from "@/Features/Threads/DomainModel/ThreadGroupSelectors";
+import { ThreadListActiveThreadRow } from "@/Features/Threads/UserInterface/ThreadListActiveThreadRow";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPaneContracts";
 import {
   DEFAULT_THREAD_PROJECT_DIRECTORY,
-  THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER,
   THREAD_GROUP_NO_PROJECT_TOOLTIP,
 } from "@/Features/Threads/UserInterface/ThreadListUserInterfaceConstants";
-import {
-  readThreadRuntimeStatusBadgeClasses,
-  readThreadRuntimeStatusBadgeLabel,
-  readThreadRuntimeStatusBadgeTitle,
-} from "@/Features/Threads/UserInterface/ThreadRuntimeStatusBadgeMetadata";
+import { recordGlobalPerformanceInstantEvent } from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 
 interface ThreadListActiveSectionProps {
   properties: ThreadListPaneProperties;
@@ -52,30 +32,55 @@ function readShouldShowUnreadIndicator(input: {
   return input.threadRuntimeStatus?.statusType !== "active";
 }
 
+function readUnreadThreadCount(unreadThreadIds: Record<string, true>): number {
+  return Object.keys(unreadThreadIds).length;
+}
+
+function readRuntimeStatusCount(
+  threadRuntimeStatusByThreadIdentifier: ThreadListPaneProperties["threadRuntimeStatusByThreadIdentifier"],
+): number {
+  return Object.keys(threadRuntimeStatusByThreadIdentifier).length;
+}
+
 export function ThreadListActiveSection({
   properties,
 }: ThreadListActiveSectionProps): React.JSX.Element {
   const [renamedThreadIdentifier, setRenamedThreadIdentifier] = useState<string | null>(null);
   const [threadNameDraft, setThreadNameDraft] = useState("");
 
-  function beginThreadRename(threadId: string, currentLabel: string): void {
+  const beginThreadRename = useCallback((threadId: string, currentLabel: string): void => {
     setRenamedThreadIdentifier(threadId);
     setThreadNameDraft(currentLabel);
-  }
+  }, []);
 
-  function cancelThreadRename(): void {
+  const cancelThreadRename = useCallback((): void => {
     setRenamedThreadIdentifier(null);
     setThreadNameDraft("");
-  }
+  }, []);
 
-  function submitThreadRename(threadId: string): void {
-    properties.onSetThreadName(threadId, threadNameDraft);
-    cancelThreadRename();
-  }
+  const submitThreadRename = useCallback(
+    (threadId: string): void => {
+      properties.onSetThreadName(threadId, threadNameDraft);
+      cancelThreadRename();
+    },
+    [cancelThreadRename, properties, threadNameDraft],
+  );
 
-  function readThreadRenameDraft(thread: ThreadListPaneProperties["threads"][number]): string {
-    return (thread.displayName ?? ThreadGroupSelectors.threadLabel(thread)).trim();
-  }
+  useEffect(() => {
+    recordGlobalPerformanceInstantEvent("thread-list-active-section-committed", {
+      activeThreadCount: properties.threads.length,
+      unreadThreadCount: readUnreadThreadCount(properties.unreadThreadIds),
+      runtimeStatusCount: readRuntimeStatusCount(properties.threadRuntimeStatusByThreadIdentifier),
+      isGenerating: properties.isGenerating,
+      selectedThreadId: properties.selectedThreadId,
+    });
+  }, [
+    properties.isGenerating,
+    properties.selectedThreadId,
+    properties.threadRuntimeStatusByThreadIdentifier,
+    properties.threads.length,
+    properties.unreadThreadIds,
+  ]);
 
   return (
     <div className="space-y-1">
@@ -174,243 +179,36 @@ export function ThreadListActiveSection({
                       const threadIsGenerating =
                         threadRuntimeStatus?.statusType === "active" ||
                         (isSelected && properties.isGenerating);
-                      const canArchive =
-                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
-                      const canRollback =
-                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
-                      const canCompact =
-                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
-                      const canCleanBackgroundTerminals =
-                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
-                      const canStartReview =
-                        thread.agentId === THREAD_ARCHIVE_MUTATION_SUPPORTED_AGENT_IDENTIFIER;
                       const isRenamingThread = renamedThreadIdentifier === thread.id;
                       return (
-                        <div
+                        <ThreadListActiveThreadRow
                           key={thread.id}
-                          className="flex items-stretch gap-1 [content-visibility:auto] [contain-intrinsic-size:56px]"
-                        >
-                          {isRenamingThread ? (
-                            <div
-                              className={`min-w-0 flex-1 h-auto flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal ${
-                                isSelected
-                                  ? "bg-muted/90 text-foreground shadow-sm"
-                                  : "bg-muted/60 text-foreground"
-                              }`}
-                            >
-                              <Input
-                                value={threadNameDraft}
-                                onChange={(event) => {
-                                  setThreadNameDraft(event.target.value);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    submitThreadRename(thread.id);
-                                  }
-                                  if (event.key === "Escape") {
-                                    event.preventDefault();
-                                    cancelThreadRename();
-                                  }
-                                }}
-                                className="h-7 text-[12px]"
-                                autoFocus
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-lg"
-                                onClick={() => {
-                                  submitThreadRename(thread.id);
-                                }}
-                                title="Save name"
-                              >
-                                <Check size={12} />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-lg"
-                                onClick={() => {
-                                  cancelThreadRename();
-                                }}
-                                title="Cancel rename"
-                              >
-                                <X size={12} />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              type="button"
-                              data-testid="thread-list-item"
-                              data-thread-id={thread.id}
-                              onClick={() => properties.onSelectThread(thread.id)}
-                              variant="ghost"
-                              className={`relative min-w-0 flex-1 h-auto flex items-start gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13px] tracking-tight font-normal whitespace-normal transition-colors ${
-                                isSelected
-                                  ? "bg-muted/90 text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                              }`}
-                            >
-                              {shouldShowUnreadIndicator && (
-                                <span
-                                  data-testid={`thread-unread-indicator-${thread.id}`}
-                                  aria-label="Unread message"
-                                  title="Unread message"
-                                  className="absolute left-1 top-[11px] h-2 w-2 rounded-full bg-sky-500"
-                                />
-                              )}
-                              <span
-                                className={`min-w-0 flex-1 leading-4 ${
-                                  shouldShowUnreadIndicator ? "pl-3.5" : ""
-                                }`}
-                              >
-                                <span className="line-clamp-2 break-words">
-                                  {ThreadGroupSelectors.threadLabel(thread)}
-                                </span>
-                              </span>
-                              <span className="shrink-0 flex items-center gap-1.5 pt-0.5">
-                                {shouldRenderThreadRuntimeStatusBadge && (
-                                  <span
-                                    data-testid={`thread-runtime-status-badge-${thread.id}`}
-                                    title={readThreadRuntimeStatusBadgeTitle(threadRuntimeStatus)}
-                                    className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${readThreadRuntimeStatusBadgeClasses(
-                                      threadRuntimeStatus,
-                                    )}`}
-                                  >
-                                    {readThreadRuntimeStatusBadgeLabel(threadRuntimeStatus)}
-                                  </span>
-                                )}
-                                {thread.isLoadedInMemory === true && (
-                                  <span
-                                    data-testid={`thread-loaded-indicator-${thread.id}`}
-                                    aria-label="Loaded in memory"
-                                    title="Loaded in memory"
-                                    className="h-2 w-2 rounded-full bg-emerald-500"
-                                  />
-                                )}
-                                {threadIsGenerating && (
-                                  <Loader2
-                                    data-testid={`thread-generating-indicator-${thread.id}`}
-                                    size={11}
-                                    className="animate-spin text-muted-foreground/70"
-                                  />
-                                )}
-                              </span>
-                            </Button>
-                          )}
-                          <div
-                            data-testid={`thread-row-meta-${thread.id}`}
-                            className="flex min-h-[34px] w-11 shrink-0 flex-col items-end justify-start gap-1 py-1"
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  data-testid="thread-row-menu-trigger"
-                                  data-thread-id={thread.id}
-                                  variant="ghost"
-                                  size="icon"
-                                  className={`h-6 w-6 rounded-md ${
-                                    isSelected
-                                      ? "bg-muted/90 text-foreground hover:bg-muted"
-                                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                                  }`}
-                                  disabled={properties.isBusy || isRenamingThread}
-                                >
-                                  <MoreHorizontal size={13} />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" sideOffset={6}>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    beginThreadRename(thread.id, readThreadRenameDraft(thread));
-                                  }}
-                                  disabled={properties.isBusy}
-                                >
-                                  <Pencil size={13} />
-                                  Rename thread
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (canStartReview) {
-                                      properties.onStartThreadReview(thread.id);
-                                    }
-                                  }}
-                                  disabled={properties.isBusy || !canStartReview}
-                                >
-                                  <Search size={13} />
-                                  Start code review
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (canCompact) {
-                                      properties.onCompactThread(thread.id);
-                                    }
-                                  }}
-                                  disabled={properties.isBusy || !canCompact}
-                                >
-                                  <Minimize2 size={13} />
-                                  Compact context
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (canCleanBackgroundTerminals) {
-                                      properties.onCleanThreadBackgroundTerminals(thread.id);
-                                    }
-                                  }}
-                                  disabled={properties.isBusy || !canCleanBackgroundTerminals}
-                                >
-                                  <Trash2 size={13} />
-                                  Clean background terminals
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    properties.onForkThread(thread.id);
-                                  }}
-                                  disabled={properties.isBusy}
-                                >
-                                  <Copy size={13} />
-                                  Fork thread
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (canRollback) {
-                                      properties.onRollbackThread(thread.id);
-                                    }
-                                  }}
-                                  disabled={properties.isBusy || !canRollback}
-                                >
-                                  <Undo2 size={13} />
-                                  Undo last turn
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (canArchive) {
-                                      properties.onArchiveThread(thread.id);
-                                    }
-                                  }}
-                                  disabled={properties.isBusy || !canArchive}
-                                >
-                                  <Archive size={13} />
-                                  Archive thread
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            {thread.updatedAt !== 0 && !Number.isNaN(thread.updatedAt) ? (
-                              <span
-                                data-testid={`thread-row-time-${thread.id}`}
-                                className="whitespace-nowrap text-right text-[9px] leading-none text-muted-foreground/50 sm:text-[10px]"
-                              >
-                                {properties.formatDate(thread.updatedAt)}
-                              </span>
-                            ) : (
-                              <span className="h-2.5" aria-hidden="true" />
-                            )}
-                          </div>
-                        </div>
+                          thread={thread}
+                          isSelected={isSelected}
+                          shouldShowUnreadIndicator={shouldShowUnreadIndicator}
+                          threadRuntimeStatus={threadRuntimeStatus}
+                          shouldRenderThreadRuntimeStatusBadge={
+                            shouldRenderThreadRuntimeStatusBadge
+                          }
+                          threadIsGenerating={threadIsGenerating}
+                          isRenamingThread={isRenamingThread}
+                          threadNameDraft={threadNameDraft}
+                          isBusy={properties.isBusy}
+                          formatDate={properties.formatDate}
+                          onUpdateThreadNameDraft={setThreadNameDraft}
+                          onSubmitThreadRename={submitThreadRename}
+                          onCancelThreadRename={cancelThreadRename}
+                          onBeginThreadRename={beginThreadRename}
+                          onSelectThread={properties.onSelectThread}
+                          onArchiveThread={properties.onArchiveThread}
+                          onForkThread={properties.onForkThread}
+                          onRollbackThread={properties.onRollbackThread}
+                          onCompactThread={properties.onCompactThread}
+                          onCleanThreadBackgroundTerminals={
+                            properties.onCleanThreadBackgroundTerminals
+                          }
+                          onStartThreadReview={properties.onStartThreadReview}
+                        />
                       );
                     })}
                   </div>

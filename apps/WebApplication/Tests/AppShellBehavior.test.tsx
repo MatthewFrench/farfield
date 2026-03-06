@@ -188,7 +188,8 @@ describe("App", () => {
     try {
       environment.renderApp();
       await screen.findByText("No thread selected");
-      expect(screen.queryByTestId("sidebar-mobile")).toBeNull();
+      const mobileSidebar = screen.getByTestId("sidebar-mobile");
+      expect(mobileSidebar.getAttribute("aria-hidden")).toBe("true");
 
       const appShell = await screen.findByTestId("app-shell");
       fireEvent.touchStart(appShell, {
@@ -199,7 +200,7 @@ describe("App", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("sidebar-mobile")).toBeTruthy();
+        expect(screen.getByTestId("sidebar-mobile").getAttribute("aria-hidden")).toBe("false");
       });
     } finally {
       Object.defineProperty(window, "innerWidth", {

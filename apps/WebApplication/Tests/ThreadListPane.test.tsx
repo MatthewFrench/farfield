@@ -354,4 +354,47 @@ describe("ThreadListPane", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
   });
+
+  it("preserves unaffected thread row identity when runtime status changes for another thread", () => {
+    cleanup();
+    const renderResult = render(<ThreadListPane {...createThreadListPaneProperties()} />);
+
+    const firstThreadRowBeforeUpdate = screen.getByTestId("thread-list-row-thread_active_one");
+
+    renderResult.rerender(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          threadRuntimeStatusByThreadIdentifier: {
+            thread_active_two: {
+              sequence: 25,
+              statusType: "active",
+              activeFlags: [],
+              receivedAtMilliseconds: 8_500,
+            },
+          },
+        })}
+      />,
+    );
+
+    const firstThreadRowAfterUpdate = screen.getByTestId("thread-list-row-thread_active_one");
+    expect(firstThreadRowAfterUpdate).toBe(firstThreadRowBeforeUpdate);
+    expect(screen.getByTestId("thread-generating-indicator-thread_active_two")).toBeDefined();
+  });
+
+  it("renders active and archived thread rows without lazy visibility classes", () => {
+    cleanup();
+    render(<ThreadListPane {...createThreadListPaneProperties()} />);
+
+    const activeThreadRow = screen.getByTestId("thread-list-row-thread_active_one");
+    const archivedThreadItems = screen.getAllByTestId("archived-thread-list-item");
+    const firstArchivedThreadItem = archivedThreadItems[0];
+    if (firstArchivedThreadItem === undefined) {
+      throw new Error("Expected archived thread list fixture to render at least one archived row.");
+    }
+
+    expect(activeThreadRow.className).not.toContain("content-visibility");
+    expect(activeThreadRow.className).not.toContain("contain-intrinsic-size");
+    expect(firstArchivedThreadItem.className).not.toContain("content-visibility");
+    expect(firstArchivedThreadItem.className).not.toContain("contain-intrinsic-size");
+  });
 });

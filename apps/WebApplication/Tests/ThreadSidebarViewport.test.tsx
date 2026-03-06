@@ -104,13 +104,15 @@ describe("ThreadSidebarViewport", () => {
     expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
   });
 
-  it("does not render desktop sidebar when closed", () => {
+  it("keeps desktop sidebar rendered but hidden when closed", () => {
     renderThreadSidebarViewport({
       viewport: "desktop",
       isOpen: false,
     });
 
-    expect(screen.queryByTestId("sidebar-desktop")).toBeNull();
+    const desktopSidebar = screen.getByTestId("sidebar-desktop");
+    expect(desktopSidebar.getAttribute("aria-hidden")).toBe("true");
+    expect(desktopSidebar.style.transform).toBe("translateX(-280px)");
   });
 
   it("calls mobile close handler", () => {
@@ -125,12 +127,46 @@ describe("ThreadSidebarViewport", () => {
     expect(onCloseMobileSidebar).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps desktop sidebar mounted after it has been opened once", () => {
+  it("preserves desktop sidebar element identity across open and close", () => {
     const renderResult = renderThreadSidebarViewport({
       viewport: "desktop",
-      isOpen: true,
+      isOpen: false,
     });
-    expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
+    const desktopSidebarBeforeOpen = screen.getByTestId("sidebar-desktop");
+
+    renderResult.rerender(
+      <TooltipProvider>
+        <ThreadSidebarViewport
+          viewport="desktop"
+          isOpen={true}
+          threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+          threadSidebarRuntimeSummary={BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY}
+          onHideDesktopSidebar={() => {}}
+          onCloseMobileSidebar={() => {}}
+          allSystemsReady={true}
+          hasAnySystemFailure={false}
+          commitLabel="abc123"
+          agentDescriptors={[
+            {
+              id: "codex",
+              label: "Codex",
+              enabled: true,
+              connected: true,
+            },
+          ]}
+          codexConfigured={true}
+          healthState={{
+            appReady: true,
+            ipcConnected: true,
+            ipcInitialized: true,
+            lastError: null,
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    const desktopSidebarAfterOpen = screen.getByTestId("sidebar-desktop");
+    expect(desktopSidebarAfterOpen).toBe(desktopSidebarBeforeOpen);
 
     renderResult.rerender(
       <TooltipProvider>
@@ -163,6 +199,91 @@ describe("ThreadSidebarViewport", () => {
       </TooltipProvider>,
     );
 
-    expect(screen.getByTestId("sidebar-desktop")).toBeDefined();
+    expect(screen.getByTestId("sidebar-desktop")).toBe(desktopSidebarBeforeOpen);
+  });
+
+  it("keeps mobile sidebar rendered but hidden when closed", () => {
+    renderThreadSidebarViewport({
+      viewport: "mobile",
+      isOpen: false,
+    });
+
+    const mobileSidebar = screen.getByTestId("sidebar-mobile");
+    expect(mobileSidebar.getAttribute("aria-hidden")).toBe("true");
+    expect(mobileSidebar.style.transform).toBe("translateX(-280px)");
+  });
+
+  it("preserves mobile sidebar element identity across open and close", () => {
+    const renderResult = renderThreadSidebarViewport({
+      viewport: "mobile",
+      isOpen: false,
+    });
+    const mobileSidebarBeforeOpen = screen.getByTestId("sidebar-mobile");
+
+    renderResult.rerender(
+      <TooltipProvider>
+        <ThreadSidebarViewport
+          viewport="mobile"
+          isOpen={true}
+          threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+          threadSidebarRuntimeSummary={BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY}
+          onHideDesktopSidebar={() => {}}
+          onCloseMobileSidebar={() => {}}
+          allSystemsReady={true}
+          hasAnySystemFailure={false}
+          commitLabel="abc123"
+          agentDescriptors={[
+            {
+              id: "codex",
+              label: "Codex",
+              enabled: true,
+              connected: true,
+            },
+          ]}
+          codexConfigured={true}
+          healthState={{
+            appReady: true,
+            ipcConnected: true,
+            ipcInitialized: true,
+            lastError: null,
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("sidebar-mobile")).toBe(mobileSidebarBeforeOpen);
+
+    renderResult.rerender(
+      <TooltipProvider>
+        <ThreadSidebarViewport
+          viewport="mobile"
+          isOpen={false}
+          threadListPaneProperties={BASE_THREAD_LIST_PANE_PROPERTIES}
+          threadSidebarRuntimeSummary={BASE_THREAD_SIDEBAR_RUNTIME_SUMMARY}
+          onHideDesktopSidebar={() => {}}
+          onCloseMobileSidebar={() => {}}
+          allSystemsReady={true}
+          hasAnySystemFailure={false}
+          commitLabel="abc123"
+          agentDescriptors={[
+            {
+              id: "codex",
+              label: "Codex",
+              enabled: true,
+              connected: true,
+            },
+          ]}
+          codexConfigured={true}
+          healthState={{
+            appReady: true,
+            ipcConnected: true,
+            ipcInitialized: true,
+            lastError: null,
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("sidebar-mobile")).toBe(mobileSidebarBeforeOpen);
   });
 });

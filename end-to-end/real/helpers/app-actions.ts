@@ -10,6 +10,22 @@ export async function openAppHome(page: Page): Promise<void> {
 }
 
 export async function openSidebarIfHidden(page: Page): Promise<void> {
+  const mobileSidebar = page.getByTestId("sidebar-mobile");
+  if (
+    (await mobileSidebar.count()) > 0 &&
+    (await mobileSidebar.first().getAttribute("aria-hidden")) === "false"
+  ) {
+    return;
+  }
+
+  const desktopSidebar = page.getByTestId("sidebar-desktop");
+  if (
+    (await desktopSidebar.count()) > 0 &&
+    (await desktopSidebar.first().getAttribute("aria-hidden")) === "false"
+  ) {
+    return;
+  }
+
   const openButtons = page.getByTestId("sidebar-toggle-open");
   const count = await openButtons.count();
 
@@ -58,16 +74,23 @@ export async function openPreflightTab(page: Page): Promise<void> {
 export async function selectFirstThreadIfAny(
   page: Page,
 ): Promise<{ selected: boolean; threadId?: string }> {
+  return selectThreadByIndexIfAny(page, 0);
+}
+
+export async function selectThreadByIndexIfAny(
+  page: Page,
+  index: number,
+): Promise<{ selected: boolean; threadId?: string }> {
   const threadRows = page.getByTestId("thread-list-item");
   const count = await threadRows.count();
 
-  if (count === 0) {
+  if (count === 0 || index >= count) {
     return { selected: false };
   }
 
-  const first = threadRows.first();
-  const threadId = await first.getAttribute("data-thread-id");
-  await first.click();
+  const targetThreadRow = threadRows.nth(index);
+  const threadId = await targetThreadRow.getAttribute("data-thread-id");
+  await targetThreadRow.click();
 
   return {
     selected: true,

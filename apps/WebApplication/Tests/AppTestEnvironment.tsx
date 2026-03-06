@@ -1,3 +1,4 @@
+import { FarfieldSidebarThreadSyncRequestSchema } from "@farfield/protocol";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { z } from "zod";
@@ -27,6 +28,9 @@ type StructuredDataObject = { [key: string]: StructuredDataValue };
 
 const HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS = Date.parse("2026-02-26T00:00:00.000Z");
 const SELECTED_THREAD_SNAPSHOT_CACHE_DATABASE_NAME = "farfield-selected-thread-snapshot-cache.v1";
+const THREAD_LIST_SNAPSHOT_CACHE_DATABASE_NAME = "farfield-thread-list-snapshot-cache.v1";
+const SIDEBAR_THREAD_SYNC_SNAPSHOT_UPDATED_AT_MILLISECONDS = Date.parse("2026-02-26T00:00:00.000Z");
+const SIDEBAR_THREAD_SYNC_EMPTY_SNAPSHOT_VERSION = "empty";
 
 function buildHistoryEventTimestampIso(sequence: number): string {
   return new Date(HISTORY_EVENT_TIMESTAMP_BASE_MILLISECONDS + sequence * 1_000).toISOString();
@@ -196,11 +200,19 @@ function resetFixtures(): void {
 }
 
 async function clearSelectedThreadSnapshotCacheDatabase(): Promise<void> {
+  await clearIndexedDatabase(SELECTED_THREAD_SNAPSHOT_CACHE_DATABASE_NAME);
+}
+
+async function clearThreadListSnapshotCacheDatabase(): Promise<void> {
+  await clearIndexedDatabase(THREAD_LIST_SNAPSHOT_CACHE_DATABASE_NAME);
+}
+
+async function clearIndexedDatabase(databaseName: string): Promise<void> {
   if (typeof indexedDB === "undefined") {
     return;
   }
   await new Promise<void>((resolve, reject) => {
-    const deleteRequest = indexedDB.deleteDatabase(SELECTED_THREAD_SNAPSHOT_CACHE_DATABASE_NAME);
+    const deleteRequest = indexedDB.deleteDatabase(databaseName);
     deleteRequest.onsuccess = () => {
       resolve();
     };
@@ -211,6 +223,39 @@ async function clearSelectedThreadSnapshotCacheDatabase(): Promise<void> {
       reject(deleteRequest.error ?? new Error("Failed to clear selected-thread snapshot cache."));
     };
   });
+}
+
+function buildThreadListFixtureSnapshotVersion(fixture: ThreadListFixture): string {
+  const versionSegments = fixture.data.map(
+    (thread) => `${thread.id}:${String(thread.updatedAt)}:${thread.agentId}:${thread.cwd ?? ""}`,
+  );
+  if (versionSegments.length === 0) {
+    return SIDEBAR_THREAD_SYNC_EMPTY_SNAPSHOT_VERSION;
+  }
+  return versionSegments.join("|");
+}
+
+function buildSidebarThreadListResponse(fixture: ThreadListFixture, snapshotVersion: string) {
+  return {
+    data: fixture.data.map((thread) => ({
+      id: thread.id,
+      preview: thread.preview,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+      hasUnreadTurn: thread.hasUnreadTurn ?? null,
+      cwd: thread.cwd,
+      agentId: thread.agentId,
+    })),
+    nextCursor: fixture.nextCursor,
+    pages: fixture.pages,
+    truncated: fixture.truncated,
+    sync: {
+      mode: "full" as const,
+      sinceUpdatedAt: null,
+      snapshotUpdatedAt: SIDEBAR_THREAD_SYNC_SNAPSHOT_UPDATED_AT_MILLISECONDS,
+      snapshotVersion,
+    },
+  };
 }
 
 function installGlobals(): void {
@@ -335,6 +380,42 @@ function installGlobals(): void {
           }
           return createJsonResponse(readThread);
         }
+      }
+
+      if (pathname === "/api/sidebar/threads/sync") {
+        const parsedBody = FarfieldSidebarThreadSyncRequestSchema.parse(
+          JSON.parse(String(init?.body)),
+        );
+        const threadListSnapshotVersion = buildThreadListFixtureSnapshotVersion(threadsFixture);
+        if (
+          parsedBody.archived === false &&
+          parsedBody.knownSnapshotVersion === threadListSnapshotVersion
+        ) {
+          return createJsonResponse({
+            ok: true,
+            syncStatus: "notModified",
+            snapshotUpdatedAt: SIDEBAR_THREAD_SYNC_SNAPSHOT_UPDATED_AT_MILLISECONDS,
+            snapshotVersion: threadListSnapshotVersion,
+          });
+        }
+        return createJsonResponse({
+          ok: true,
+          syncStatus: "snapshot",
+          snapshotUpdatedAt: SIDEBAR_THREAD_SYNC_SNAPSHOT_UPDATED_AT_MILLISECONDS,
+          snapshotVersion: threadListSnapshotVersion,
+          threadList: parsedBody.archived
+            ? buildSidebarThreadListResponse(
+                {
+                  ok: true,
+                  data: [],
+                  nextCursor: null,
+                  pages: 0,
+                  truncated: false,
+                },
+                threadListSnapshotVersion,
+              )
+            : buildSidebarThreadListResponse(threadsFixture, threadListSnapshotVersion),
+        });
       }
 
       if (pathname === "/api/threads") {
@@ -474,6 +555,7 @@ export function registerAppTestEnvironment(): AppTestEnvironment {
 
   beforeEach(async () => {
     await clearSelectedThreadSnapshotCacheDatabase();
+    await clearThreadListSnapshotCacheDatabase();
     resetFixtures();
   });
 

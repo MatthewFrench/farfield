@@ -39,7 +39,6 @@ import {
   STARTUP_DEFERRED_HEALTH_OPERATION,
   STARTUP_DEFERRED_MODELS_OPERATION,
   STARTUP_DEFERRED_MODES_OPERATION,
-  STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
   STARTUP_DEFERRED_TRACE_STATUS_OPERATION,
 } from "./CoreDataStartupRequestProfile";
 
@@ -52,8 +51,6 @@ const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
 // Yield one event-loop turn so critical startup reads can commit before non-critical hydration starts.
 const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
 const STARTUP_CRITICAL_THREAD_READ_FROM_CACHE = true;
-const STARTUP_THREAD_REVALIDATION_READ_FROM_CACHE = false;
-const STARTUP_DEFERRED_THREAD_REVALIDATION_MIN_INTERVAL_MILLISECONDS = 15_000;
 const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
 type Health = CoreDataHealthResponse;
@@ -251,7 +248,6 @@ function applyDeferredStartupSnapshotResult<ResultValue>(input: {
 export class CoreDataStartupLoader {
   private deps: CoreDataStartupLoaderDependencies;
   private deferredStartupSequence = 0;
-  private lastDeferredThreadRevalidationAtEpochMilliseconds = 0;
 
   public constructor(dependencies: CoreDataStartupLoaderDependencies) {
     this.deps = dependencies;
@@ -335,40 +331,10 @@ export class CoreDataStartupLoader {
       applySnapshotState,
       reportDeferredStartupFailure,
     });
-    if (
-      nextActiveThreadState.loadedFromCache &&
-      this.shouldRunDeferredThreadRevalidation(Date.now())
-    ) {
-      const startupDeferredThreadRevalidateRequest = this.deps.buildActionRequestOptions(
-        STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
-      );
-      this.lastDeferredThreadRevalidationAtEpochMilliseconds = Date.now();
-      // Keep cache-first responsiveness but revalidate active threads in the background so
-      // external updates (for example event-stream-driven updates) still converge quickly.
-      void this.runDeferredThreadRevalidation(
-        {
-          threadListLimit: this.deps.threadListLimit,
-          threadListMaxPages: this.deps.threadListMaxPages,
-          previousUnreadThreadIdentifiers: nextActiveThreadState.nextUnreadThreadIdentifiers,
-          selectedThreadIdentifier: this.deps.selectedThreadIdRef.current,
-          readFromCache: STARTUP_THREAD_REVALIDATION_READ_FROM_CACHE,
-          requestOptions: startupDeferredThreadRevalidateRequest.requestOptions,
-        },
-        applySnapshotState,
-        reportDeferredStartupFailure,
-      );
-    }
   }
 
   private isDeferredStartupReadStale(deferredStartupSequence: number): boolean {
     return this.deferredStartupSequence !== deferredStartupSequence;
-  }
-
-  private shouldRunDeferredThreadRevalidation(nowEpochMilliseconds: number): boolean {
-    return (
-      nowEpochMilliseconds - this.lastDeferredThreadRevalidationAtEpochMilliseconds >=
-      STARTUP_DEFERRED_THREAD_REVALIDATION_MIN_INTERVAL_MILLISECONDS
-    );
   }
 
   private scheduleDeferredStartupReads(input: {
@@ -512,26 +478,5 @@ export class CoreDataStartupLoader {
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
-  }
-
-  private async runDeferredThreadRevalidation(
-    threadLoadRequest: BuildActiveThreadStateLoadRequestInput,
-    applySnapshotState: SnapshotStateApplier,
-    reportDeferredStartupFailure: DeferredStartupFailureReporter,
-  ): Promise<void> {
-    try {
-      const networkActiveThreadState =
-        await this.deps.threadListStateController.loadActiveThreadState(
-          createActiveThreadStateLoadRequest(threadLoadRequest),
-        );
-      applySnapshotState({
-        nextActiveThreadState: networkActiveThreadState,
-      });
-    } catch (error) {
-      if (shouldIgnoreDeferredStartupFailure(error)) {
-        return;
-      }
-      reportDeferredStartupFailure(STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION, error);
-    }
   }
 }

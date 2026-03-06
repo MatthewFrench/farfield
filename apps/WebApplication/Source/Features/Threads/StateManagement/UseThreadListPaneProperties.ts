@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useMemo } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useMemo } from "react";
 import {
   type ThreadListItem,
   type ThreadProjectGroup,
@@ -103,6 +103,120 @@ export function useThreadListPaneProperties(
     renderAgentFavicon,
   } = input;
 
+  const handleToggleThreadProjectGroup = useCallback(
+    (groupKey: string, nextCollapsed: boolean): void => {
+      setCollapsedThreadProjectGroups((previous) => ({
+        ...previous,
+        [groupKey]: nextCollapsed,
+      }));
+    },
+    [setCollapsedThreadProjectGroups],
+  );
+
+  const handleCreateThreadForSingleAgent = useCallback(
+    (projectPath: string): void => {
+      createThreadForSingleAgent(projectPath);
+    },
+    [createThreadForSingleAgent],
+  );
+
+  const handleCreateNewThread = useCallback(
+    (projectPath: string, agentId: AgentId): void => {
+      void createNewThread(projectPath, agentId);
+    },
+    [createNewThread],
+  );
+
+  const handleSelectThread = useCallback(
+    (threadId: string): void => {
+      selectedThreadIdRef.current = threadId;
+      setIsSelectedThreadLoading(true);
+      applyCachedSelectedThreadSnapshot(threadId);
+      setSelectedThreadId(threadId);
+      setMobileSidebarOpen(false);
+    },
+    [
+      applyCachedSelectedThreadSnapshot,
+      selectedThreadIdRef,
+      setIsSelectedThreadLoading,
+      setMobileSidebarOpen,
+      setSelectedThreadId,
+    ],
+  );
+
+  const handleArchiveThread = useCallback(
+    (threadId: string): void => {
+      void archiveThread(threadId);
+    },
+    [archiveThread],
+  );
+
+  const handleForkThread = useCallback(
+    (threadId: string): void => {
+      void forkThread(threadId);
+    },
+    [forkThread],
+  );
+
+  const handleRollbackThread = useCallback(
+    (threadId: string): void => {
+      void rollbackThread(threadId);
+    },
+    [rollbackThread],
+  );
+
+  const handleCompactThread = useCallback(
+    (threadId: string): void => {
+      void compactThread(threadId);
+    },
+    [compactThread],
+  );
+
+  const handleCleanThreadBackgroundTerminals = useCallback(
+    (threadId: string): void => {
+      void cleanThreadBackgroundTerminals(threadId);
+    },
+    [cleanThreadBackgroundTerminals],
+  );
+
+  const handleStartThreadReview = useCallback(
+    (threadId: string): void => {
+      void startThreadReview(threadId);
+    },
+    [startThreadReview],
+  );
+
+  const handleSetThreadName = useCallback(
+    (threadId: string, name: string): void => {
+      void setThreadName(threadId, name);
+    },
+    [setThreadName],
+  );
+
+  const handleToggleArchivedThreads = useCallback(
+    (nextOpen: boolean): void => {
+      setIsArchivedThreadsOpen(nextOpen);
+    },
+    [setIsArchivedThreadsOpen],
+  );
+
+  const handleToggleArchivedProjectGroup = useCallback(
+    (groupKey: string, nextCollapsed: boolean): void => {
+      setCollapsedArchivedProjectGroups((previous) => ({
+        ...previous,
+        [groupKey]: nextCollapsed,
+      }));
+    },
+    [setCollapsedArchivedProjectGroups],
+  );
+
+  const handleUnarchiveThread = useCallback(
+    (threadId: string): void => {
+      void unarchiveThread(threadId);
+    },
+    [unarchiveThread],
+  );
+
   return useMemo<ThreadListPaneProperties>(
     () => ({
       threadListState,
@@ -119,50 +233,19 @@ export function useThreadListPaneProperties(
       unreadThreadIds,
       threadRuntimeStatusByThreadIdentifier,
       isGenerating,
-      onToggleThreadProjectGroup: (groupKey, nextCollapsed) => {
-        setCollapsedThreadProjectGroups((previous) => ({
-          ...previous,
-          [groupKey]: nextCollapsed,
-        }));
-      },
-      onCreateThreadForSingleAgent: (projectPath) => {
-        createThreadForSingleAgent(projectPath);
-      },
-      onCreateNewThread: (projectPath, agentId) => {
-        void createNewThread(projectPath, agentId);
-      },
-      onSelectThread: (threadId) => {
-        selectedThreadIdRef.current = threadId;
-        setIsSelectedThreadLoading(true);
-        applyCachedSelectedThreadSnapshot(threadId);
-        setSelectedThreadId(threadId);
-        setMobileSidebarOpen(false);
-      },
-      onArchiveThread: (threadId) => {
-        void archiveThread(threadId);
-      },
-      onForkThread: (threadId) => {
-        void forkThread(threadId);
-      },
-      onRollbackThread: (threadId) => {
-        void rollbackThread(threadId);
-      },
-      onCompactThread: (threadId) => {
-        void compactThread(threadId);
-      },
-      onCleanThreadBackgroundTerminals: (threadId) => {
-        void cleanThreadBackgroundTerminals(threadId);
-      },
-      onStartThreadReview: (threadId) => {
-        void startThreadReview(threadId);
-      },
-      onSetThreadName: (threadId, name) => {
-        void setThreadName(threadId, name);
-      },
+      onToggleThreadProjectGroup: handleToggleThreadProjectGroup,
+      onCreateThreadForSingleAgent: handleCreateThreadForSingleAgent,
+      onCreateNewThread: handleCreateNewThread,
+      onSelectThread: handleSelectThread,
+      onArchiveThread: handleArchiveThread,
+      onForkThread: handleForkThread,
+      onRollbackThread: handleRollbackThread,
+      onCompactThread: handleCompactThread,
+      onCleanThreadBackgroundTerminals: handleCleanThreadBackgroundTerminals,
+      onStartThreadReview: handleStartThreadReview,
+      onSetThreadName: handleSetThreadName,
       isArchivedThreadsOpen,
-      onToggleArchivedThreads: (nextOpen) => {
-        setIsArchivedThreadsOpen(nextOpen);
-      },
+      onToggleArchivedThreads: handleToggleArchivedThreads,
       isArchivedThreadsLoading,
       hasLoadedArchivedThreads,
       archivedSectionThreadCount,
@@ -170,15 +253,8 @@ export function useThreadListPaneProperties(
       archivedProjectGroups,
       collapsedArchivedProjectGroups,
       archivedThreadIds,
-      onToggleArchivedProjectGroup: (groupKey, nextCollapsed) => {
-        setCollapsedArchivedProjectGroups((previous) => ({
-          ...previous,
-          [groupKey]: nextCollapsed,
-        }));
-      },
-      onUnarchiveThread: (threadId) => {
-        void unarchiveThread(threadId);
-      },
+      onToggleArchivedProjectGroup: handleToggleArchivedProjectGroup,
+      onUnarchiveThread: handleUnarchiveThread,
       formatDate,
       renderAgentFavicon,
     }),
@@ -198,9 +274,21 @@ export function useThreadListPaneProperties(
       availableAgentIds,
       collapsedArchivedProjectGroups,
       collapsedThreadProjectGroups,
-      createNewThread,
-      createThreadForSingleAgent,
       formatDate,
+      handleArchiveThread,
+      handleCleanThreadBackgroundTerminals,
+      handleCompactThread,
+      handleCreateNewThread,
+      handleCreateThreadForSingleAgent,
+      handleForkThread,
+      handleRollbackThread,
+      handleSelectThread,
+      handleSetThreadName,
+      handleStartThreadReview,
+      handleToggleArchivedProjectGroup,
+      handleToggleArchivedThreads,
+      handleToggleThreadProjectGroup,
+      handleUnarchiveThread,
       hasLoadedArchivedThreads,
       isArchivedThreadsLoading,
       isArchivedThreadsOpen,
@@ -208,22 +296,12 @@ export function useThreadListPaneProperties(
       isCoreLoading,
       isGenerating,
       renderAgentFavicon,
-      applyCachedSelectedThreadSnapshot,
       selectedAgentDescriptor,
       selectedAgentLabel,
       selectedThreadId,
-      selectedThreadIdRef,
-      setThreadName,
-      setCollapsedArchivedProjectGroups,
-      setCollapsedThreadProjectGroups,
-      setIsArchivedThreadsOpen,
-      setIsSelectedThreadLoading,
-      setMobileSidebarOpen,
-      setSelectedThreadId,
       threadListState,
       threads,
       threadRuntimeStatusByThreadIdentifier,
-      unarchiveThread,
       unreadThreadIds,
     ],
   );

@@ -3,7 +3,7 @@
  * This module wires typed owner hooks into the shell layout while keeping
  * feature behavior in dedicated owner modules.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   APP_DEFAULT_VALUE,
   ARCHIVED_THREAD_LIST_MAX_PAGES,
@@ -346,13 +346,13 @@ export function App(): React.JSX.Element {
   });
   const { shellComposition } = runtimeComposition;
 
-  const handleCloseMobileSidebar = (): void => {
+  const handleCloseMobileSidebar = useCallback((): void => {
     applicationShellState.setMobileSidebarOpen(false);
-  };
+  }, [applicationShellState.setMobileSidebarOpen]);
 
-  const handleHideDesktopSidebar = (): void => {
+  const handleHideDesktopSidebar = useCallback((): void => {
     applicationShellState.setDesktopSidebarOpen(false);
-  };
+  }, [applicationShellState.setDesktopSidebarOpen]);
 
   return (
     <TooltipProvider delayDuration={APPLICATION_SHELL_TOOLTIP_DELAY_MILLISECONDS}>

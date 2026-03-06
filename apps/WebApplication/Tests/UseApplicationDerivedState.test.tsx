@@ -552,6 +552,43 @@ function renderDerivedState(input: UseApplicationDerivedStateInput): Application
   return snapshot;
 }
 
+function renderDerivedStateHarness(input: UseApplicationDerivedStateInput): {
+  readLatestDerivedState: () => ApplicationDerivedState;
+  rerender: (nextInput: UseApplicationDerivedStateInput) => void;
+} {
+  const snapshotReference: { current: ApplicationDerivedState | null } = {
+    current: null,
+  };
+  const renderResult = render(
+    <Harness
+      input={input}
+      onDerivedState={(derivedState) => {
+        snapshotReference.current = derivedState;
+      }}
+    />,
+  );
+
+  return {
+    readLatestDerivedState: () => {
+      const snapshot = snapshotReference.current;
+      if (!snapshot) {
+        throw new Error("Expected application derived state snapshot to be captured");
+      }
+      return snapshot;
+    },
+    rerender: (nextInput: UseApplicationDerivedStateInput) => {
+      renderResult.rerender(
+        <Harness
+          input={nextInput}
+          onDerivedState={(derivedState) => {
+            snapshotReference.current = derivedState;
+          }}
+        />,
+      );
+    },
+  };
+}
+
 describe("useApplicationDerivedState", () => {
   afterEach(() => {
     cleanup();
@@ -926,5 +963,24 @@ describe("useApplicationDerivedState", () => {
       await Promise.resolve();
     });
     expect(snapshotReference.current?.filteredDebugIssues[0]?.id).toContain("error-second");
+  });
+
+  it("preserves empty-state collection identity across unchanged rerenders", () => {
+    const input = createBaseInput();
+    const harness = renderDerivedStateHarness(input);
+
+    const initialDerivedState = harness.readLatestDerivedState();
+    harness.rerender({
+      ...input,
+    });
+    const nextDerivedState = harness.readLatestDerivedState();
+
+    expect(nextDerivedState.turns).toBe(initialDerivedState.turns);
+    expect(nextDerivedState.visibleConversationItems).toBe(
+      initialDerivedState.visibleConversationItems,
+    );
+    expect(nextDerivedState.debugHistoryEntryListItems).toBe(
+      initialDerivedState.debugHistoryEntryListItems,
+    );
   });
 });

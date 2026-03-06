@@ -62,7 +62,7 @@ async function openAndCloseSidebarCycle(page: Page, sentinel: ErrorSentinel): Pr
     const sidebarMobile = page.getByTestId("sidebar-mobile");
     await sidebarMobile.getByTestId("sidebar-toggle-close").click();
     await expect(sidebarMobile).toHaveAttribute("aria-hidden", "true");
-    await expect(page.getByTestId("sidebar-backdrop")).toHaveCount(0);
+    await expect(page.getByTestId("sidebar-backdrop")).toHaveClass(/opacity-0/);
   });
 }
 

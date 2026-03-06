@@ -427,7 +427,7 @@ describe("useCoreDataLoaders", () => {
     expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
   });
 
-  it("throttles deferred thread revalidation when cached active threads are still fresh", async () => {
+  it("does not schedule deferred thread revalidation after cache-first startup", async () => {
     const harness = createHarness("chat");
     const cachedActiveThreadState: LoadActiveThreadStateResult = {
       ...ACTIVE_THREAD_STATE,
@@ -462,12 +462,12 @@ describe("useCoreDataLoaders", () => {
       await vi.runOnlyPendingTimersAsync();
     });
 
-    expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(3);
+    expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(2);
     expect(
       harness.actionLog.filter(
         (actionName) => actionName === STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
       ),
-    ).toEqual([STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION]);
+    ).toEqual([]);
   });
 
   it("does not report deferred startup request-cancellation errors", async () => {

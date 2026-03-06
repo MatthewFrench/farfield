@@ -1,60 +1,28 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { type TouchEvent as ReactTouchEvent } from "react";
 import {
-  ApiSessionBootstrapOverlay,
-  type ApiSessionBootstrapOverlayProperties,
-} from "@/Application/UserInterface/ApiSessionBootstrapOverlay";
+  ApplicationShellMainRegion,
+  type ApplicationShellMainRegionProps,
+} from "@/Application/UserInterface/ApplicationShellMainRegion";
 import {
-  ApplicationHeaderBar,
-  type ApplicationHeaderBarProps,
-} from "@/Application/UserInterface/ApplicationHeaderBar";
-import {
-  ChatWorkspacePane,
-  type ChatWorkspacePaneProps,
-} from "@/Features/Chat/UserInterface/ChatWorkspacePane";
-import {
-  DebugStatusBanners,
-  type DebugStatusBannersProps,
-} from "@/Features/Debugging/UserInterface/DebugStatusBanners";
-import {
-  SettingsWorkspacePane,
-  type SettingsWorkspacePaneProps,
-} from "@/Features/Settings/UserInterface/SettingsWorkspacePane";
+  ApplicationShellSidebarRegion,
+  type ApplicationShellSidebarRegionProps,
+} from "@/Application/UserInterface/ApplicationShellSidebarRegion";
 import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadListPaneProperties } from "@/Features/Threads/UserInterface/ThreadListPane";
 import {
   type ThreadSidebarAgentDescriptor,
   type ThreadSidebarPanelHealthState,
 } from "@/Features/Threads/UserInterface/ThreadSidebarPanel";
-import { ThreadSidebarViewport } from "@/Features/Threads/UserInterface/ThreadSidebarViewport";
 
 export type ApplicationShellActiveTab = "chat" | "debug";
 
-export interface ApplicationShellLayoutProps {
+export interface ApplicationShellLayoutProps
+  extends ApplicationShellSidebarRegionProps,
+    ApplicationShellMainRegionProps {
   applicationShellElementRef: React.RefObject<HTMLDivElement | null>;
   onAppShellTouchStart: (event: ReactTouchEvent<HTMLDivElement>) => void;
   onAppShellTouchMove: (event: ReactTouchEvent<HTMLDivElement>) => void;
   onEndSidebarSwipeTracking: () => void;
-  isMobileLayout: boolean;
-  mobileSidebarOpen: boolean;
-  desktopSidebarOpen: boolean;
-  onCloseMobileSidebar: () => void;
-  onHideDesktopSidebar: () => void;
-  threadListPaneProperties: ThreadListPaneProperties;
-  allSystemsReady: boolean;
-  hasAnySystemFailure: boolean;
-  commitLabel: string;
-  agentDescriptors: ThreadSidebarAgentDescriptor[];
-  codexConfigured: boolean;
-  threadSidebarHealthState: ThreadSidebarPanelHealthState | null;
-  threadSidebarRuntimeSummary: ThreadSidebarRuntimeSummary;
-  activeTab: ApplicationShellActiveTab;
-  applicationHeaderBarProperties: ApplicationHeaderBarProps;
-  debugStatusBannersProperties: DebugStatusBannersProps;
-  chatWorkspacePaneProperties: ChatWorkspacePaneProps;
-  settingsWorkspacePaneProperties: SettingsWorkspacePaneProps;
-  showApiSessionBootstrapOverlay: boolean;
-  apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
 
 export function ApplicationShellLayout({
@@ -83,19 +51,6 @@ export function ApplicationShellLayout({
   showApiSessionBootstrapOverlay,
   apiSessionBootstrapOverlayProperties,
 }: ApplicationShellLayoutProps): React.JSX.Element {
-  const threadSidebarViewportSharedProperties = {
-    threadListPaneProperties,
-    onHideDesktopSidebar,
-    onCloseMobileSidebar,
-    allSystemsReady,
-    hasAnySystemFailure,
-    commitLabel,
-    agentDescriptors,
-    codexConfigured,
-    healthState: threadSidebarHealthState,
-    threadSidebarRuntimeSummary,
-  };
-
   return (
     <div
       ref={applicationShellElementRef}
@@ -106,53 +61,33 @@ export function ApplicationShellLayout({
       onTouchEnd={onEndSidebarSwipeTracking}
       onTouchCancel={onEndSidebarSwipeTracking}
     >
-      <AnimatePresence>
-        {isMobileLayout && mobileSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            data-testid="sidebar-backdrop"
-            className="md:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={onCloseMobileSidebar}
-          />
-        )}
-      </AnimatePresence>
+      <ApplicationShellSidebarRegion
+        isMobileLayout={isMobileLayout}
+        mobileSidebarOpen={mobileSidebarOpen}
+        desktopSidebarOpen={desktopSidebarOpen}
+        onCloseMobileSidebar={onCloseMobileSidebar}
+        onHideDesktopSidebar={onHideDesktopSidebar}
+        threadListPaneProperties={threadListPaneProperties}
+        allSystemsReady={allSystemsReady}
+        hasAnySystemFailure={hasAnySystemFailure}
+        commitLabel={commitLabel}
+        agentDescriptors={agentDescriptors}
+        codexConfigured={codexConfigured}
+        threadSidebarHealthState={threadSidebarHealthState}
+        threadSidebarRuntimeSummary={threadSidebarRuntimeSummary}
+      />
 
-      {!isMobileLayout && (
-        <ThreadSidebarViewport
-          viewport="desktop"
-          isOpen={desktopSidebarOpen}
-          {...threadSidebarViewportSharedProperties}
-        />
-      )}
-
-      {isMobileLayout && (
-        <ThreadSidebarViewport
-          viewport="mobile"
-          isOpen={mobileSidebarOpen}
-          {...threadSidebarViewportSharedProperties}
-        />
-      )}
-
-      <div
-        className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
-          !isMobileLayout && desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
-        } h-full overflow-hidden`}
-      >
-        <ApplicationHeaderBar {...applicationHeaderBarProperties} />
-
-        <DebugStatusBanners {...debugStatusBannersProperties} />
-
-        {activeTab === "chat" && <ChatWorkspacePane {...chatWorkspacePaneProperties} />}
-
-        {activeTab === "debug" && <SettingsWorkspacePane {...settingsWorkspacePaneProperties} />}
-
-        {showApiSessionBootstrapOverlay && (
-          <ApiSessionBootstrapOverlay {...apiSessionBootstrapOverlayProperties} />
-        )}
-      </div>
+      <ApplicationShellMainRegion
+        isMobileLayout={isMobileLayout}
+        desktopSidebarOpen={desktopSidebarOpen}
+        activeTab={activeTab}
+        applicationHeaderBarProperties={applicationHeaderBarProperties}
+        debugStatusBannersProperties={debugStatusBannersProperties}
+        chatWorkspacePaneProperties={chatWorkspacePaneProperties}
+        settingsWorkspacePaneProperties={settingsWorkspacePaneProperties}
+        showApiSessionBootstrapOverlay={showApiSessionBootstrapOverlay}
+        apiSessionBootstrapOverlayProperties={apiSessionBootstrapOverlayProperties}
+      />
     </div>
   );
 }

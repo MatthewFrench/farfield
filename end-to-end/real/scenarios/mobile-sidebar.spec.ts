@@ -30,7 +30,7 @@ test("mobile sidebar open and close behavior", async ({ page, sentinel }) => {
   const sidebarMobile = page.getByTestId("sidebar-mobile");
   await sidebarMobile.getByTestId("sidebar-toggle-close").click();
   await expect(sidebarMobile).toHaveAttribute("aria-hidden", "true");
-  await expect(page.getByTestId("sidebar-backdrop")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-backdrop")).toHaveClass(/opacity-0/);
 
   await openButton.click();
   await expect(sidebarMobile).toBeVisible();
@@ -38,7 +38,7 @@ test("mobile sidebar open and close behavior", async ({ page, sentinel }) => {
     position: { x: 360, y: 120 },
   });
   await expect(sidebarMobile).toHaveAttribute("aria-hidden", "true");
-  await expect(page.getByTestId("sidebar-backdrop")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-backdrop")).toHaveClass(/opacity-0/);
 
   await expectNoUnexpectedClientErrors(sentinel);
   await expectNoFailedApiResponses(sentinel);

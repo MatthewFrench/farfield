@@ -31,6 +31,13 @@ Farfield now records these browser-side signals during development sessions:
 4. Standard render metrics
    - FP, FCP, LCP, CLS, long-task count, total long-task duration.
 
+The sidebar pane commit marker also records:
+
+1. `changedFields`
+   - explicit named fields that changed since the previous sampled pane render
+2. `suppressedStableParentRerenderCount`
+   - sampled count of repeated pane rerenders where the pane snapshot itself stayed stable
+
 These signals are available live in dev sessions through:
 
 ```js
@@ -57,6 +64,13 @@ For the adjacent authenticated thread-open scenario, use:
 
 ```bash
 node scripts/tooling/with-env.mjs "bun run --filter @farfield/protocol build && bunx playwright test -c playwright.real.config.ts end-to-end/real/scenarios/thread-open.spec.ts"
+```
+
+For the repeated mobile thread-open freeze profile, use:
+
+```bash
+pnpm end-to-end:real:mobile-thread-open-freeze-profile
+pnpm end-to-end:real:mobile-thread-open-freeze-profile:webkit
 ```
 
 This run:

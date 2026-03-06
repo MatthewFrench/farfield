@@ -60,8 +60,34 @@ async function refreshCreatedThreadData(
 
 export function useThreadActionHandlers(input: UseThreadActionHandlersInput): ThreadActionHandlers {
   const selectedThreadIdRef = input.selectedThreadIdRef;
-  const refreshCreatedThreadDataForThread = (threadId: string): Promise<void> =>
-    refreshCreatedThreadData(input.loadCoreDataTracked, input.loadSelectedThreadTracked, threadId);
+  const refreshCreatedThreadDataForThread = useCallback(
+    (threadId: string): Promise<void> =>
+      refreshCreatedThreadData(
+        input.loadCoreDataTracked,
+        input.loadSelectedThreadTracked,
+        threadId,
+      ),
+    [input.loadCoreDataTracked, input.loadSelectedThreadTracked],
+  );
+  const markThreadPendingMaterialization = useCallback(
+    (threadId: string): void => {
+      input.pendingThreadMaterializationCoordinator.markPending(threadId);
+    },
+    [input.pendingThreadMaterializationCoordinator],
+  );
+  const handleThreadSelected = useCallback(
+    (threadId: string | null): void => {
+      input.setSelectedThreadId(threadId);
+      selectedThreadIdRef.current = threadId;
+    },
+    [input.setSelectedThreadId, selectedThreadIdRef],
+  );
+  const invalidateActiveThreadQuery = useCallback((): void => {
+    input.threadListStateController.invalidateActiveThreadQuery();
+  }, [input.threadListStateController]);
+  const invalidateArchivedThreadQuery = useCallback((): void => {
+    input.threadListStateController.invalidateArchivedThreadQuery();
+  }, [input.threadListStateController]);
 
   const createNewThread = useCallback(
     async (projectPath: string, agentId?: AgentId) => {
@@ -70,17 +96,10 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onSetErrorMessage: input.setError,
-        onMarkThreadPendingMaterialization: (threadId) => {
-          input.pendingThreadMaterializationCoordinator.markPending(threadId);
-        },
-        onThreadSelected: (threadId) => {
-          input.setSelectedThreadId(threadId);
-          selectedThreadIdRef.current = threadId;
-        },
+        onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
+        onThreadSelected: handleThreadSelected,
         onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         threadMutationClient: input.threadMutationServerClient,
         onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -92,16 +111,14 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
-      input.loadCoreDataTracked,
-      input.loadSelectedThreadTracked,
-      input.pendingThreadMaterializationCoordinator,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      markThreadPendingMaterialization,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
-      selectedThreadIdRef,
       input.setError,
       input.setIsBusy,
       input.setMobileSidebarOpen,
-      input.setSelectedThreadId,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -127,16 +144,9 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         activeThreadIdentifiersInOrder: input.threads.map((thread) => thread.id),
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onThreadSelected: (nextThreadId) => {
-          input.setSelectedThreadId(nextThreadId);
-          selectedThreadIdRef.current = nextThreadId;
-        },
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
-        onInvalidateArchivedThreadQuery: () => {
-          input.threadListStateController.invalidateArchivedThreadQuery();
-        },
+        onThreadSelected: handleThreadSelected,
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
+        onInvalidateArchivedThreadQuery: invalidateArchivedThreadQuery,
         loadCoreData: input.loadCoreDataTracked,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -144,12 +154,12 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      invalidateArchivedThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
-      selectedThreadIdRef,
       input.setIsBusy,
-      input.setSelectedThreadId,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
       input.threads,
@@ -162,17 +172,10 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         threadId,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onThreadSelected: (nextThreadId) => {
-          input.setSelectedThreadId(nextThreadId);
-          selectedThreadIdRef.current = nextThreadId;
-        },
+        onThreadSelected: handleThreadSelected,
         onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
-        onInvalidateArchivedThreadQuery: () => {
-          input.threadListStateController.invalidateArchivedThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
+        onInvalidateArchivedThreadQuery: invalidateArchivedThreadQuery,
         loadCoreData: input.loadCoreDataTracked,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -180,13 +183,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      invalidateArchivedThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
-      selectedThreadIdRef,
       input.setIsBusy,
       input.setMobileSidebarOpen,
-      input.setSelectedThreadId,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -198,17 +201,10 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         threadId,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onMarkThreadPendingMaterialization: (nextThreadId) => {
-          input.pendingThreadMaterializationCoordinator.markPending(nextThreadId);
-        },
-        onThreadSelected: (nextThreadId) => {
-          input.setSelectedThreadId(nextThreadId);
-          selectedThreadIdRef.current = nextThreadId;
-        },
+        onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
+        onThreadSelected: handleThreadSelected,
         onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -216,14 +212,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
-      input.pendingThreadMaterializationCoordinator,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      markThreadPendingMaterialization,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
-      selectedThreadIdRef,
       input.setIsBusy,
       input.setMobileSidebarOpen,
-      input.setSelectedThreadId,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -237,12 +232,8 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onSetErrorMessage: input.setError,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
-        onInvalidateArchivedThreadQuery: () => {
-          input.threadListStateController.invalidateArchivedThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
+        onInvalidateArchivedThreadQuery: invalidateArchivedThreadQuery,
         onThreadNameUpdated: (updatedThreadIdentifier, threadName) => {
           input.threadDisplayNameStateOwner.writeThreadDisplayName(
             updatedThreadIdentifier,
@@ -256,12 +247,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      invalidateActiveThreadQuery,
+      invalidateArchivedThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
       input.setError,
       input.setIsBusy,
       input.threadDisplayNameStateOwner,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -276,9 +268,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onSetErrorMessage: input.setError,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         loadCoreData: input.loadCoreDataTracked,
         onRefreshRolledBackThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
@@ -287,13 +277,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      invalidateActiveThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setError,
       input.setIsBusy,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -306,9 +296,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         selectedThreadId: selectedThreadIdRef.current,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         loadCoreData: input.loadCoreDataTracked,
         onRefreshCompactedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
@@ -324,12 +312,12 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      invalidateActiveThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -342,9 +330,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         selectedThreadId: selectedThreadIdRef.current,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         loadCoreData: input.loadCoreDataTracked,
         onRefreshCleanedThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
@@ -360,12 +346,12 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      invalidateActiveThreadQuery,
       input.loadCoreDataTracked,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
       selectedThreadIdRef,
       input.setIsBusy,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
@@ -377,14 +363,9 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
         threadId,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
-        onThreadSelected: (nextThreadId) => {
-          input.setSelectedThreadId(nextThreadId);
-          selectedThreadIdRef.current = nextThreadId;
-        },
+        onThreadSelected: handleThreadSelected,
         onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: () => {
-          input.threadListStateController.invalidateActiveThreadQuery();
-        },
+        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
         onRefreshReviewThreadData: refreshCreatedThreadDataForThread,
         threadMutationClient: input.threadMutationServerClient,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
@@ -392,13 +373,12 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     },
     [
       input.buildActionRequestOptions,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
       input.reportTrackedUserInterfaceError,
       refreshCreatedThreadDataForThread,
-      selectedThreadIdRef,
       input.setIsBusy,
       input.setMobileSidebarOpen,
-      input.setSelectedThreadId,
-      input.threadListStateController,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
