@@ -276,8 +276,12 @@ export function useApplicationOwnerDependencies<
     () => new EventStreamConnectionCoordinator(),
   );
   const runtimeViewportSizingCoordinator = useMemo(
-    () => new RuntimeViewportSizingCoordinator(mobileVisualViewportKeyboardOpenDeltaPx),
-    [mobileVisualViewportKeyboardOpenDeltaPx],
+    () =>
+      new RuntimeViewportSizingCoordinator(
+        mobileVisualViewportKeyboardOpenDeltaPx,
+        mobileLayoutMaximumWidthPx,
+      ),
+    [mobileLayoutMaximumWidthPx, mobileVisualViewportKeyboardOpenDeltaPx],
   );
   const pageTouchOverscrollGuardCoordinator = useStableOwner(
     () => new PageTouchOverscrollGuardCoordinator(),

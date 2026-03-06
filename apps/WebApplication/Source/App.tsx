@@ -142,6 +142,7 @@ export function App(): React.JSX.Element {
     initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
     initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
+    initialIsMobileLayout: window.innerWidth <= MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
   });
 
   const applicationOwnerDependencies = useApplicationOwnerDependencies<CoreDataCapabilitySnapshot>({
@@ -359,6 +360,7 @@ export function App(): React.JSX.Element {
         onAppShellTouchStart={shellComposition.handleAppShellTouchStart}
         onAppShellTouchMove={shellComposition.handleAppShellTouchMove}
         onEndSidebarSwipeTracking={shellComposition.endSidebarSwipeTracking}
+        isMobileLayout={applicationShellState.isMobileLayout}
         mobileSidebarOpen={applicationShellState.mobileSidebarOpen}
         desktopSidebarOpen={applicationShellState.desktopSidebarOpen}
         onCloseMobileSidebar={handleCloseMobileSidebar}

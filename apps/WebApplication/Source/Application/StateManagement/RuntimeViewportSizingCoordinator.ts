@@ -6,6 +6,7 @@ export type ViewportOrientation = "portrait" | "landscape";
 
 export interface RuntimeViewportMetrics {
   orientation: ViewportOrientation;
+  isMobileLayout: boolean;
   appHeight: number;
   visualViewportHeight: number;
   layoutViewportHeight: number;
@@ -18,14 +19,20 @@ export class RuntimeViewportSizingCoordinator {
   private maxVisualHeightPortrait: number;
   private maxVisualHeightLandscape: number;
   private readonly keyboardOpenDeltaThresholdPx: number;
+  private readonly mobileLayoutMaximumWidthPx: number;
   private readonly positiveFiniteNumberSchema: z.ZodNumber;
 
-  public constructor(keyboardOpenDeltaThresholdPx: number) {
+  public constructor(keyboardOpenDeltaThresholdPx: number, mobileLayoutMaximumWidthPx: number) {
     this.keyboardOpenDeltaThresholdPx = z
       .number()
       .finite()
       .nonnegative()
       .parse(keyboardOpenDeltaThresholdPx);
+    this.mobileLayoutMaximumWidthPx = z
+      .number()
+      .finite()
+      .positive()
+      .parse(mobileLayoutMaximumWidthPx);
     this.maxVisualHeightPortrait = 0;
     this.maxVisualHeightLandscape = 0;
     this.positiveFiniteNumberSchema = z.number().finite().positive();
@@ -55,6 +62,7 @@ export class RuntimeViewportSizingCoordinator {
     const safeAreaInsetBottom = this.readCssPixelVariable("--safe-area-inset-bottom-clamped");
     const composerSafeBottomInset = keyboardOpen ? 0 : safeAreaInsetBottom;
     const appHeight = Math.max(MINIMUM_VIEWPORT_HEIGHT_PX, Math.round(visualViewportHeight));
+    const isMobileLayout = this.readViewportWidthPx() <= this.mobileLayoutMaximumWidthPx;
 
     root.style.setProperty("--app-height", `${String(appHeight)}px`);
     root.style.setProperty(
@@ -64,6 +72,7 @@ export class RuntimeViewportSizingCoordinator {
 
     return {
       orientation,
+      isMobileLayout,
       appHeight,
       visualViewportHeight,
       layoutViewportHeight,
@@ -106,5 +115,13 @@ export class RuntimeViewportSizingCoordinator {
       return innerHeightResult.data;
     }
     return MINIMUM_VIEWPORT_HEIGHT_PX;
+  }
+
+  private readViewportWidthPx(): number {
+    const innerWidthResult = this.positiveFiniteNumberSchema.safeParse(window.innerWidth);
+    if (innerWidthResult.success) {
+      return innerWidthResult.data;
+    }
+    return this.mobileLayoutMaximumWidthPx + 1;
   }
 }

@@ -116,6 +116,7 @@ export function buildViewportShellEffectsInput(
     isChatAtBottomRef: applicationShellState.isChatAtBottomRef,
     viewportKeyboardStateRef: applicationShellState.viewportKeyboardStateRef,
     keyboardOpenScrollRafRef: applicationShellState.keyboardOpenScrollRafRef,
+    setIsMobileLayout: applicationShellState.setIsMobileLayout,
     setIsChatAtBottom: applicationShellState.setIsChatAtBottom,
     runtimeViewportSizingCoordinator: applicationOwnerDependencies.runtimeViewportSizingCoordinator,
     pageTouchOverscrollGuardCoordinator:

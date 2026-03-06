@@ -54,6 +54,7 @@ interface ShellInitialFlags {
   isBusy: boolean;
   isCoreLoading: boolean;
   waitForReplayResponse: boolean;
+  isMobileLayout: boolean;
   mobileSidebarOpen: boolean;
   desktopSidebarOpen: boolean;
   isChatAtBottom: boolean;
@@ -83,6 +84,7 @@ const INITIAL_SHELL_FLAGS: ShellInitialFlags = {
   isBusy: false,
   isCoreLoading: true,
   waitForReplayResponse: false,
+  isMobileLayout: false,
   mobileSidebarOpen: false,
   desktopSidebarOpen: true,
   isChatAtBottom: true,
@@ -262,6 +264,7 @@ export function useApplicationShellState(
   const [activeTab, setActiveTab] = useState<ApplicationShellTab>(routeSeededShellState.activeTab);
   const [settingsWorkspaceSection, setSettingsWorkspaceSection] =
     useState<SettingsWorkspaceSection>(routeSeededShellState.settingsWorkspaceSection);
+  const [isMobileLayout, setIsMobileLayout] = useState(input.initialIsMobileLayout);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(INITIAL_SHELL_FLAGS.mobileSidebarOpen);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(
     INITIAL_SHELL_FLAGS.desktopSidebarOpen,
@@ -401,6 +404,8 @@ export function useApplicationShellState(
     setActiveTab,
     settingsWorkspaceSection,
     setSettingsWorkspaceSection,
+    isMobileLayout,
+    setIsMobileLayout,
     mobileSidebarOpen,
     setMobileSidebarOpen,
     desktopSidebarOpen,

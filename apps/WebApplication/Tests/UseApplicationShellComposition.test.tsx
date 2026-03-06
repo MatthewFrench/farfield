@@ -238,6 +238,7 @@ function createShellCompositionFixture(): ShellCompositionFixture {
     }),
     runtimeViewportSizingCoordinator: new RuntimeViewportSizingCoordinator(
       MOBILE_VISUAL_VIEWPORT_KEYBOARD_OPEN_DELTA_PX,
+      MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
     ),
     chatScrollStateCoordinator: new ChatScrollStateCoordinator(CHAT_SCROLL_BOTTOM_THRESHOLD_PX),
     chatFeatureComposition: createChatFeatureCompositionFixture(),
@@ -267,6 +268,7 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     initialUiState,
     unsupportedPushClientState: createUnsupportedPushClientState(),
     initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
+    initialIsMobileLayout: false,
   });
 
   const modeSelectionStateResolver = useMemo(() => new ModeSelectionStateResolver(), []);

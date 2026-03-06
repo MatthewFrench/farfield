@@ -19,6 +19,7 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
     initialUiState: properties.initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
     initialVisibleChatItems: properties.initialVisibleChatItems,
+    initialIsMobileLayout: false,
   });
   properties.onState(state);
   return <div data-testid="application-shell-state-harness" />;
@@ -126,6 +127,7 @@ describe("useApplicationShellState", () => {
     expect(applicationShellState.selectedModelId).toBe("");
     expect(applicationShellState.selectedReasoningEffort).toBe("");
     expect(applicationShellState.settingsWorkspaceSection).toBe("notifications");
+    expect(applicationShellState.isMobileLayout).toBe(false);
     expect(applicationShellState.debugWorkspaceSection).toBe("issues");
     expect(applicationShellState.debugIssueSeverityFilter).toBe("all");
     expect(applicationShellState.debugIssueFilterQuery).toBe("");

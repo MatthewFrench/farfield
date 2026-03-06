@@ -270,6 +270,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     initialUiState,
     unsupportedPushClientState: UNSUPPORTED_PUSH_CLIENT_STATE,
     initialVisibleChatItems: INITIAL_VISIBLE_CHAT_ITEMS,
+    initialIsMobileLayout: false,
   });
 
   const applicationOwnerDependencies = useApplicationOwnerDependencies<CoreDataCapabilitySnapshot>({

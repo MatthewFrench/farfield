@@ -61,6 +61,7 @@ export interface UseApplicationShellStateInput {
   initialUiState: ApplicationRouteState;
   unsupportedPushClientState: PushClientState;
   initialVisibleChatItems: number;
+  initialIsMobileLayout: boolean;
 }
 
 export interface ApplicationShellState {
@@ -174,6 +175,8 @@ export interface ApplicationShellState {
   setActiveTab: ApplicationShellStateSetter<ApplicationShellTab>;
   settingsWorkspaceSection: SettingsWorkspaceSection;
   setSettingsWorkspaceSection: ApplicationShellStateSetter<SettingsWorkspaceSection>;
+  isMobileLayout: boolean;
+  setIsMobileLayout: ApplicationShellStateSetter<boolean>;
   mobileSidebarOpen: boolean;
   setMobileSidebarOpen: ApplicationShellStateSetter<boolean>;
   desktopSidebarOpen: boolean;

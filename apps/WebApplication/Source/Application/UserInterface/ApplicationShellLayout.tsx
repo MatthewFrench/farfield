@@ -35,6 +35,7 @@ export interface ApplicationShellLayoutProps {
   onAppShellTouchStart: (event: ReactTouchEvent<HTMLDivElement>) => void;
   onAppShellTouchMove: (event: ReactTouchEvent<HTMLDivElement>) => void;
   onEndSidebarSwipeTracking: () => void;
+  isMobileLayout: boolean;
   mobileSidebarOpen: boolean;
   desktopSidebarOpen: boolean;
   onCloseMobileSidebar: () => void;
@@ -61,6 +62,7 @@ export function ApplicationShellLayout({
   onAppShellTouchStart,
   onAppShellTouchMove,
   onEndSidebarSwipeTracking,
+  isMobileLayout,
   mobileSidebarOpen,
   desktopSidebarOpen,
   onCloseMobileSidebar,
@@ -105,7 +107,7 @@ export function ApplicationShellLayout({
       onTouchCancel={onEndSidebarSwipeTracking}
     >
       <AnimatePresence>
-        {mobileSidebarOpen && (
+        {isMobileLayout && mobileSidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -118,21 +120,25 @@ export function ApplicationShellLayout({
         )}
       </AnimatePresence>
 
-      <ThreadSidebarViewport
-        viewport="desktop"
-        isOpen={desktopSidebarOpen}
-        {...threadSidebarViewportSharedProperties}
-      />
+      {!isMobileLayout && (
+        <ThreadSidebarViewport
+          viewport="desktop"
+          isOpen={desktopSidebarOpen}
+          {...threadSidebarViewportSharedProperties}
+        />
+      )}
 
-      <ThreadSidebarViewport
-        viewport="mobile"
-        isOpen={mobileSidebarOpen}
-        {...threadSidebarViewportSharedProperties}
-      />
+      {isMobileLayout && (
+        <ThreadSidebarViewport
+          viewport="mobile"
+          isOpen={mobileSidebarOpen}
+          {...threadSidebarViewportSharedProperties}
+        />
+      )}
 
       <div
         className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
-          desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
+          !isMobileLayout && desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
         } h-full overflow-hidden`}
       >
         <ApplicationHeaderBar {...applicationHeaderBarProperties} />

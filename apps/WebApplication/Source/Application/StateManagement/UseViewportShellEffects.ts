@@ -18,6 +18,7 @@ export interface UseViewportShellEffectsInput {
   isChatAtBottomRef: MutableRefObject<boolean>;
   viewportKeyboardStateRef: MutableRefObject<boolean | null>;
   keyboardOpenScrollRafRef: MutableRefObject<number | null>;
+  setIsMobileLayout: Dispatch<SetStateAction<boolean>>;
   setIsChatAtBottom: Dispatch<SetStateAction<boolean>>;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
   pageTouchOverscrollGuardCoordinator: PageTouchOverscrollGuardCoordinator;
@@ -54,6 +55,12 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
 
     const applyRuntimeViewportSizing = () => {
       const metrics = input.runtimeViewportSizingCoordinator.applyViewportSizingVariables();
+
+      input.setIsMobileLayout((previousIsMobileLayout) =>
+        previousIsMobileLayout === metrics.isMobileLayout
+          ? previousIsMobileLayout
+          : metrics.isMobileLayout,
+      );
 
       if (window.scrollY !== 0 || window.pageYOffset !== 0) {
         window.scrollTo(0, 0);
@@ -129,6 +136,7 @@ export function useViewportShellEffects(input: UseViewportShellEffectsInput): vo
     input.keyboardOpenScrollRafRef,
     input.runtimeViewportSizingCoordinator,
     input.scrollRef,
+    input.setIsMobileLayout,
     input.setIsChatAtBottom,
     input.viewportKeyboardStateRef,
   ]);

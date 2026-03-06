@@ -23,7 +23,7 @@ class TestRuntimeViewportSizingCoordinator extends RuntimeViewportSizingCoordina
   private metrics: RuntimeViewportMetrics;
 
   public constructor(metrics: RuntimeViewportMetrics) {
-    super(120);
+    super(120, 768);
     this.metrics = metrics;
   }
 
@@ -70,6 +70,7 @@ function Harness(properties: HarnessProperties): React.JSX.Element {
 function createRuntimeViewportMetrics(keyboardOpen: boolean): RuntimeViewportMetrics {
   return {
     orientation: "portrait",
+    isMobileLayout: true,
     appHeight: 800,
     visualViewportHeight: 800,
     layoutViewportHeight: 800,
@@ -185,6 +186,7 @@ describe("useViewportShellEffects", () => {
       isChatAtBottomRef: { current: false },
       viewportKeyboardStateRef: { current: null },
       keyboardOpenScrollRafRef: { current: null },
+      setIsMobileLayout: vi.fn(),
       setIsChatAtBottom: vi.fn(),
       runtimeViewportSizingCoordinator,
       pageTouchOverscrollGuardCoordinator,
@@ -227,6 +229,7 @@ describe("useViewportShellEffects", () => {
     });
 
     const setIsChatAtBottom = vi.fn();
+    const setIsMobileLayout = vi.fn();
     const isChatAtBottomRef = { current: false };
     const keyboardOpenScrollRafRef = { current: null };
 
@@ -237,6 +240,7 @@ describe("useViewportShellEffects", () => {
       isChatAtBottomRef,
       viewportKeyboardStateRef: { current: false },
       keyboardOpenScrollRafRef,
+      setIsMobileLayout,
       setIsChatAtBottom,
       runtimeViewportSizingCoordinator,
       pageTouchOverscrollGuardCoordinator,
@@ -252,6 +256,7 @@ describe("useViewportShellEffects", () => {
     expect(chatScrollStateCoordinator.lastPinnedElement).toBe(scrollElement);
     expect(isChatAtBottomRef.current).toBe(true);
     expect(setIsChatAtBottom).toHaveBeenCalledWith(true);
+    expect(setIsMobileLayout).toHaveBeenCalled();
     expect(keyboardOpenScrollRafRef.current).toBeNull();
   });
 });

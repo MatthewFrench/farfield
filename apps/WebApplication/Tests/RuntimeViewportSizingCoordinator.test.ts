@@ -4,6 +4,7 @@ import { RuntimeViewportSizingCoordinator } from "../Source/Application/StateMan
 const originalMatchMedia = window.matchMedia;
 const originalVisualViewport = window.visualViewport;
 const originalInnerHeight = window.innerHeight;
+const originalInnerWidth = window.innerWidth;
 
 function installOrientation(landscape: boolean): void {
   Object.defineProperty(window, "matchMedia", {
@@ -40,6 +41,14 @@ function installInnerHeight(height: number): void {
   });
 }
 
+function installInnerWidth(width: number): void {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+}
+
 describe("RuntimeViewportSizingCoordinator", () => {
   afterEach(() => {
     Object.defineProperty(window, "matchMedia", {
@@ -57,6 +66,11 @@ describe("RuntimeViewportSizingCoordinator", () => {
       writable: true,
       value: originalInnerHeight,
     });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: originalInnerWidth,
+    });
     document.documentElement.style.removeProperty("--app-height");
     document.documentElement.style.removeProperty("--composer-safe-bottom-inset");
     document.documentElement.style.removeProperty("--safe-area-inset-bottom-clamped");
@@ -65,14 +79,16 @@ describe("RuntimeViewportSizingCoordinator", () => {
 
   it("applies runtime viewport metrics and css variables", () => {
     installOrientation(false);
+    installInnerWidth(390);
     installInnerHeight(900);
     installVisualViewportHeight(900);
     document.documentElement.style.setProperty("--safe-area-inset-bottom-clamped", "16px");
-    const coordinator = new RuntimeViewportSizingCoordinator(120);
+    const coordinator = new RuntimeViewportSizingCoordinator(120, 768);
 
     const metrics = coordinator.applyViewportSizingVariables();
 
     expect(metrics.orientation).toBe("portrait");
+    expect(metrics.isMobileLayout).toBe(true);
     expect(metrics.appHeight).toBe(900);
     expect(metrics.visualViewportHeight).toBe(900);
     expect(metrics.keyboardOpen).toBe(false);
@@ -84,10 +100,11 @@ describe("RuntimeViewportSizingCoordinator", () => {
 
   it("uses baseline height to classify keyboard-open transitions", () => {
     installOrientation(false);
+    installInnerWidth(390);
     installInnerHeight(900);
     installVisualViewportHeight(900);
     document.documentElement.style.setProperty("--safe-area-inset-bottom-clamped", "20px");
-    const coordinator = new RuntimeViewportSizingCoordinator(120);
+    const coordinator = new RuntimeViewportSizingCoordinator(120, 768);
 
     const initialMetrics = coordinator.applyViewportSizingVariables();
     installVisualViewportHeight(730);
@@ -103,10 +120,11 @@ describe("RuntimeViewportSizingCoordinator", () => {
 
   it("reads safe area inset left and clears runtime css variables", () => {
     installOrientation(false);
+    installInnerWidth(1024);
     installInnerHeight(600);
     installVisualViewportHeight(600);
     document.documentElement.style.setProperty("--safe-area-inset-left", "18px");
-    const coordinator = new RuntimeViewportSizingCoordinator(120);
+    const coordinator = new RuntimeViewportSizingCoordinator(120, 768);
 
     coordinator.applyViewportSizingVariables();
     expect(coordinator.readSafeAreaInsetLeftPx()).toBe(18);
@@ -120,9 +138,10 @@ describe("RuntimeViewportSizingCoordinator", () => {
 
   it("uses layout viewport height when visual viewport metrics are not finite", () => {
     installOrientation(false);
+    installInnerWidth(390);
     installInnerHeight(640);
     installVisualViewportHeight(Number.NaN);
-    const coordinator = new RuntimeViewportSizingCoordinator(120);
+    const coordinator = new RuntimeViewportSizingCoordinator(120, 768);
 
     const metrics = coordinator.applyViewportSizingVariables();
 

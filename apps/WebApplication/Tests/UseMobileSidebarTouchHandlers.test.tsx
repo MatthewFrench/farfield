@@ -94,7 +94,7 @@ describe("useMobileSidebarTouchHandlers", () => {
 
   it("forwards touch-start metadata to swipe tracking with safe-area ownership", () => {
     const mobileSidebarSwipeCoordinator = new TestMobileSidebarSwipeCoordinator();
-    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120);
+    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120, 768);
     vi.spyOn(runtimeViewportSizingCoordinator, "readSafeAreaInsetLeftPx").mockReturnValue(12);
     const setMobileSidebarOpen = vi.fn();
 
@@ -130,7 +130,7 @@ describe("useMobileSidebarTouchHandlers", () => {
 
   it("ends swipe tracking when touch-move events have no primary touch", () => {
     const mobileSidebarSwipeCoordinator = new TestMobileSidebarSwipeCoordinator();
-    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120);
+    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120, 768);
     const setMobileSidebarOpen = vi.fn();
 
     render(
@@ -156,7 +156,7 @@ describe("useMobileSidebarTouchHandlers", () => {
     mobileSidebarSwipeCoordinator.setNextContinueTrackingOutput({
       shouldOpenSidebar: true,
     });
-    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120);
+    const runtimeViewportSizingCoordinator = new RuntimeViewportSizingCoordinator(120, 768);
     const setMobileSidebarOpen = vi.fn();
 
     render(

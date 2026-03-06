@@ -69,6 +69,10 @@ Artifacts:
 2. `.runtime/end-to-end-performance/latest.json`
 3. `.runtime/end-to-end-sentinel/latest.ndjson`
 
+Baseline and improvement history:
+
+1. `docs/debug/mobile-freeze-baseline-log.md`
+
 The performance artifact includes:
 
 1. raw client probe snapshot
