@@ -357,3 +357,56 @@ Interpretation:
 1. The sidebar runtime summary traffic is much less severe than the original WebKit baseline.
 2. WebKit still has large freeze windows, but the apps and rate-limit requests are no longer the catastrophic 15s-scale events seen in the first baseline.
 3. As with Chromium, the remaining dominant work is now the thread-list path itself.
+
+## 2026-03-06 Follow-Up: Longer Thread-List Cache TTLs
+
+Changes under test:
+
+1. Increase the web thread-list query cache TTL from `1.5s` to `15s`.
+2. Increase the server thread-list aggregation cache TTL from `2s` to `15s`.
+
+Command used:
+
+```bash
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile
+```
+
+### Chromium Mobile Sidebar Repeated Profile After TTL Increase
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/browser-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `5`
+3. Total freeze duration: `1266ms`
+4. Max freeze duration: `683ms`
+5. Total long-task duration: `4555ms`
+6. Max long-task duration: `391ms`
+
+Top request paths:
+
+1. `/api/threads?limit=80&archived=false&all=true&maxPages=20&sortKey=updated_at`
+   - count `19`
+   - total `7126ms`
+   - max `1309ms`
+2. `/api/notifications/events?limit=80&agentId=codex`
+   - count `1`
+   - total `87ms`
+3. `/api/health`
+   - count `1`
+   - total `85ms`
+
+Change from the previous Chromium follow-up:
+
+1. Freeze count improved from `20` to `5`
+2. Total freeze duration improved from `6184ms` to `1266ms`
+3. Total long-task duration improved from `9117ms` to `4555ms`
+
+Interpretation:
+
+1. Longer thread-list cache TTLs reduced the number of user-visible sidebar freezes substantially on Chromium.
+2. The dominant remaining cost is still the thread-list path itself, but it now appears far less often as a user-visible stall.
+3. The next structural step should be a cheaper thread-list change-detection path so even the remaining `/api/threads` work can be reduced.

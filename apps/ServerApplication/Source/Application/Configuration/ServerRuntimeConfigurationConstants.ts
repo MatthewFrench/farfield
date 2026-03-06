@@ -63,7 +63,9 @@ export const ServerRuntimeDefaultValues = Object.freeze({
   threadListAdapterTimeoutMilliseconds: 7_500,
   // Bound thread-list aggregation cache cardinality to keep memory growth predictable.
   threadListAggregationCacheMaximumEntries: 48,
-  threadListAggregationCacheTimeToLiveMilliseconds: 2_000,
+  // Thread-list mutations explicitly invalidate this cache, so a longer TTL primarily reduces
+  // repeated merge/sort work during passive refresh cycles.
+  threadListAggregationCacheTimeToLiveMilliseconds: 15_000,
   webHealthBuildId: "dev",
 });
 
