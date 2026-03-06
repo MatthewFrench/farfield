@@ -235,21 +235,13 @@ export class ThreadListStateController {
   }
 
   public invalidateActiveThreadQuery(): void {
+    // Keep the last snapshot as a sync baseline; invalidation should only revoke freshness.
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.activeThreads);
-    void this.threadListSnapshotPersistenceStore
-      .clearThreadListSnapshot(ThreadListCacheKeyByName.activeThreads)
-      .catch(() => {
-        // Keep cache invalidation non-blocking for user actions.
-      });
   }
 
   public invalidateArchivedThreadQuery(): void {
+    // Keep the last snapshot as a sync baseline; invalidation should only revoke freshness.
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);
-    void this.threadListSnapshotPersistenceStore
-      .clearThreadListSnapshot(ThreadListCacheKeyByName.archivedThreads)
-      .catch(() => {
-        // Keep cache invalidation non-blocking for user actions.
-      });
   }
 
   public invalidateThreadQueries(): void {

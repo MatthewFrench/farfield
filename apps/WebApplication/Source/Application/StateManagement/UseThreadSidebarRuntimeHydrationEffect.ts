@@ -1,10 +1,13 @@
-import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
+import { type Dispatch, type SetStateAction, useEffect } from "react";
 import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { type ThreadSidebarRuntimeSummary } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
-import { ThreadSidebarRuntimeSummaryNetworkCacheOwner } from "./ThreadSidebarRuntimeSummaryNetworkCacheOwner";
+import {
+  ThreadSidebarRuntimeSummaryNetworkCacheOwner,
+  type ThreadSidebarRuntimeSummaryNetworkSnapshotCoverage,
+} from "./ThreadSidebarRuntimeSummaryNetworkCacheOwner";
 import {
   readThreadSidebarAccountSummary,
   readThreadSidebarAppsSummary,
@@ -14,6 +17,8 @@ import {
 const SIDEBAR_APPS_LIST_LIMIT = 100;
 const SIDEBAR_RUNTIME_SUMMARY_REFRESH_OPERATION = "refresh-sidebar-runtime-summary";
 const EMPTY_RUNTIME_SUMMARY_REFRESH_ERROR_MESSAGE = "Unknown sidebar runtime summary refresh error";
+const threadSidebarRuntimeSummaryNetworkCacheOwner =
+  new ThreadSidebarRuntimeSummaryNetworkCacheOwner();
 
 interface ThreadSidebarRuntimeSummaryNetworkSnapshot {
   account: ThreadSidebarRuntimeSummary["account"];
@@ -40,6 +45,18 @@ function applyNetworkSnapshotToSidebarRuntimeSummary(
     rateLimits: snapshot.rateLimits,
     apps: snapshot.apps,
   }));
+}
+
+function readRequiredSnapshotCoverage(input: {
+  canReadAccount: boolean;
+  canReadAccountRateLimits: boolean;
+  canListApps: boolean;
+}): ThreadSidebarRuntimeSummaryNetworkSnapshotCoverage {
+  return {
+    account: input.canReadAccount,
+    rateLimits: input.canReadAccountRateLimits,
+    apps: input.canListApps,
+  };
 }
 
 async function readThreadSidebarRuntimeSummaryNetworkSnapshot(
@@ -120,28 +137,29 @@ function createSidebarRuntimeSummaryRefreshError<ErrorType>(error: ErrorType): E
 export function useThreadSidebarRuntimeHydrationEffect(
   input: UseThreadSidebarRuntimeHydrationEffectInput,
 ): void {
-  const networkSnapshotCacheOwnerReference =
-    useRef<ThreadSidebarRuntimeSummaryNetworkCacheOwner | null>(null);
-  if (networkSnapshotCacheOwnerReference.current === null) {
-    networkSnapshotCacheOwnerReference.current = new ThreadSidebarRuntimeSummaryNetworkCacheOwner();
-  }
-  const networkSnapshotCacheOwner = networkSnapshotCacheOwnerReference.current;
-
   useEffect(() => {
     if (!input.isSidebarVisible) {
       return;
     }
 
     let shouldCancelRefresh = false;
-    const cachedSnapshot = networkSnapshotCacheOwner.readSnapshot(input.selectedAgentId);
+    const requiredCoverage = readRequiredSnapshotCoverage({
+      canReadAccount: input.canReadAccount,
+      canReadAccountRateLimits: input.canReadAccountRateLimits,
+      canListApps: input.canListApps,
+    });
+    const cachedSnapshot = threadSidebarRuntimeSummaryNetworkCacheOwner.readSnapshot(
+      input.selectedAgentId,
+    );
     if (cachedSnapshot !== null) {
       applyNetworkSnapshotToSidebarRuntimeSummary(
         input.setThreadSidebarRuntimeSummary,
         cachedSnapshot,
       );
     }
-    const freshCachedSnapshot = networkSnapshotCacheOwner.readSnapshotIfFresh(
+    const freshCachedSnapshot = threadSidebarRuntimeSummaryNetworkCacheOwner.readSnapshotIfFresh(
       input.selectedAgentId,
+      requiredCoverage,
     );
     if (freshCachedSnapshot !== null) {
       return;
@@ -149,18 +167,22 @@ export function useThreadSidebarRuntimeHydrationEffect(
 
     const hydrateThreadSidebarRuntimeSummary = async (): Promise<void> => {
       try {
-        const nextSnapshot = await readThreadSidebarRuntimeSummaryNetworkSnapshot({
-          selectedAgentId: input.selectedAgentId,
-          canReadAccount: input.canReadAccount,
-          canReadAccountRateLimits: input.canReadAccountRateLimits,
-          canListApps: input.canListApps,
-          capabilityServerClient: input.capabilityServerClient,
-          shouldCancel: () => shouldCancelRefresh,
+        const nextSnapshot = await threadSidebarRuntimeSummaryNetworkCacheOwner.readFreshOrLoad({
+          agentIdentifier: input.selectedAgentId,
+          requiredCoverage,
+          loadSnapshot: async () =>
+            await readThreadSidebarRuntimeSummaryNetworkSnapshot({
+              selectedAgentId: input.selectedAgentId,
+              canReadAccount: input.canReadAccount,
+              canReadAccountRateLimits: input.canReadAccountRateLimits,
+              canListApps: input.canListApps,
+              capabilityServerClient: input.capabilityServerClient,
+              shouldCancel: () => shouldCancelRefresh,
+            }),
         });
         if (shouldCancelRefresh) {
           return;
         }
-        networkSnapshotCacheOwner.writeSnapshot(input.selectedAgentId, nextSnapshot);
         applyNetworkSnapshotToSidebarRuntimeSummary(
           input.setThreadSidebarRuntimeSummary,
           nextSnapshot,
@@ -189,6 +211,5 @@ export function useThreadSidebarRuntimeHydrationEffect(
     input.capabilityServerClient,
     input.setThreadSidebarRuntimeSummary,
     input.handleRuntimeRequestError,
-    networkSnapshotCacheOwner,
   ]);
 }

@@ -286,6 +286,7 @@ describe("Thread ownership modules", () => {
     expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toEqual(response);
     cache.invalidate(ThreadListCacheKeyByName.activeThreads);
     expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toBeNull();
+    expect(cache.readCached(ThreadListCacheKeyByName.activeThreads)).toEqual(response);
   });
 
   it("ThreadQueryCache enforces maximum entries with least-recently-used eviction", () => {
@@ -572,6 +573,46 @@ describe("Thread ownership modules", () => {
       threadListStateStore: new ThreadListStateStore(),
       threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
     });
+
+    const cachedRead = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-1",
+      readFromCache: true,
+    });
+
+    expect(cachedRead.loadedFromCache).toBe(true);
+    expect(cachedRead.nextThreads).toEqual(active.data);
+    expect(serverClient.getListRequestCount()).toBe(0);
+  });
+
+  it("ThreadListStateController keeps persisted snapshots available after active query invalidation", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001,
+    });
+    const archived = buildThreadListResponse({
+      threadOneUpdatedAt: 1_600_000_000,
+      threadTwoUpdatedAt: 1_600_000_001,
+    });
+    const persistedSnapshotStore = new TestThreadListSnapshotPersistenceStore();
+    await persistedSnapshotStore.writeThreadListSnapshot(
+      ThreadListCacheKeyByName.activeThreads,
+      active,
+    );
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadListSnapshotPersistenceStore: persistedSnapshotStore,
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+    });
+
+    controller.invalidateActiveThreadQuery();
 
     const cachedRead = await controller.loadActiveThreadState({
       limit: 80,

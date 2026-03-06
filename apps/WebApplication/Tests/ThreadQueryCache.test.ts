@@ -59,4 +59,17 @@ describe("ThreadQueryCache", () => {
     expect(cache.readFresh(ThreadListCacheKeyByName.archivedThreads)).toBeNull();
     expect(cache.readFresh("threads:removed")).toEqual(removedResponse);
   });
+
+  it("marks entries stale without dropping the cached response baseline", () => {
+    const cache = new ThreadQueryCache(1_000, 2, {
+      readCurrentEpochMilliseconds: () => 100,
+    });
+    const activeResponse = buildThreadListResponse("thread-active");
+
+    cache.write(ThreadListCacheKeyByName.activeThreads, activeResponse);
+    cache.invalidate(ThreadListCacheKeyByName.activeThreads);
+
+    expect(cache.readFresh(ThreadListCacheKeyByName.activeThreads)).toBeNull();
+    expect(cache.readCached(ThreadListCacheKeyByName.activeThreads)).toEqual(activeResponse);
+  });
 });

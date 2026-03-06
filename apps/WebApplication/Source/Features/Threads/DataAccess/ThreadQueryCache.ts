@@ -18,6 +18,11 @@ const INVALID_CACHE_MAXIMUM_ENTRIES_MESSAGE =
  * Owns in-memory thread-list query caching.
  * Entries are bounded by TTL and least-recently-used eviction so thread-list refreshes can read
  * immediately during short bursts without unbounded growth.
+ *
+ * Freshness and retention are separate:
+ * 1. `readFresh` enforces the interactive freshness window.
+ * 2. stale entries remain retained for baseline sidebar sync and cache-first rendering until LRU
+ *    eviction or explicit `invalidateAll`.
  */
 export class ThreadQueryCache {
   private readonly timeToLiveMs: number;
@@ -48,7 +53,6 @@ export class ThreadQueryCache {
       return null;
     }
     if (this.readCurrentEpochMilliseconds() >= entry.expiresAtEpochMs) {
-      this.entryByKey.delete(cacheKey);
       return null;
     }
     // Move the key to the end to keep eviction least-recently-used.
@@ -73,7 +77,14 @@ export class ThreadQueryCache {
   }
 
   public invalidate(cacheKey: string): void {
-    this.entryByKey.delete(cacheKey);
+    const entry = this.entryByKey.get(cacheKey);
+    if (!entry) {
+      return;
+    }
+    this.entryByKey.set(cacheKey, {
+      response: entry.response,
+      expiresAtEpochMs: 0,
+    });
   }
 
   public invalidateAll(): void {

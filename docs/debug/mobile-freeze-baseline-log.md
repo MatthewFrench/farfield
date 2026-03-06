@@ -524,3 +524,118 @@ Interpretation:
 
 1. Thread open is currently healthier than the repeated sidebar loop because it passed its scenario budgets.
 2. It still is not especially fast, and the LCP readout is worth watching while sidebar work continues.
+
+## 2026-03-06 Follow-Up: Retained Sidebar Baselines And Runtime-Summary Single-Flight
+
+Changes under test:
+
+1. Keep invalidated thread-list cache entries as stale retained baselines instead of deleting them.
+2. Keep persisted thread-list snapshots available across active and archived invalidation.
+3. Add capability-aware single-flight dedupe for sidebar runtime summary network reads.
+4. Reuse one process-lifetime sidebar runtime summary cache owner so remount churn does not duplicate `/api/apps` and `/api/account/*` requests.
+
+Commands used:
+
+```bash
+bun run test -- Tests/ThreadQueryCache.test.ts Tests/ThreadOwnership.test.ts Tests/UseCoreDataLoaders.test.tsx
+bun run test -- Tests/ThreadSidebarRuntimeSummaryNetworkCacheOwner.test.ts Tests/UseCoreDataLoaders.test.tsx
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile
+E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-freeze-profile:webkit
+```
+
+### Chromium Mobile Sidebar Repeated Profile After Baseline Retention And Single-Flight
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/browser-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `4`
+3. Total freeze duration: `1201ms`
+4. Max freeze duration: `684ms`
+5. Total long-task duration: `5477ms`
+6. Max long-task duration: `409ms`
+7. LCP: `1080ms`
+
+Observed request mix:
+
+1. `/api/sidebar/threads/sync`
+   - count `1`
+   - duration about `429ms`
+2. `/api/apps?limit=100`
+   - count `1`
+   - duration about `462ms`
+3. `/api/account/rate-limits?agentId=codex`
+   - count `1`
+   - duration about `380ms`
+4. `/api/account?agentId=codex`
+   - count `1`
+   - duration about `147ms`
+5. `/api/health`
+   - count `1`
+6. `/api/notifications/events?limit=80&agentId=codex`
+   - count `1`
+
+Change from the previous sidebar-sync follow-up:
+
+1. Freeze count improved from `14` to `4`
+2. Total freeze duration improved from `4153ms` to `1201ms`
+3. `/api/sidebar/threads/sync` request count improved from `21` to `1`
+4. `/api/apps`, `/api/account`, and `/api/account/rate-limits` each improved from `2` requests to `1`
+
+Interpretation:
+
+1. Preserving stale baselines after invalidation was the right move for the sidebar.
+2. The app now keeps enough sidebar state to make the sync endpoint cheap in practice, not just in theory.
+3. Chromium is now close to passing the current freeze budget; the remaining failures are one max-freeze outlier and one max-long-task outlier.
+
+### WebKit Mobile Sidebar Repeated Profile After Baseline Retention And Single-Flight
+
+Artifact:
+
+1. `.runtime/end-to-end-performance/webkit-mobile-sidebar-freeze-profile.json`
+
+Observed metrics:
+
+1. Iterations observed: `16`
+2. Freeze count: `4`
+3. Total freeze duration: `3911ms`
+4. Max freeze duration: `3404ms`
+5. Long-task count: `0`
+6. Total long-task duration: `0ms`
+7. LCP: `1302ms`
+
+Observed request mix:
+
+1. `/api/sidebar/threads/sync`
+   - count `1`
+   - duration about `430ms`
+2. `/api/apps?limit=100`
+   - count `1`
+   - duration about `428ms`
+3. `/api/account/rate-limits?agentId=codex`
+   - count `1`
+   - duration about `335ms`
+4. `/api/account?agentId=codex`
+   - count `1`
+   - duration about `86ms`
+5. `/api/notifications/events?limit=80&agentId=codex`
+   - count `1`
+6. `/api/health`
+   - count `1`
+
+Change from the previous sidebar-sync follow-up:
+
+1. Freeze count improved from `15` to `4`
+2. Total freeze duration improved from `37352ms` to `3911ms`
+3. Max freeze duration improved from `7368ms` to `3404ms`
+4. `/api/sidebar/threads/sync` request count improved from `33` to `1`
+5. `/api/apps`, `/api/account`, and `/api/account/rate-limits` each improved from `2` requests to `1`
+
+Interpretation:
+
+1. The duplicate sidebar work is now largely gone on WebKit too.
+2. The remaining WebKit problem is no longer repeated app work; it is a smaller number of larger browser-visible stalls.
+3. The next high-value investigation should target the remaining commit or animation churn around sidebar open rather than broad request duplication.
