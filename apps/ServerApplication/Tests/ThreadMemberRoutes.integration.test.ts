@@ -247,6 +247,7 @@ function createThreadMemberRouteDependencies(
     readJsonBody,
     jsonResponse: createJsonResponseWriter(capturedResponse),
     invalidateThreadListAggregationCache: () => {},
+    scheduleThreadStreamDeltaPublish: () => {},
     pushActionEventWithRequestContext: () => {},
     pushActionErrorWithRequestContext: () => ActionErrorIdentifier,
   };

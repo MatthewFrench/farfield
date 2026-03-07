@@ -50,6 +50,7 @@ export class CodexMessageDispatchOwner {
 
       if (ownerClientId !== null) {
         const turnStartTemplate = this.readTurnStartTemplate(input.threadId);
+        const optimisticTurnStartParams = buildOptimisticTurnStartParams(input, turnStartTemplate);
         try {
           await this.service.sendMessage({
             threadId: input.threadId,
@@ -58,6 +59,13 @@ export class CodexMessageDispatchOwner {
             ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
             ...(typeof input.isSteering === "boolean" ? { isSteering: input.isSteering } : {}),
             ...(turnStartTemplate !== null ? { turnStartTemplate } : {}),
+          });
+          this.threadStreamStateOwner.stageOptimisticTurnStart({
+            threadId: input.threadId,
+            ownerClientId,
+            turnStartParams: optimisticTurnStartParams,
+            nowMilliseconds: Date.now(),
+            isSteering: input.isSteering === true,
           });
           return;
         } catch (error) {
@@ -104,6 +112,7 @@ export class CodexMessageDispatchOwner {
     }
 
     const turnStartTemplate = this.readTurnStartTemplate(input.threadId);
+    const optimisticTurnStartParams = buildOptimisticTurnStartParams(input, turnStartTemplate);
     await this.runAppServerCall(() =>
       this.appClient.startTurn({
         threadId: input.threadId,
@@ -112,6 +121,16 @@ export class CodexMessageDispatchOwner {
         ...(turnStartTemplate !== null ? { turnStartTemplate } : {}),
       }),
     );
+    this.threadStreamStateOwner.stageOptimisticTurnStart({
+      threadId: input.threadId,
+      ownerClientId: this.threadStreamStateOwner.resolveKnownOwnerClientId(
+        input.threadId,
+        input.ownerClientId,
+      ),
+      turnStartParams: optimisticTurnStartParams,
+      nowMilliseconds: Date.now(),
+      isSteering: false,
+    });
   }
 
   private async readSteerExpectedTurnIdentifier(threadId: string): Promise<string> {
@@ -152,6 +171,28 @@ export class CodexMessageDispatchOwner {
 
     return null;
   }
+}
+
+function buildOptimisticTurnStartParams(
+  input: AgentSendMessageInput,
+  turnStartTemplate: TurnStartParams | null,
+): TurnStartParams {
+  const normalizedCwd =
+    input.cwd !== undefined && input.cwd.length > 0
+      ? input.cwd
+      : (turnStartTemplate?.cwd ?? undefined);
+  return {
+    ...(turnStartTemplate ?? {}),
+    threadId: input.threadId,
+    input: [
+      {
+        type: "text",
+        text: input.text,
+      },
+    ],
+    ...(normalizedCwd !== undefined ? { cwd: normalizedCwd } : {}),
+    attachments: turnStartTemplate?.attachments ?? [],
+  };
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {

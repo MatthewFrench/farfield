@@ -29,6 +29,7 @@ import type { ServerObservabilitySnapshot } from "./ServerObservabilitySnapshotO
 import type { SidebarThreadSyncSnapshotCache } from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
+import type { ThreadStreamDeltaEventPublisher } from "./ThreadStreamDeltaEventPublisher.js";
 
 const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
 
@@ -51,6 +52,7 @@ export interface ServerRequestRouteDispatchOwnerDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
+  threadStreamDeltaEventPublisher: ThreadStreamDeltaEventPublisher;
   eventStreamClientRegistry: EventStreamClientRegistry;
   runtimeStateOwner: RuntimeStateSnapshotReader;
   activityHistoryService: ActivityHistoryService;
@@ -215,6 +217,9 @@ export class ServerRequestRouteDispatchOwner {
         readJsonBody: this.deps.readJsonBody,
         jsonResponse: this.deps.jsonResponse,
         invalidateThreadListAggregationCache: this.deps.invalidateThreadListAggregationCache,
+        scheduleThreadStreamDeltaPublish: (threadId) => {
+          this.deps.threadStreamDeltaEventPublisher.schedulePublish(threadId);
+        },
         pushActionEventWithRequestContext,
         pushActionErrorWithRequestContext,
         withTimeout: this.deps.withTimeout,

@@ -700,6 +700,36 @@ Verification evidence:
 3. `bun run --cwd apps/ServerApplication typecheck`
 4. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2822`, `7122`, `7345` and no new sentinel errors
 
+### March 7, 2026: Accepted Send Now Stages Optimistic In-Progress Turn Before First Inbound Stream Frame
+
+Changed owner modules:
+
+1. [CodexMessageDispatchOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexMessageDispatchOwner.ts)
+2. [CodexThreadLiveStateProjectionOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadLiveStateProjectionOwner.ts)
+3. [CodexThreadStreamStateOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadStreamStateOwner.ts)
+4. [ThreadMemberMessageMutationRouteOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberMessageMutationRouteOwner.ts)
+
+Implementation summary:
+
+1. after send acceptance, Codex server projection now stages a minimal optimistic in-progress turn in live state when a projected conversation baseline already exists
+2. the message mutation route now schedules one immediate thread delta publish after successful send so web clients can observe that optimistic state before the first inbound `thread-stream-state-changed` frame arrives
+
+User-visible impact:
+
+1. assistant-visible progression can begin earlier on accepted sends because the client no longer waits solely for the first upstream stream-state event before seeing an in-progress turn
+2. latest clean-stack real soak improved the first iteration send step to `1885ms`, with later iterations at `5365ms` and `8477ms`, while keeping the run green
+
+Verification evidence:
+
+1. [CodexMessageDispatchOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexMessageDispatchOwner.test.ts)
+2. [CodexThreadStreamStateOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadStreamStateOwner.test.ts)
+3. [ThreadMemberMutationRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts)
+4. [ThreadMemberReadRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts)
+5. [ThreadRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadRoutes.test.ts)
+6. [ThreadMemberRoutes.integration.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberRoutes.integration.test.ts)
+7. `bun run --cwd apps/ServerApplication typecheck`
+8. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1885`, `5365`, `8477` and no new sentinel errors
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

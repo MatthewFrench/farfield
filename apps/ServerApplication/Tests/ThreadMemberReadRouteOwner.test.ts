@@ -183,6 +183,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };
@@ -287,6 +288,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };
@@ -379,6 +381,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };
@@ -469,6 +472,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };
@@ -529,6 +533,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };
@@ -592,6 +597,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
     };

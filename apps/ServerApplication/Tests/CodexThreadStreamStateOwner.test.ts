@@ -266,6 +266,29 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(noChangeSlice.events.length).toBe(0);
   });
 
+  it("stages an optimistic in-progress turn on projected live state", () => {
+    const owner = new CodexThreadStreamStateOwner();
+    owner.ingestInboundFrame(createSnapshotEvent());
+
+    owner.stageOptimisticTurnStart({
+      threadId: "thread-1",
+      ownerClientId: "client-a",
+      turnStartParams: {
+        threadId: "thread-1",
+        input: [{ type: "text", text: "optimistic send" }],
+        attachments: [],
+      },
+      nowMilliseconds: 1_700_000_000,
+      isSteering: false,
+    });
+
+    const conversationState = owner.readLiveState("thread-1").conversationState;
+    const lastTurn = conversationState?.turns[conversationState.turns.length - 1];
+    expect(lastTurn?.status).toBe("inProgress");
+    expect(lastTurn?.params?.input).toEqual([{ type: "text", text: "optimistic send" }]);
+    expect(lastTurn?.turnStartedAtMs).toBe(1_700_000_000);
+  });
+
   it("marks stream reads for reset when cursor history has been evicted", () => {
     const owner = new CodexThreadStreamStateOwner({
       streamEventLimit: 40,

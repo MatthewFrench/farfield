@@ -29,6 +29,7 @@ export class ThreadMemberMessageMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
+      scheduleThreadStreamDeltaPublish,
       jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
@@ -86,6 +87,7 @@ export class ThreadMemberMessageMutationRouteOwner {
       threadId,
       agentId,
     });
+    scheduleThreadStreamDeltaPublish(threadId);
 
     jsonResponse(this.dependencies.res, 200, {
       ok: true,

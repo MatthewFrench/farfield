@@ -211,6 +211,7 @@ function createDependencies(input: {
   readJsonBody: ThreadMemberRouteDependencies["readJsonBody"];
   onJsonResponse: (statusCode: number, body: object) => void;
   pushActionEventWithRequestContext: ThreadMemberRouteDependencies["pushActionEventWithRequestContext"];
+  scheduleThreadStreamDeltaPublish?: (threadId: string) => void;
 }): ThreadMemberRouteDependencies {
   return {
     req: input.request,
@@ -241,6 +242,7 @@ function createDependencies(input: {
       input.onJsonResponse(statusCode, body);
     },
     invalidateThreadListAggregationCache: () => {},
+    scheduleThreadStreamDeltaPublish: input.scheduleThreadStreamDeltaPublish ?? (() => {}),
     pushActionEventWithRequestContext: input.pushActionEventWithRequestContext,
     pushActionErrorWithRequestContext: () => "action-error-id",
   };
@@ -280,6 +282,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
       action: string;
       stage: "attempt" | "success" | "error";
     }> = [];
+    const scheduledThreadDeltaPublishThreadIds: string[] = [];
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
 
@@ -294,6 +297,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
+        },
+        scheduleThreadStreamDeltaPublish: (threadId) => {
+          scheduledThreadDeltaPublishThreadIds.push(threadId);
         },
         pushActionEventWithRequestContext: (action, stage) => {
           actionEvents.push({ action, stage });
@@ -311,6 +317,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
         text: "hello",
       },
     ]);
+    expect(scheduledThreadDeltaPublishThreadIds).toEqual(["thread-1"]);
     expect(actionEvents).toEqual([
       {
         action: ThreadMemberMutationActionByName.messages,

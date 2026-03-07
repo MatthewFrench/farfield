@@ -37,6 +37,7 @@ import { ServerRequestRouteDispatchOwner } from "./ServerRequestRouteDispatchOwn
 import type { SidebarThreadSyncSnapshotCache } from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
+import type { ThreadStreamDeltaEventPublisher } from "./ThreadStreamDeltaEventPublisher.js";
 
 const STATUS_CODE_BY_NAME = {
   successOk: 200,
@@ -81,6 +82,7 @@ export interface ServerRequestHandlerDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
+  threadStreamDeltaEventPublisher: ThreadStreamDeltaEventPublisher;
   eventStreamClientRegistry: EventStreamClientRegistry;
   runtimeStateOwner: RuntimeStateSnapshotReader;
   activityHistoryService: ActivityHistoryService;
@@ -182,6 +184,7 @@ export class ServerRequestHandler {
       threadListAggregationCache: this.deps.threadListAggregationCache,
       sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
       threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
+      threadStreamDeltaEventPublisher: this.deps.threadStreamDeltaEventPublisher,
       eventStreamClientRegistry: this.deps.eventStreamClientRegistry,
       runtimeStateOwner: this.deps.runtimeStateOwner,
       activityHistoryService: this.deps.activityHistoryService,

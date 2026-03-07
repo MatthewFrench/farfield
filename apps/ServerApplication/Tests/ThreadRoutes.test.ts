@@ -111,6 +111,7 @@ function createThreadRouteDependencies(input: {
       input.onJsonResponse(statusCode, body);
     },
     invalidateThreadListAggregationCache: () => {},
+    scheduleThreadStreamDeltaPublish: () => {},
     pushActionEventWithRequestContext: () => {},
     pushActionErrorWithRequestContext: () => "action-error-id",
     withTimeout: async (promise) => promise,
@@ -159,11 +160,11 @@ describe("handleThreadRoutes", () => {
       pages: 0,
       truncated: false,
       orderedThreadIds: undefined,
-      sync: {
+      sync: expect.objectContaining({
         mode: "full",
         sinceUpdatedAt: null,
         snapshotUpdatedAt: 0,
-      },
+      }),
     });
   });
 

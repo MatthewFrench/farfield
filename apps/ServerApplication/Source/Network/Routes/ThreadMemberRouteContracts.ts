@@ -116,6 +116,7 @@ export interface ThreadMemberRouteDependencies {
     reason: string,
     details?: Record<string, JsonValue>,
   ) => void;
+  scheduleThreadStreamDeltaPublish: (threadId: string) => void;
   pushActionEventWithRequestContext: (
     action: string,
     stage: "attempt" | "success" | "error",

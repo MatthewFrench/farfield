@@ -40,6 +40,7 @@ interface OwnerTestContext {
   owner: CodexMessageDispatchOwner;
   service: TestCodexMonitorService;
   appServerTransport: TestAppServerTransport;
+  threadStreamStateOwner: CodexThreadStreamStateOwner;
   readRunAppServerCallCount: () => number;
 }
 
@@ -189,6 +190,7 @@ function createOwnerTestContext(
     owner,
     service,
     appServerTransport,
+    threadStreamStateOwner,
     readRunAppServerCallCount: () => runAppServerCallCount,
   };
 }
@@ -274,6 +276,26 @@ describe("CodexMessageDispatchOwner", () => {
     expect(context.appServerTransport.requestCalls).toHaveLength(0);
   });
 
+  it("stages an optimistic in-progress turn after IPC send acceptance", async () => {
+    const threadId = "thread-ipc-optimistic";
+    const ownerClientId = "owner-client-ipc-optimistic";
+    const context = createOwnerTestContext(threadId, ownerClientId);
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "optimistic send",
+      },
+      true,
+    );
+
+    const conversationState =
+      context.threadStreamStateOwner.readLiveState(threadId).conversationState;
+    const lastTurn = conversationState?.turns[conversationState.turns.length - 1];
+    expect(lastTurn?.status).toBe("inProgress");
+    expect(lastTurn?.params?.input).toEqual([{ type: "text", text: "optimistic send" }]);
+  });
+
   it("uses turn/start for app-server sends when IPC is unavailable", async () => {
     const threadId = "thread-3";
     const ownerClientId = "owner-client-3";
@@ -349,6 +371,31 @@ describe("CodexMessageDispatchOwner", () => {
         timeoutMs: undefined,
       },
     ]);
+  });
+
+  it("stages an optimistic in-progress turn after app-server send acceptance", async () => {
+    const threadId = "thread-app-server-optimistic";
+    const ownerClientId = "owner-client-app-server-optimistic";
+    const context = createOwnerTestContext(threadId, ownerClientId);
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-app-server",
+      },
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "optimistic send",
+      },
+      false,
+    );
+
+    const conversationState =
+      context.threadStreamStateOwner.readLiveState(threadId).conversationState;
+    const lastTurn = conversationState?.turns[conversationState.turns.length - 1];
+    expect(lastTurn?.status).toBe("inProgress");
+    expect(lastTurn?.params?.input).toEqual([{ type: "text", text: "optimistic send" }]);
   });
 
   it("resumes the thread and retries turn/start after conversation-not-found errors", async () => {

@@ -386,6 +386,7 @@ const serverRequestHandler = new ServerRequestHandler({
   threadListAggregationCache,
   sidebarThreadSyncSnapshotCache,
   threadConcurrencyCoordinator,
+  threadStreamDeltaEventPublisher,
   eventStreamClientRegistry,
   runtimeStateOwner,
   activityHistoryService,

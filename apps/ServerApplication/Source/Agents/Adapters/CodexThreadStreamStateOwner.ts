@@ -3,6 +3,7 @@ import {
   type IpcFrame,
   type JsonValue,
   parseThreadStreamStateChangedBroadcast,
+  type TurnStartParams,
 } from "@farfield/protocol";
 import { resolveOwnerClientId } from "../../Modules/Threads/ThreadOwner.js";
 import type {
@@ -140,6 +141,19 @@ export class CodexThreadStreamStateOwner {
       this.readOwnerClientId(threadId),
       input,
     );
+  }
+
+  public stageOptimisticTurnStart(input: {
+    threadId: string;
+    ownerClientId: string | null;
+    turnStartParams: TurnStartParams;
+    nowMilliseconds: number;
+    isSteering: boolean;
+  }): void {
+    if (input.ownerClientId !== null) {
+      this.threadOwnerById.set(input.threadId, input.ownerClientId);
+    }
+    this.liveStateProjectionOwner.stageOptimisticTurnStart(input);
   }
 
   private readOwnerClientId(threadId: string): string | null {

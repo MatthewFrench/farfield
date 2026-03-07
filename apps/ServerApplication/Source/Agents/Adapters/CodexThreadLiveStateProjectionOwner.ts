@@ -1,5 +1,10 @@
 import { applyTrustedPatchSequence, StrictPatchSequenceError } from "@farfield/api";
-import type { ThreadStreamPatch, ThreadStreamStateChangedBroadcast } from "@farfield/protocol";
+import type {
+  ThreadConversationState,
+  ThreadStreamPatch,
+  ThreadStreamStateChangedBroadcast,
+  TurnStartParams,
+} from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
 import { type AgentThreadLiveState, AgentThreadLiveStateErrorKindByName } from "../Types.js";
 
@@ -24,6 +29,16 @@ interface ThreadPatchReductionInput {
 
 const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
 const THREAD_STREAM_REDUCTION_FAILED_LOG_NAME = "codex-thread-stream-reduction-failed";
+const TURN_IN_PROGRESS_STATUS = "inProgress";
+const SYNTHETIC_TURN_IDENTIFIER_PREFIX = "optimistic-turn";
+
+interface OptimisticTurnStartInput {
+  threadId: string;
+  ownerClientId: string | null;
+  turnStartParams: TurnStartParams;
+  nowMilliseconds: number;
+  isSteering: boolean;
+}
 
 /**
  * Owns projected live-state reduction for thread stream snapshots and patches.
@@ -32,6 +47,7 @@ const THREAD_STREAM_REDUCTION_FAILED_LOG_NAME = "codex-thread-stream-reduction-f
  */
 export class CodexThreadLiveStateProjectionOwner {
   private readonly liveStateProjectionByThreadId = new Map<string, ThreadLiveStateProjection>();
+  private optimisticTurnSequence = 0;
 
   public projectEvent(
     event: ThreadStreamStateChangedBroadcast,
@@ -81,6 +97,38 @@ export class CodexThreadLiveStateProjectionOwner {
       conversationState: projectedState.conversationState,
       liveStateError: projectedState.liveStateError,
     };
+  }
+
+  public stageOptimisticTurnStart(input: OptimisticTurnStartInput): void {
+    if (input.isSteering) {
+      return;
+    }
+
+    const previousProjection = this.liveStateProjectionByThreadId.get(input.threadId);
+    if (previousProjection?.conversationState === null || previousProjection === undefined) {
+      return;
+    }
+
+    const previousConversationState = previousProjection.conversationState;
+    const lastTurn = previousConversationState.turns[previousConversationState.turns.length - 1];
+    if (lastTurn && isTurnInProgressStatus(lastTurn.status)) {
+      return;
+    }
+
+    const nextConversationState = createOptimisticConversationState({
+      previousConversationState,
+      turnStartParams: input.turnStartParams,
+      nowMilliseconds: input.nowMilliseconds,
+      optimisticTurnIdentifier: this.readNextOptimisticTurnIdentifier(),
+    });
+    this.liveStateProjectionByThreadId.set(
+      input.threadId,
+      this.createThreadLiveStateProjection(
+        input.ownerClientId ?? previousProjection.ownerClientId,
+        nextConversationState,
+        null,
+      ),
+    );
   }
 
   private projectPatchChange(
@@ -185,6 +233,11 @@ export class CodexThreadLiveStateProjectionOwner {
       patchIndex: reductionFailureLocalization.patchIndex,
     };
   }
+
+  private readNextOptimisticTurnIdentifier(): string {
+    this.optimisticTurnSequence += 1;
+    return `${SYNTHETIC_TURN_IDENTIFIER_PREFIX}-${String(this.optimisticTurnSequence)}`;
+  }
 }
 
 function toErrorMessage<ErrorType>(error: ErrorType): string {
@@ -203,4 +256,38 @@ function readPatchIndex<ErrorType>(error: ErrorType): number | null {
   }
 
   return Number.isInteger(error.patchIndex) && error.patchIndex >= 0 ? error.patchIndex : null;
+}
+
+function isTurnInProgressStatus(status: string): boolean {
+  return status === TURN_IN_PROGRESS_STATUS;
+}
+
+function createOptimisticConversationState(input: {
+  previousConversationState: ThreadConversationState;
+  turnStartParams: TurnStartParams;
+  nowMilliseconds: number;
+  optimisticTurnIdentifier: string;
+}): ThreadConversationState {
+  const { previousConversationState, turnStartParams, nowMilliseconds, optimisticTurnIdentifier } =
+    input;
+  return {
+    ...previousConversationState,
+    turns: [
+      ...previousConversationState.turns,
+      {
+        params: turnStartParams,
+        turnId: optimisticTurnIdentifier,
+        status: TURN_IN_PROGRESS_STATUS,
+        turnStartedAtMs: nowMilliseconds,
+        items: [],
+      },
+    ],
+    updatedAt: nowMilliseconds,
+    latestModel: turnStartParams.model ?? previousConversationState.latestModel,
+    latestReasoningEffort:
+      turnStartParams.effort ?? previousConversationState.latestReasoningEffort,
+    latestCollaborationMode:
+      turnStartParams.collaborationMode ?? previousConversationState.latestCollaborationMode,
+    hasUnreadTurn: false,
+  };
 }
