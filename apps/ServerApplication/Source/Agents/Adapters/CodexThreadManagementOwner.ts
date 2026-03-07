@@ -167,6 +167,7 @@ import {
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
 const FORK_WITH_EXTENDED_HISTORY = true;
+const READ_THREAD_RESUME_WITH_EXTENDED_HISTORY = true;
 const READ_CONFIG_DEFAULTS_OPTIONS = {
   includeLayers: false,
 };
@@ -464,6 +465,8 @@ export interface CodexThreadManagementOwnerOptions {
   runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
   ensureCodexAvailable: () => void;
   readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
+  isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
+  isThreadNotLoadedError: (error: Error) => boolean;
 }
 
 /**
@@ -477,12 +480,16 @@ export class CodexThreadManagementOwner {
   ) => Promise<ValueType>;
   private readonly ensureCodexAvailable: () => void;
   private readonly readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
+  private readonly isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
+  private readonly isThreadNotLoadedError: (error: Error) => boolean;
 
   public constructor(options: CodexThreadManagementOwnerOptions) {
     this.appClient = options.appClient;
     this.runAppServerCall = options.runAppServerCall;
     this.ensureCodexAvailable = options.ensureCodexAvailable;
     this.readProjectedHasUnreadTurnSignal = options.readProjectedHasUnreadTurnSignal;
+    this.isConversationNotFoundError = options.isConversationNotFoundError;
+    this.isThreadNotLoadedError = options.isThreadNotLoadedError;
   }
 
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
@@ -507,12 +514,40 @@ export class CodexThreadManagementOwner {
 
   public async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
     this.ensureCodexAvailable();
+    try {
+      const result = await this.runAppServerCall(() =>
+        this.appClient.readThread(input.threadId, input.includeTurns),
+      );
+      return {
+        thread: result.thread,
+      };
+    } catch (error) {
+      if (!this.shouldRetryReadThreadAfterResume(error)) {
+        throw error;
+      }
+    }
+
+    await this.runAppServerCall(() =>
+      this.appClient.resumeThread(input.threadId, {
+        persistExtendedHistory: READ_THREAD_RESUME_WITH_EXTENDED_HISTORY,
+      }),
+    );
     const result = await this.runAppServerCall(() =>
       this.appClient.readThread(input.threadId, input.includeTurns),
     );
     return {
       thread: result.thread,
     };
+  }
+
+  private shouldRetryReadThreadAfterResume<ErrorType>(error: ErrorType): boolean {
+    if (this.isConversationNotFoundError(error)) {
+      return true;
+    }
+    if (error instanceof Error) {
+      return this.isThreadNotLoadedError(error);
+    }
+    return false;
   }
 
   public async listLoadedThreads(): Promise<AgentListLoadedThreadsResult> {

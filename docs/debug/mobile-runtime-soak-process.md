@@ -460,6 +460,31 @@ Verification evidence:
 2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 3. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
 
+### March 7, 2026: Codex Read Resumes Missing Threads Before Returning 404
+
+Changed owner modules:
+
+1. [CodexThreadManagementOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadManagementOwner.ts)
+2. [CodexAgentAdapterOwnerFactory.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterOwnerFactory.ts)
+3. [CodexAgentAdapter.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts)
+4. [CodexThreadManagementOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts)
+
+Implementation summary:
+
+1. the Codex thread-management read owner now resumes a thread with extended history and retries once when `readThread` fails with `conversation not found` or `thread not loaded`
+2. the read path keeps returning the original error for unrelated failures, so the recovery scope stays limited to the missing-thread race
+
+User-visible impact:
+
+1. mobile thread open and reload flows are less likely to surface transient `404` read failures after app-server drops in-memory thread state
+2. users should see more thread reads recover in place instead of bouncing through a runtime request error path
+
+Verification evidence:
+
+1. [CodexThreadManagementOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts)
+2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+3. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

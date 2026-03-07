@@ -20,6 +20,7 @@ interface CodexAgentAdapterOwnerFactoryInput {
   ensureCodexAvailable: () => void;
   ensureIpcReady: () => void;
   isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
+  isThreadNotLoadedError: (error: Error) => boolean;
 }
 
 interface CodexAgentAdapterOwners {
@@ -55,6 +56,8 @@ export function createCodexAgentAdapterOwners(
     readProjectedHasUnreadTurnSignal: (threadId) => {
       return input.threadStreamStateOwner.readProjectedHasUnreadTurnSignal(threadId);
     },
+    isConversationNotFoundError: input.isConversationNotFoundError,
+    isThreadNotLoadedError: input.isThreadNotLoadedError,
   });
   const threadInteractionOwner = new CodexThreadInteractionOwner({
     appClient: input.appClient,

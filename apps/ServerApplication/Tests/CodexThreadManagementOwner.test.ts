@@ -52,6 +52,7 @@ import {
   type ReadConfigRequirementsOptions,
   type ReadConfigRequirementsResult,
   type ReadUserInfoResult,
+  type ResumeThreadOptions,
   type StartMcpServerOauthLoginOptions,
   type StartMcpServerOauthLoginResult,
   type StartReviewOptions,
@@ -116,6 +117,24 @@ const START_THREAD_RESPONSE: AppServerStartThreadResponse = {
   cwd: "/tmp/workspace",
 };
 
+const READ_THREAD_RESPONSE: AppServerReadThreadResponse = {
+  thread: {
+    id: "thread-1",
+    turns: [],
+    requests: [],
+  },
+};
+
+interface ReadThreadCall {
+  threadId: string;
+  includeTurns: boolean;
+}
+
+interface ResumeThreadCall {
+  threadId: string;
+  options?: ResumeThreadOptions;
+}
+
 class TestAppServerClient extends AppServerClient {
   public readonly listThreadsCalls: ListThreadsOptions[] = [];
   public readonly listThreadsAllCalls: ListThreadsAllOptions[] = [];
@@ -125,6 +144,8 @@ class TestAppServerClient extends AppServerClient {
   public readonly rollbackThreadCalls: Array<{ threadId: string; numTurns: number }> = [];
   public readonly compactThreadCalls: Array<{ threadId: string }> = [];
   public readonly cleanThreadBackgroundTerminalsCalls: Array<{ threadId: string }> = [];
+  public readonly readThreadCalls: ReadThreadCall[] = [];
+  public readonly resumeThreadCalls: ResumeThreadCall[] = [];
   public readonly listLoadedThreadsCalls: Array<ListLoadedThreadsOptions | undefined> = [];
   public readonly unsubscribeThreadCalls: Array<{ threadId: string }> = [];
   public readonly startReviewCalls: StartReviewOptions[] = [];
@@ -169,6 +190,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly listThreadsResult: AppServerListThreadsResponse;
   private readonly listThreadsAllResult: AppServerListThreadsResponse;
   private readonly startThreadResult: AppServerStartThreadResponse;
+  private readonly readThreadResult: AppServerReadThreadResponse;
   private readonly rollbackThreadResult: AppServerReadThreadResponse;
   private readonly listLoadedThreadsResult: ListLoadedThreadsResult;
   private readonly unsubscribeThreadResult: UnsubscribeThreadStatus;
@@ -205,11 +227,13 @@ class TestAppServerClient extends AppServerClient {
   private readonly writeConfigValueResult: ConfigWriteResult;
   private readonly writeSkillsConfigResult: WriteSkillsConfigResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
+  private readonly readThreadErrorQueue: Error[] = [];
 
   public constructor(input?: {
     listThreadsResult?: AppServerListThreadsResponse;
     listThreadsAllResult?: AppServerListThreadsResponse;
     startThreadResult?: AppServerStartThreadResponse;
+    readThreadResult?: AppServerReadThreadResponse;
     rollbackThreadResult?: AppServerReadThreadResponse;
     listLoadedThreadsResult?: ListLoadedThreadsResult;
     unsubscribeThreadResult?: UnsubscribeThreadStatus;
@@ -251,6 +275,7 @@ class TestAppServerClient extends AppServerClient {
     this.listThreadsResult = input?.listThreadsResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.listThreadsAllResult = input?.listThreadsAllResult ?? EMPTY_LIST_THREADS_RESPONSE;
     this.startThreadResult = input?.startThreadResult ?? START_THREAD_RESPONSE;
+    this.readThreadResult = input?.readThreadResult ?? READ_THREAD_RESPONSE;
     this.rollbackThreadResult = input?.rollbackThreadResult ?? {
       thread: {
         id: "thread-1",
@@ -421,6 +446,32 @@ class TestAppServerClient extends AppServerClient {
       numTurns,
     });
     return this.rollbackThreadResult;
+  }
+
+  public override async readThread(
+    threadId: string,
+    includeTurns = true,
+  ): Promise<AppServerReadThreadResponse> {
+    this.readThreadCalls.push({
+      threadId,
+      includeTurns,
+    });
+    const queuedError = this.readThreadErrorQueue.shift();
+    if (queuedError !== undefined) {
+      throw queuedError;
+    }
+    return this.readThreadResult;
+  }
+
+  public override async resumeThread(
+    threadId: string,
+    options?: ResumeThreadOptions,
+  ): Promise<AppServerReadThreadResponse> {
+    this.resumeThreadCalls.push({
+      threadId,
+      ...(options !== undefined ? { options } : {}),
+    });
+    return this.readThreadResult;
   }
 
   public override async compactThread(threadId: string): Promise<void> {
@@ -675,11 +726,19 @@ class TestAppServerClient extends AppServerClient {
     this.readConfigCalls.push(options);
     return this.readConfigResult;
   }
+
+  public queueReadThreadError(error: Error): void {
+    this.readThreadErrorQueue.push(error);
+  }
 }
 
 function createOwner(
   appClient: AppServerClient,
   readProjectedHasUnreadTurnSignal: (threadId: string) => boolean | null = () => null,
+  options?: {
+    isConversationNotFoundError?: <ErrorType>(error: ErrorType) => boolean;
+    isThreadNotLoadedError?: (error: Error) => boolean;
+  },
 ): CodexThreadManagementOwner {
   return new CodexThreadManagementOwner({
     appClient,
@@ -687,6 +746,9 @@ function createOwner(
       operation(),
     ensureCodexAvailable: () => {},
     readProjectedHasUnreadTurnSignal,
+    isConversationNotFoundError:
+      options?.isConversationNotFoundError ?? (<ErrorType>(_error: ErrorType): boolean => false),
+    isThreadNotLoadedError: options?.isThreadNotLoadedError ?? ((_error: Error): boolean => false),
   });
 }
 
@@ -965,6 +1027,104 @@ describe("CodexThreadManagementOwner", () => {
       sandbox: "workspace-write",
       reasoningEffort: "medium",
     });
+  });
+
+  it("resumes and retries readThread when codex reports conversation not found", async () => {
+    const appClient = new TestAppServerClient();
+    const readThreadError = new Error("conversation not found");
+    appClient.queueReadThreadError(readThreadError);
+    const owner = createOwner(appClient, undefined, {
+      isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
+        return error === readThreadError;
+      },
+    });
+
+    const result = await owner.readThread({
+      threadId: "thread-read-1",
+      includeTurns: true,
+    });
+
+    expect(appClient.readThreadCalls).toEqual([
+      {
+        threadId: "thread-read-1",
+        includeTurns: true,
+      },
+      {
+        threadId: "thread-read-1",
+        includeTurns: true,
+      },
+    ]);
+    expect(appClient.resumeThreadCalls).toEqual([
+      {
+        threadId: "thread-read-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+    ]);
+    expect(result).toEqual({
+      thread: READ_THREAD_RESPONSE.thread,
+    });
+  });
+
+  it("resumes and retries readThread when codex reports thread not loaded", async () => {
+    const appClient = new TestAppServerClient();
+    const readThreadError = new Error("thread not loaded");
+    appClient.queueReadThreadError(readThreadError);
+    const owner = createOwner(appClient, undefined, {
+      isThreadNotLoadedError: (error: Error): boolean => {
+        return error === readThreadError;
+      },
+    });
+
+    const result = await owner.readThread({
+      threadId: "thread-read-2",
+      includeTurns: false,
+    });
+
+    expect(appClient.readThreadCalls).toEqual([
+      {
+        threadId: "thread-read-2",
+        includeTurns: false,
+      },
+      {
+        threadId: "thread-read-2",
+        includeTurns: false,
+      },
+    ]);
+    expect(appClient.resumeThreadCalls).toEqual([
+      {
+        threadId: "thread-read-2",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+    ]);
+    expect(result).toEqual({
+      thread: READ_THREAD_RESPONSE.thread,
+    });
+  });
+
+  it("rethrows unclassified readThread errors without resuming", async () => {
+    const appClient = new TestAppServerClient();
+    const readThreadError = new Error("permission denied");
+    appClient.queueReadThreadError(readThreadError);
+    const owner = createOwner(appClient);
+
+    await expect(
+      owner.readThread({
+        threadId: "thread-read-3",
+        includeTurns: true,
+      }),
+    ).rejects.toThrow("permission denied");
+
+    expect(appClient.readThreadCalls).toEqual([
+      {
+        threadId: "thread-read-3",
+        includeTurns: true,
+      },
+    ]);
+    expect(appClient.resumeThreadCalls).toEqual([]);
   });
 
   it("forks a thread with extended-history persistence and maps create-thread metadata", async () => {

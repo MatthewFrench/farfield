@@ -199,6 +199,9 @@ export class CodexAgentAdapter implements AgentAdapter {
       isConversationNotFoundError: <ErrorType>(error: ErrorType): boolean => {
         return this.isConversationNotFoundError(error);
       },
+      isThreadNotLoadedError: (error: Error): boolean => {
+        return this.isThreadNotLoadedError(error);
+      },
     });
     this.messageDispatchOwner = owners.messageDispatchOwner;
     this.threadManagementOwner = owners.threadManagementOwner;
