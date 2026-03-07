@@ -28,6 +28,20 @@ Add standards-compliant iOS Home Screen web app support and background push noti
 4. Push support requires Home Screen install flow and HTTPS secure origin.
 5. Notification display behavior can vary by iOS version and system settings.
 
+## PWA Asset Auth Rule
+
+If Farfield is placed behind any auth proxy or login portal, browser-managed PWA assets must stay
+public. Do not require login for:
+
+1. `/manifest.webmanifest`
+2. `/icons/*`
+3. `/sw.js`
+4. `/favicon.ico`
+5. `/apple-touch-icon.png`
+
+If these paths redirect to an auth page, the browser will parse HTML instead of the manifest or
+service worker asset and PWA install/push behavior will break.
+
 ## Current Codebase Baseline
 
 1. Frontend is Vite + React in `apps/WebApplication`.

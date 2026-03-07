@@ -1,4 +1,6 @@
 {{DOMAIN_HOST}} {
+  # If an outer auth layer is added later, keep browser-managed PWA assets public:
+  # /manifest.webmanifest, /icons/*, /sw.js, /favicon.ico, /apple-touch-icon.png
   map "{env.API_TOKEN}" {farfield_api_token} {
     default "{env.API_TOKEN}"
     "" "{env.PUSH_API_TOKEN}"
