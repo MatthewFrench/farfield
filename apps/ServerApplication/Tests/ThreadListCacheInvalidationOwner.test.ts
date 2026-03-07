@@ -122,6 +122,60 @@ describe("ThreadListCacheInvalidationOwner", () => {
     expect(cache.readStatistics().invalidationCount).toBe(1);
   });
 
+  it("invalidates all cache scopes for thread name mutations", () => {
+    const cache = new ThreadListAggregationCache(1_000, 8);
+    const sidebarThreadSyncSnapshotCache = new SidebarThreadSyncSnapshotCache(1_000, 8);
+    const owner = new ThreadListCacheInvalidationOwner(cache, {
+      sidebarThreadSyncSnapshotCache,
+    });
+    const activeQuery = buildQuery({ archived: false });
+    const archivedQuery = buildQuery({ archived: true });
+
+    cache.write(activeQuery, buildSnapshot({ combinedTruncated: true }));
+    cache.write(archivedQuery, buildSnapshot({ combinedTruncated: false }));
+    sidebarThreadSyncSnapshotCache.write(activeQuery, {
+      threadList: {
+        data: [],
+        nextCursor: null,
+        pages: 0,
+        truncated: false,
+        sync: {
+          mode: "full",
+          sinceUpdatedAt: null,
+          snapshotUpdatedAt: 0,
+          snapshotVersion: "snapshot-version-active",
+        },
+      },
+      snapshotUpdatedAt: 0,
+      snapshotVersion: "snapshot-version-active",
+    });
+    sidebarThreadSyncSnapshotCache.write(archivedQuery, {
+      threadList: {
+        data: [],
+        nextCursor: null,
+        pages: 0,
+        truncated: false,
+        sync: {
+          mode: "full",
+          sinceUpdatedAt: null,
+          snapshotUpdatedAt: 0,
+          snapshotVersion: "snapshot-version-archived",
+        },
+      },
+      snapshotUpdatedAt: 0,
+      snapshotVersion: "snapshot-version-archived",
+    });
+
+    owner.invalidate("thread-name-set", { threadId: "thread-1" });
+
+    expect(cache.readFresh(activeQuery)).toBeNull();
+    expect(cache.readFresh(archivedQuery)).toBeNull();
+    expect(sidebarThreadSyncSnapshotCache.readFresh(activeQuery)).toBeNull();
+    expect(sidebarThreadSyncSnapshotCache.readFresh(archivedQuery)).toBeNull();
+    expect(cache.readStatistics().invalidationCount).toBe(1);
+    expect(sidebarThreadSyncSnapshotCache.readStatistics().invalidationCount).toBe(1);
+  });
+
   it("debounces repeated stream-state invalidations for the same thread while keeping per-thread isolation", () => {
     const cache = new ThreadListAggregationCache(1_000, 8);
     const nowMilliseconds = 10_000;

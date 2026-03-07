@@ -782,7 +782,7 @@ describe("handleThreadCollectionRoutes", () => {
     });
   });
 
-  it("backfills loaded readable threads that are missing from adapter list results", async () => {
+  it("does not leak loaded threads that are missing from adapter list results", async () => {
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
     const adapter = createMockAgentAdapter(
@@ -803,33 +803,6 @@ describe("handleThreadCollectionRoutes", () => {
         data: ["thread_listed", "thread_backfilled"],
         nextCursor: null,
       }),
-      async (): Promise<AgentReadThreadResult> => ({
-        thread: {
-          id: "thread_backfilled",
-          createdAt: 3,
-          updatedAt: 10,
-          cwd: "/tmp/project",
-          requests: [],
-          turns: [
-            {
-              id: "turn-backfilled",
-              status: "inProgress",
-              items: [
-                {
-                  type: "userMessage",
-                  id: "item-backfilled",
-                  content: [
-                    {
-                      type: "text",
-                      text: "Backfilled user message preview",
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      }),
     );
 
     const handled = await handleThreadCollectionRoutes(
@@ -848,11 +821,6 @@ describe("handleThreadCollectionRoutes", () => {
     expect(capturedBody).toMatchObject({
       ok: true,
       data: [
-        {
-          id: "thread_backfilled",
-          preview: "Backfilled user message preview",
-          isLoadedInMemory: true,
-        },
         {
           id: "thread_listed",
           preview: "listed",

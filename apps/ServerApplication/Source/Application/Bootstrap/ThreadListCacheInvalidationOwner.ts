@@ -45,7 +45,7 @@ const ThreadListInvalidationScopeByReason: Readonly<
   "thread-compaction-started": "active",
   "thread-review-started": "active",
   "thread-unsubscribed": "active",
-  "thread-name-set": "active",
+  "thread-name-set": "all",
   "thread-archived": "all",
   "thread-unarchived": "all",
 };

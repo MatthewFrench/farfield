@@ -255,4 +255,59 @@ describe("handleSidebarThreadSyncRoutes", () => {
       error: "Invalid sidebar thread sync request",
     });
   });
+
+  it("does not leak loaded threads that are missing from active list results", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_active",
+            preview: "active",
+            createdAt: 1_735_600_000_000,
+            updatedAt: 1_735_600_000_001,
+          },
+        ],
+        nextCursor: null,
+      }),
+      async (): Promise<AgentListLoadedThreadsResult> => ({
+        data: ["thread_active", "thread_archived_loaded_only"],
+        nextCursor: null,
+      }),
+    );
+
+    const handled = await handleSidebarThreadSyncRoutes(
+      createSidebarThreadSyncDependencies({
+        requestBody: {
+          archived: false,
+          limit: 20,
+          maxPages: 2,
+          sortKey: "updated_at",
+          cwd: null,
+          knownSnapshotVersion: null,
+        },
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    const response = FarfieldSidebarThreadSyncResponseSchema.parse(capturedBody);
+    expect(response.syncStatus).toBe("snapshot");
+    if (response.syncStatus !== "snapshot") {
+      throw new Error("Expected snapshot sidebar sync response");
+    }
+    expect(response.threadList.data).toEqual([
+      expect.objectContaining({
+        id: "thread_active",
+        isLoadedInMemory: true,
+      }),
+    ]);
+  });
 });

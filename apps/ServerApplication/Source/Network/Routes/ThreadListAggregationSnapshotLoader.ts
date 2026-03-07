@@ -3,30 +3,20 @@ import type {
   AgentId,
   AgentListLoadedThreadsResult,
   AgentListThreadsInput,
-  AgentReadThreadInput,
-  AgentReadThreadResult,
 } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 import type {
   ThreadListItemWithAgentId,
   ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
-import {
-  projectThreadListItemFromAgentThreadListItem,
-  type ThreadCollectionListItemProjectionSource,
-} from "./ThreadCollectionListItemProjection.js";
+import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
 
 const ThreadCollectionRouteLogEventByName = {
   agentListThreadsFailed: "agent-list-threads-failed",
   agentListLoadedThreadsFailed: "agent-list-loaded-threads-failed",
-  agentReadThreadFailed: "agent-read-thread-failed",
 } as const;
 const ThreadCollectionRouteListThreadsTimeoutLabelPrefix = "list-threads:";
 const ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix = "list-loaded-threads:";
-const ThreadCollectionRouteReadThreadTimeoutLabelPrefix = "read-thread:";
-const THREAD_READ_WITH_TURNS_INPUT: Pick<AgentReadThreadInput, "includeTurns"> = {
-  includeTurns: true,
-};
 
 type ThreadCollectionRouteWithTimeout = <ValueType>(
   promise: Promise<ValueType>,
@@ -52,10 +42,6 @@ function buildListThreadsTimeoutLabel(agentId: AgentId): string {
 
 function buildListLoadedThreadsTimeoutLabel(agentId: AgentId): string {
   return `${ThreadCollectionRouteListLoadedThreadsTimeoutLabelPrefix}${agentId}`;
-}
-
-function buildReadThreadTimeoutLabel(agentId: AgentId, threadId: string): string {
-  return `${ThreadCollectionRouteReadThreadTimeoutLabelPrefix}${agentId}:${threadId}`;
 }
 
 function mapLoadedThreadIdentifierSet(loadedThreads: AgentListLoadedThreadsResult): Set<string> {
@@ -88,55 +74,6 @@ async function loadAdapterLoadedThreadIdentifierSet(input: {
     );
     return null;
   }
-}
-
-async function readLoadedThreadResultIfMissingFromList(input: {
-  adapter: AgentAdapter;
-  threadId: string;
-  listThreadsTimeoutMs: number;
-  withTimeout: ThreadCollectionRouteWithTimeout;
-}): Promise<AgentReadThreadResult | null> {
-  try {
-    return await input.withTimeout(
-      input.adapter.readThread({
-        threadId: input.threadId,
-        includeTurns: THREAD_READ_WITH_TURNS_INPUT.includeTurns,
-      }),
-      input.listThreadsTimeoutMs,
-      buildReadThreadTimeoutLabel(input.adapter.id, input.threadId),
-    );
-  } catch (error) {
-    logger.warn(
-      {
-        agentId: input.adapter.id,
-        threadId: input.threadId,
-        error: toErrorMessage(error),
-      },
-      ThreadCollectionRouteLogEventByName.agentReadThreadFailed,
-    );
-    return null;
-  }
-}
-
-function buildBackfilledThreadListProjectionSource(
-  readThreadResult: AgentReadThreadResult,
-): ThreadCollectionListItemProjectionSource | null {
-  const createdAt = readThreadResult.thread.createdAt;
-  const updatedAt = readThreadResult.thread.updatedAt;
-  if (createdAt === undefined || updatedAt === undefined) {
-    return null;
-  }
-
-  return {
-    id: readThreadResult.thread.id,
-    createdAt,
-    updatedAt,
-    cwd: readThreadResult.thread.cwd,
-    path: null,
-    turns: readThreadResult.thread.turns,
-    hasUnreadTurn: undefined,
-    isLoadedInMemory: true,
-  };
 }
 
 export function buildAggregationAdapterListThreadsInput(input: {
@@ -222,45 +159,14 @@ export async function loadThreadListAggregationSnapshot(input: {
         adapterResult.loadedThreadIdentifierSet !== null
           ? adapterResult.loadedThreadIdentifierSet.has(thread.id)
           : undefined;
+      // Keep list query semantics owned by adapter listThreads. Loaded-thread state can annotate
+      // listed items, but it must not inject threads that were filtered out by archive/cwd/query rules.
       const projectedThreadListItem: ThreadListItemWithAgentId =
         projectThreadListItemFromAgentThreadListItem({
           thread,
           agentId: adapterResult.adapter.id,
           isLoadedInMemory,
         });
-      mergedData.push(projectedThreadListItem);
-    }
-
-    if (adapterResult.loadedThreadIdentifierSet === null) {
-      continue;
-    }
-
-    for (const loadedThreadIdentifier of adapterResult.loadedThreadIdentifierSet) {
-      if (listedThreadIdentifierSet.has(loadedThreadIdentifier)) {
-        continue;
-      }
-
-      const readThreadResult = await readLoadedThreadResultIfMissingFromList({
-        adapter: adapterResult.adapter,
-        threadId: loadedThreadIdentifier,
-        listThreadsTimeoutMs: input.listThreadsTimeoutMs,
-        withTimeout: input.withTimeout,
-      });
-      if (readThreadResult === null) {
-        continue;
-      }
-
-      input.registerThreadAdapterOwnership(loadedThreadIdentifier, adapterResult.adapter.id);
-      const backfilledThreadProjectionSource =
-        buildBackfilledThreadListProjectionSource(readThreadResult);
-      if (backfilledThreadProjectionSource === null) {
-        continue;
-      }
-      const projectedThreadListItem = projectThreadListItemFromAgentThreadListItem({
-        thread: backfilledThreadProjectionSource,
-        agentId: adapterResult.adapter.id,
-        isLoadedInMemory: true,
-      });
       mergedData.push(projectedThreadListItem);
     }
   }

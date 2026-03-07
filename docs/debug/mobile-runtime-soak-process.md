@@ -759,6 +759,38 @@ Verification evidence:
 5. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2230`, `6244`, `6949` and no new sentinel errors
 6. direct local probe after `POST /api/threads/:threadId/messages` recorded `lastAcceptedToFirstInboundThreadStreamStateChangedMs=141` and `lastAcceptedToFirstPublishedThreadDeltaMs=177` in `/api/debug/observability`
 
+### March 7, 2026: Stop Sidebar Active-List Leaks From Loaded Archived Threads
+
+Changed owner modules:
+
+1. [ThreadListAggregationSnapshotLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadListAggregationSnapshotLoader.ts)
+2. [ThreadListCacheInvalidationOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/Bootstrap/ThreadListCacheInvalidationOwner.ts)
+3. [ThreadCollectionRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts)
+4. [SidebarThreadSyncRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/SidebarThreadSyncRoutes.test.ts)
+5. [ThreadListCacheInvalidationOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadListCacheInvalidationOwner.test.ts)
+
+Implementation summary:
+
+1. thread-list aggregation no longer backfills loaded in-memory threads that were omitted from the adapter list response
+2. this keeps `/api/threads` and `/api/sidebar/threads/sync` aligned with the requested query semantics instead of leaking loaded archived or out-of-scope threads into the active sidebar
+3. thread-name mutations now invalidate both active and archived thread-list caches so archived-thread titles do not stay stale behind sidebar sync snapshots after rename
+
+User-visible impact:
+
+1. active sidebar lists stop surfacing archived threads just because they were still loaded in memory
+2. tapping an older active-sidebar thread is less likely to jump into an invalid archived target and trigger `runtime-request-error`
+3. archived-thread titles refresh after rename instead of staying stale until cache expiry
+
+Verification evidence:
+
+1. [ThreadCollectionRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts)
+2. [SidebarThreadSyncRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/SidebarThreadSyncRoutes.test.ts)
+3. [ThreadListCacheInvalidationOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadListCacheInvalidationOwner.test.ts)
+4. `bun run --cwd apps/ServerApplication typecheck`
+5. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=3124`, `7193`, `9290`, one `166ms` freeze window, and zero new sentinel API/banner/page errors
+6. live remote verification on `https://farfield.matthewfrench.io` after restart showed `POST /api/sidebar/threads/sync` returning `activeCount=49`, `archivedCount=188`, and `duplicatedThreadIds=[]`
+7. live remote verification also opened `https://farfield.matthewfrench.io/threads/019cc584-3d22-7500-91f4-37199ccb1ade` from the active sidebar without a visible `runtime-request-error`, and `/api/debug/client-errors?limit=10` only contained restart-window `503` entries
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
