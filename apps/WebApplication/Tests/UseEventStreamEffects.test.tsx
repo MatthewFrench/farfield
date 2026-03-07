@@ -853,6 +853,27 @@ describe("useEventStreamEffects", () => {
     });
   });
 
+  it("suppresses transient notification-projection restart errors from runtime error reporting", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    vi.spyOn(input.capabilityServerClient, "readNotificationEvents").mockRejectedValue(
+      new Error("Request failed for /api/notifications/events?limit=80&agentId=codex status=503"),
+    );
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    expect(input.handleRuntimeRequestError).not.toHaveBeenCalled();
+  });
+
   it("projects account rate-limit and app summary refreshes from notification-event reads", async () => {
     setDocumentVisibilityState("visible");
 

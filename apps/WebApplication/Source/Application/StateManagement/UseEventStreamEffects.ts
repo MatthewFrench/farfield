@@ -65,6 +65,16 @@ const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions =
   includeReadThread: true,
   includeTurns: false,
 };
+const TRANSIENT_NOTIFICATION_PROJECTION_ROUTE_PATTERNS = [
+  /\/api\/notifications\/events\b/i,
+  /\/api\/account\b/i,
+  /\/api\/account\/rate-limits\b/i,
+  /\/api\/apps\b/i,
+  /\/api\/server-requests\/pending\b/i,
+] as const;
+const TRANSIENT_NOTIFICATION_PROJECTION_FAILED_TO_FETCH_PATTERN = /failed to fetch status=n\/a/i;
+const TRANSIENT_NOTIFICATION_PROJECTION_EMPTY_RESPONSE_PATTERN = /empty response status=200/i;
+const TRANSIENT_NOTIFICATION_PROJECTION_STATUS_PATTERN = /status=(502|503|504)\b/i;
 
 interface RuntimeNotificationProjectionCursorState {
   nextSequence: number | null;
@@ -151,6 +161,19 @@ function useRuntimeWarningThreadSwitchEffect(
 
 function isMissingSelectedThreadReadError<ErrorType>(error: ErrorType): boolean {
   return isThreadNotLoadedReadError(toErrorMessage(error));
+}
+
+function isTransientNotificationProjectionRefreshError<ErrorType>(error: ErrorType): boolean {
+  const message = toErrorMessage(error);
+  if (!TRANSIENT_NOTIFICATION_PROJECTION_ROUTE_PATTERNS.some((pattern) => pattern.test(message))) {
+    return false;
+  }
+
+  return (
+    TRANSIENT_NOTIFICATION_PROJECTION_FAILED_TO_FETCH_PATTERN.test(message) ||
+    TRANSIENT_NOTIFICATION_PROJECTION_EMPTY_RESPONSE_PATTERN.test(message) ||
+    TRANSIENT_NOTIFICATION_PROJECTION_STATUS_PATTERN.test(message)
+  );
 }
 
 export interface UseEventStreamEffectsInput {
@@ -496,6 +519,12 @@ function useEventStreamConnectionLifecycleEffect(
                   input.setSelectedThreadId(null);
                   input.setErrorMessage("");
                 }
+                return;
+              }
+              if (
+                flags.refreshNotificationProjections &&
+                isTransientNotificationProjectionRefreshError(error)
+              ) {
                 return;
               }
               input.handleRuntimeRequestError(error);

@@ -607,6 +607,27 @@ Verification evidence:
 1. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
 2. real browser run on `https://farfield.matthewfrench.io/` after the restart-window banner repro settled with no visible deferred-startup error banner, all deferred startup routes returning `200`, and no fresh client-error entries after `2026-03-07T08:20:09Z`
 
+### March 7, 2026: Notification Projection Restart Errors Stop Surfacing Runtime Banner
+
+Changed owner modules:
+
+1. [UseEventStreamEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts)
+
+Implementation summary:
+
+1. restart-window `502/503/504`, failed-fetch, and empty-response notification projection reads now stay noncritical inside the event-stream scheduled refresh path
+2. transient errors for `/api/notifications/events`, `/api/account`, `/api/account/rate-limits`, `/api/apps`, and `/api/server-requests/pending` no longer promote to sticky `runtime-request-error` banner state during runtime summary refresh
+
+User-visible impact:
+
+1. mobile-width remote sessions are less likely to show a red runtime error banner after the dev server briefly restarts while runtime summary reads are in flight
+2. the page can settle back to usable state on its own once the next notification projection read succeeds
+
+Verification evidence:
+
+1. [UseEventStreamEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseEventStreamEffects.test.tsx)
+2. real browser mobile-width run on `https://farfield.matthewfrench.io/` after `2026-03-07T08:43:09Z` settled with no visible banner and no fresh client-error entries, including no new `/api/notifications/events` runtime-request-error record
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
