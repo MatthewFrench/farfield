@@ -19,6 +19,8 @@ import type { LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 
 export interface UseSelectedThreadLifecycleEffectsInput {
   selectedThreadId: string | null;
+  setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
+  isSelectedThreadKnown: (threadId: string) => boolean;
   selectedThreadIdRef: MutableRefObject<string | null>;
   selectedThreadLoadTokenRef: MutableRefObject<number>;
   loadSelectedThreadRef: MutableRefObject<
@@ -146,6 +148,12 @@ export function useSelectedThreadLifecycleEffects(
         }
         const message = toErrorMessage(error);
         if (isThreadNotLoadedReadError(message)) {
+          if (!cachedSnapshotApplied || !input.isSelectedThreadKnown(selectedThreadIdentifier)) {
+            const selectedThreadIdRef = input.selectedThreadIdRef;
+            input.setSelectedThreadId(null);
+            selectedThreadIdRef.current = null;
+            return;
+          }
           // Preserve explicit user selection when the read path fails. Redirecting to another
           // thread lets one thread's load failure override the requested view.
           input.handleRuntimeRequestError(error);
@@ -164,6 +172,7 @@ export function useSelectedThreadLifecycleEffects(
     input.loadSelectedThreadRef,
     input.applyCachedSelectedThreadSnapshot,
     input.selectedThreadId,
+    input.setSelectedThreadId,
     input.selectedThreadIdRef,
     input.selectedThreadLoadTokenRef,
     input.selectedThreadRefreshConcurrencyCoordinator,

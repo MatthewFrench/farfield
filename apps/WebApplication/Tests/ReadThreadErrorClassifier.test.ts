@@ -12,7 +12,7 @@ describe("ReadThreadErrorClassifier", () => {
       isTransientReadThreadError(
         "Request failed for /api/threads/thread-404?includeTurns=true status=404",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isTransientReadThreadError(
         "app-server error -32600: thread abc is not materialized yet; includeTurns is unavailable before first user message",

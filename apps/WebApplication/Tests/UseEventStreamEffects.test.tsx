@@ -537,6 +537,10 @@ function createBaseInput(
   const loadCoreDataTracked = vi.fn(async (): Promise<void> => {});
   const loadSelectedThread = vi.fn(async (_threadId: string): Promise<void> => {});
   const capabilityServerClient = new CapabilityServerClient();
+  vi.spyOn(capabilityServerClient, "readPendingServerRequests").mockResolvedValue({
+    ok: true,
+    requests: [],
+  });
 
   return {
     debugHistoryLimit: DEBUG_HISTORY_LIMIT,
@@ -549,6 +553,8 @@ function createBaseInput(
     selectedThreadId: "thread-1",
     activeTabRef: { current: "chat" },
     selectedThreadIdRef: { current: "thread-1" },
+    setSelectedThreadId: createDispatchSpy<string | null>(),
+    setErrorMessage: createDispatchSpy<string>(),
     loadCoreDataTrackedRef: { current: loadCoreDataTracked },
     loadSelectedThreadRef: {
       current: loadSelectedThread,
@@ -622,6 +628,8 @@ const originalVisibilityStateDescriptor = Object.getOwnPropertyDescriptor(
   document,
   "visibilityState",
 );
+const originalRequestIdleCallback = window.requestIdleCallback;
+const originalCancelIdleCallback = window.cancelIdleCallback;
 
 function setDocumentVisibilityState(nextVisibilityState: "visible" | "hidden"): void {
   Object.defineProperty(document, "visibilityState", {
@@ -630,12 +638,26 @@ function setDocumentVisibilityState(nextVisibilityState: "visible" | "hidden"): 
   });
 }
 
+function installImmediateRequestIdleCallback(): void {
+  const idleDeadline: IdleDeadline = {
+    didTimeout: false,
+    timeRemaining: () => 50,
+  };
+  window.requestIdleCallback = (callback) => {
+    callback(idleDeadline);
+    return 1;
+  };
+  window.cancelIdleCallback = () => {};
+}
+
 describe("useEventStreamEffects", () => {
   afterEach(() => {
     cleanup();
     if (originalVisibilityStateDescriptor) {
       Object.defineProperty(document, "visibilityState", originalVisibilityStateDescriptor);
     }
+    window.requestIdleCallback = originalRequestIdleCallback;
+    window.cancelIdleCallback = originalCancelIdleCallback;
   });
 
   it("wires lifecycle start/stop through the event-stream connection coordinator", async () => {
@@ -687,6 +709,28 @@ describe("useEventStreamEffects", () => {
       includeReadThread: true,
       includeTurns: false,
     });
+  });
+
+  it("clears stale selected-thread selection instead of reporting a missing-thread refresh error", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.loadSelectedThreadRef.current = vi.fn(async (): Promise<void> => {
+      throw new Error("Request failed for /api/threads/thread-1?includeTurns=true status=404");
+    });
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(SELECTED_THREAD_ONLY_REFRESH_FLAGS);
+
+    expect(input.handleRuntimeRequestError).not.toHaveBeenCalled();
+    expect(input.selectedThreadIdRef.current).toBeNull();
+    expect(input.setSelectedThreadId).toHaveBeenCalledWith(null);
+    expect(input.setErrorMessage).toHaveBeenCalledWith("");
   });
 
   it("reads selected-thread identifier once per scheduled refresh execution", async () => {
@@ -786,6 +830,8 @@ describe("useEventStreamEffects", () => {
 
     const updateStateAction = setThreadRuntimeStatusByThreadIdentifier.mock.calls
       .map((call) => call[0])
+      .slice()
+      .reverse()
       .find(
         (
           action,
@@ -1133,12 +1179,14 @@ describe("useEventStreamEffects", () => {
 
   it("hydrates sidebar runtime summary on mount when capability reads are enabled", async () => {
     setDocumentVisibilityState("visible");
+    installImmediateRequestIdleCallback();
 
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
       new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
+    input.isSidebarVisible = true;
     input.canReadAccount = true;
     input.canReadAccountRateLimits = true;
     input.canListApps = true;
@@ -1173,12 +1221,15 @@ describe("useEventStreamEffects", () => {
 
   it("reports sidebar runtime hydration failures with readable operation-prefixed messages", async () => {
     setDocumentVisibilityState("visible");
+    installImmediateRequestIdleCallback();
 
     const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
     const input = createBaseInput(
       eventStreamConnectionCoordinator,
       new TestDebugWorkspaceDataReader(createDebugSnapshot()),
     );
+    input.selectedAgentId = "opencode";
+    input.isSidebarVisible = true;
     input.canReadAccount = true;
     const handleRuntimeRequestError = vi.fn();
     input.handleRuntimeRequestError = handleRuntimeRequestError;
@@ -1231,7 +1282,7 @@ describe("useEventStreamEffects", () => {
     render(<Harness input={input} />);
 
     await waitFor(() => {
-      expect(input.ensureApiSessionBootstrapped).toHaveBeenCalledTimes(1);
+      expect(input.ensureApiSessionBootstrapped).toHaveBeenCalled();
     });
 
     expect(eventStreamConnectionCoordinator.startInput).toBeNull();

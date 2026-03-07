@@ -190,6 +190,13 @@ export function buildSelectedThreadLifecycleEffectsInput(
   const { applicationShellState, applicationOwnerDependencies, runtimeRequestHandlers } = context;
   return {
     selectedThreadId: applicationShellState.selectedThreadId,
+    setSelectedThreadId: applicationShellState.setSelectedThreadId,
+    isSelectedThreadKnown: (threadId: string): boolean => {
+      return (
+        applicationShellState.threads.some((thread) => thread.id === threadId) ||
+        applicationShellState.archivedThreads.some((thread) => thread.id === threadId)
+      );
+    },
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
@@ -230,6 +237,8 @@ export function buildEventStreamEffectsInput(
     selectedThreadId: applicationShellState.selectedThreadId,
     activeTabRef: applicationShellState.activeTabRef,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
+    setSelectedThreadId: applicationShellState.setSelectedThreadId,
+    setErrorMessage: applicationShellState.setError,
     loadCoreDataTrackedRef: applicationShellState.loadCoreDataTrackedRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
     debugWorkspaceDataReader: applicationOwnerDependencies.debugWorkspaceDataReader,

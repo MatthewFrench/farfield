@@ -734,4 +734,78 @@ describe("useApplicationRuntimeComposition", () => {
       "Runtime refresh invariant violated: selected-thread loader is unavailable for active selection.",
     );
   });
+
+  it("clears selected thread when startup refresh hits a known missing-thread read error", async () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+    const refreshEffectsInput = applicationRefreshEffectsCapture;
+    if (!refreshEffectsInput) {
+      throw new Error("Expected refresh effects input to be captured");
+    }
+
+    const coreLoader = vi.fn(async (): Promise<void> => {});
+    const missingThreadError = new Error("thread not loaded in app-server");
+    const selectedThreadLoader = vi.fn(async (): Promise<void> => {
+      throw missingThreadError;
+    });
+
+    harnessSnapshot.applicationShellState.loadCoreDataTrackedRef.current = coreLoader;
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = selectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-missing";
+
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshCoreDataAndSelectedThread();
+    });
+
+    const updatedHarnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!updatedHarnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot after refresh");
+    }
+
+    expect(coreLoader).toHaveBeenCalledTimes(1);
+    expect(selectedThreadLoader).toHaveBeenCalledWith("thread-missing", undefined);
+    expect(updatedHarnessSnapshot.applicationShellState.selectedThreadId).toBeNull();
+    expect(updatedHarnessSnapshot.applicationShellState.selectedThreadIdRef.current).toBeNull();
+    expect(updatedHarnessSnapshot.applicationShellState.error).toBe("");
+  });
+
+  it("clears selected thread when incremental refresh hits a known missing-thread read error", async () => {
+    render(<RuntimeCompositionHarness />);
+    const harnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!harnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot to be captured");
+    }
+    const refreshEffectsInput = applicationRefreshEffectsCapture;
+    if (!refreshEffectsInput) {
+      throw new Error("Expected refresh effects input to be captured");
+    }
+
+    const missingThreadError = new Error("thread not loaded in app-server");
+    const selectedThreadLoader = vi.fn(async (): Promise<void> => {
+      throw missingThreadError;
+    });
+
+    harnessSnapshot.applicationShellState.loadSelectedThreadRef.current = selectedThreadLoader;
+    harnessSnapshot.applicationShellState.selectedThreadIdRef.current = "thread-missing";
+
+    await act(async (): Promise<void> => {
+      await refreshEffectsInput.refreshSelectedThreadIncrementalIfPresent();
+    });
+
+    const updatedHarnessSnapshot = latestRuntimeHarnessSnapshot;
+    if (!updatedHarnessSnapshot) {
+      throw new Error("Expected runtime harness snapshot after refresh");
+    }
+
+    expect(selectedThreadLoader).toHaveBeenCalledWith("thread-missing", {
+      includeReadThread: true,
+      includeTurns: false,
+    });
+    expect(updatedHarnessSnapshot.applicationShellState.selectedThreadId).toBeNull();
+    expect(updatedHarnessSnapshot.applicationShellState.selectedThreadIdRef.current).toBeNull();
+    expect(updatedHarnessSnapshot.applicationShellState.error).toBe("");
+  });
 });

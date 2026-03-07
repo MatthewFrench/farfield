@@ -10,6 +10,7 @@ import {
   type CapabilityReadNotificationEventsOptions,
   type CapabilityServerClient,
 } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { isThreadNotLoadedReadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type {
   DebugErrorListResponse,
@@ -23,6 +24,7 @@ import {
 } from "@/Features/Threads/DomainModel/ThreadRuntimeStatusContracts";
 import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import { type AgentId } from "@/Shared/Contracts/ApiContracts";
+import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import { EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
@@ -147,6 +149,10 @@ function useRuntimeWarningThreadSwitchEffect(
   }, [input.selectedThreadId, input.setThreadSidebarRuntimeSummary]);
 }
 
+function isMissingSelectedThreadReadError<ErrorType>(error: ErrorType): boolean {
+  return isThreadNotLoadedReadError(toErrorMessage(error));
+}
+
 export interface UseEventStreamEffectsInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
@@ -158,6 +164,8 @@ export interface UseEventStreamEffectsInput {
   selectedThreadId: string | null;
   activeTabRef: MutableRefObject<"chat" | "debug">;
   selectedThreadIdRef: MutableRefObject<string | null>;
+  setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
+  setErrorMessage: Dispatch<SetStateAction<string>>;
   loadCoreDataTrackedRef: MutableRefObject<(() => Promise<void>) | null>;
   loadSelectedThreadRef: MutableRefObject<
     ((threadId: string, options?: SelectedThreadLoaderOptions) => Promise<void>) | null
@@ -395,12 +403,12 @@ function useEventStreamConnectionLifecycleEffect(
               return;
             }
 
+            const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
+              input.activeTabRef,
+              input.selectedThreadIdRef,
+            );
             try {
               // Freeze mutable refs once so each scheduled refresh run applies one consistent snapshot.
-              const scheduledRefreshSnapshot = readScheduledRefreshExecutionSnapshot(
-                input.activeTabRef,
-                input.selectedThreadIdRef,
-              );
               const loadCoreDataFunction = input.loadCoreDataTrackedRef.current;
               const loadSelectedThreadFunction = input.loadSelectedThreadRef.current;
               const refreshOperations: Array<Promise<void>> = [];
@@ -474,6 +482,22 @@ function useEventStreamConnectionLifecycleEffect(
               if (error instanceof Error && isRequestCanceledError(error)) {
                 return;
               }
+              if (
+                flags.refreshSelectedThread &&
+                scheduledRefreshSnapshot.selectedThreadId !== null &&
+                scheduledRefreshSnapshot.selectedThreadId.length > 0 &&
+                isMissingSelectedThreadReadError(error)
+              ) {
+                if (
+                  input.selectedThreadIdRef.current === scheduledRefreshSnapshot.selectedThreadId
+                ) {
+                  const selectedThreadIdRef = input.selectedThreadIdRef;
+                  selectedThreadIdRef.current = null;
+                  input.setSelectedThreadId(null);
+                  input.setErrorMessage("");
+                }
+                return;
+              }
               input.handleRuntimeRequestError(error);
             }
           },
@@ -529,6 +553,8 @@ function useEventStreamConnectionLifecycleEffect(
     input.handleRuntimeRequestError,
     input.loadCoreDataTrackedRef,
     input.loadSelectedThreadRef,
+    input.setErrorMessage,
+    input.setSelectedThreadId,
     input.selectedThreadIdRef,
     input.setThreadRuntimeStatusByThreadIdentifier,
     input.setThreadSidebarRuntimeSummary,

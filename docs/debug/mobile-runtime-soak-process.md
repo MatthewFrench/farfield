@@ -557,6 +557,35 @@ Verification evidence:
 
 1. [UseSelectedThreadLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLoaders.test.tsx)
 
+### March 7, 2026: Stale Selected-Thread Routes Clear Without Runtime Error Banner
+
+Changed owner modules:
+
+1. [ReadThreadErrorClassifier.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DomainModel/ReadThreadErrorClassifier.ts)
+2. [UseSelectedThreadLifecycleEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects.ts)
+3. [UseApplicationRuntimeRefreshOrchestration.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationRuntimeRefreshOrchestration.ts)
+4. [UseEventStreamEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts)
+
+Implementation summary:
+
+1. plain thread-read `404` responses are no longer classified as retryable transient selected-thread refresh errors, so dead-thread routes stop looping the same `/api/threads/:threadId?includeTurns=true` read
+2. selected-thread lifecycle, runtime refresh, and event-stream scheduled refresh paths now clear stale route selection instead of surfacing `runtime-request-error` after the thread is already gone
+
+User-visible impact:
+
+1. opening a stale thread URL on phone or remote browser now settles on `No thread selected` without a red runtime error banner
+2. stale-thread recovery now emits one read-thread `404` instead of the earlier repeated read burst, reducing reload noise and visible roughness
+
+Verification evidence:
+
+1. [ReadThreadErrorClassifier.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ReadThreadErrorClassifier.test.ts)
+2. [SelectedThreadDataRefreshCoordinator.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/SelectedThreadDataRefreshCoordinator.test.ts)
+3. [UseEventStreamEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseEventStreamEffects.test.tsx)
+4. [UseSelectedThreadLifecycleEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLifecycleEffects.test.tsx)
+5. [UseSelectedThreadLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLoaders.test.tsx)
+6. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+7. real browser run on `https://farfield.matthewfrench.io/threads/019cc17a-1b65-7ef3-9c15-e7cfc6494273` redirected to `/`, showed `No thread selected`, emitted no fresh `runtime-request-error`, and reduced the thread-read request sequence to one `GET /api/threads/:threadId?includeTurns=true => 404`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

@@ -191,6 +191,44 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     expect(snapshot.containsAnyTurns).toBe(true);
   });
 
+  it("does not retry missing-thread read-thread 404 failures", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 3,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 40,
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const missingThreadError = new Error(
+      "Request failed for /api/threads/thread-404?includeTurns=true status=404",
+    );
+    const readThread = vi.fn(async (): Promise<SelectedThreadReadThreadSnapshot> => {
+      throw missingThreadError;
+    });
+    const chatClient = createChatClient({
+      readThread,
+    });
+
+    await expect(
+      coordinator.readSnapshot({
+        threadId: "thread-404",
+        includeTurns: true,
+        includeReadThread: true,
+        canReadLiveState: false,
+        canReadStreamEvents: false,
+        streamEventsSinceSequence: null,
+        chatClient,
+      }),
+    ).rejects.toThrow(missingThreadError.message);
+
+    expect(readThread).toHaveBeenCalledTimes(1);
+    expect(waitDurations).toEqual([]);
+  });
+
   it("retries transient live-state read errors once before succeeding", async () => {
     const waitDurations: number[] = [];
     const coordinator = new SelectedThreadDataRefreshCoordinator({

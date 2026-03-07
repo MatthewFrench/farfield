@@ -51,6 +51,8 @@ function createLifecycleInput(selectedThreadId: string | null) {
   const selectedThreadLoadTokenRef: MutableRefObject<number> = {
     current: 0,
   };
+  const setSelectedThreadId = vi.fn<(value: SetStateAction<string | null>) => void>();
+  const isSelectedThreadKnown = vi.fn((threadId: string): boolean => threadId.length > 0);
   const loadSelectedThreadRef: MutableRefObject<
     ((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null
   > = {
@@ -71,6 +73,8 @@ function createLifecycleInput(selectedThreadId: string | null) {
   return {
     input: {
       selectedThreadId,
+      setSelectedThreadId,
+      isSelectedThreadKnown,
       selectedThreadIdRef,
       selectedThreadLoadTokenRef,
       loadSelectedThreadRef,
@@ -85,6 +89,8 @@ function createLifecycleInput(selectedThreadId: string | null) {
     },
     selectedThreadIdRef,
     selectedThreadLoadTokenRef,
+    setSelectedThreadId,
+    isSelectedThreadKnown,
     loadSelectedThreadRef,
     applyCachedSelectedThreadSnapshot,
     selectedThreadRefreshConcurrencyCoordinator,
@@ -124,6 +130,7 @@ describe("useSelectedThreadLifecycleEffects", () => {
   it("preserves the selected thread and reports a load error when the read path reports not loaded", async () => {
     const lifecycle = createLifecycleInput("thread-1");
     const loadError = new Error("thread not loaded in app-server");
+    lifecycle.applyCachedSelectedThreadSnapshot.mockReturnValue(true);
     lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {
       throw loadError;
     });
@@ -135,8 +142,45 @@ describe("useSelectedThreadLifecycleEffects", () => {
     });
 
     expect(lifecycle.selectedThreadIdRef.current).toBe("thread-1");
-    expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenCalledWith(true);
+    expect(lifecycle.setSelectedThreadId).not.toHaveBeenCalled();
+    expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenCalledWith(false);
     expect(lifecycle.setIsSelectedThreadLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it("clears missing selected thread when no cached snapshot is available", async () => {
+    const lifecycle = createLifecycleInput("thread-missing");
+    const loadError = new Error("thread not loaded in app-server");
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {
+      throw loadError;
+    });
+
+    render(<LifecycleHarness input={lifecycle.input} />);
+
+    await waitFor(() => {
+      expect(lifecycle.setSelectedThreadId).toHaveBeenCalledWith(null);
+    });
+
+    expect(lifecycle.selectedThreadIdRef.current).toBeNull();
+    expect(lifecycle.handleRuntimeRequestError).not.toHaveBeenCalled();
+  });
+
+  it("clears stale selected thread when cached data exists but the thread is no longer known", async () => {
+    const lifecycle = createLifecycleInput("thread-stale");
+    const loadError = new Error("thread not loaded in app-server");
+    lifecycle.applyCachedSelectedThreadSnapshot.mockReturnValue(true);
+    lifecycle.isSelectedThreadKnown.mockReturnValue(false);
+    lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {
+      throw loadError;
+    });
+
+    render(<LifecycleHarness input={lifecycle.input} />);
+
+    await waitFor(() => {
+      expect(lifecycle.setSelectedThreadId).toHaveBeenCalledWith(null);
+    });
+
+    expect(lifecycle.selectedThreadIdRef.current).toBeNull();
+    expect(lifecycle.handleRuntimeRequestError).not.toHaveBeenCalled();
   });
 
   it("keeps cached selected-thread state visible while refresh is in flight", async () => {
