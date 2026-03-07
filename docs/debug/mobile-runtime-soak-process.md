@@ -677,6 +677,29 @@ Verification evidence:
 3. `bun run --cwd apps/ServerApplication typecheck`
 4. unchanged real soak stayed green on Saturday, March 7, 2026, with no new sentinel errors
 
+### March 7, 2026: Thread Delta Publisher Emits Live-State-Only First Updates
+
+Changed owner modules:
+
+1. [ThreadStreamDeltaEventPublisher.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ThreadStreamDeltaEventPublisher.ts)
+
+Implementation summary:
+
+1. server-side thread delta publication no longer suppresses an update solely because the stream-event batch is empty
+2. if live thread state changed and the last broadcast snapshot differs, the publisher now emits a delta even when `stream-events` is temporarily empty
+
+User-visible impact:
+
+1. the first visible thread-state update after turn start no longer has to wait for a non-empty stream-event batch when live conversation state already advanced
+2. managed-thread soak send timings still vary with turn execution, but the clean-stack rerun reduced the first iteration send step to `2822ms` and kept the run green
+
+Verification evidence:
+
+1. [ThreadStreamDeltaEventPublisher.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadStreamDeltaEventPublisher.test.ts)
+2. `bun run --cwd apps/ServerApplication test -- Tests/ThreadStreamDeltaEventPublisher.test.ts Tests/CodexMessageDispatchOwner.test.ts`
+3. `bun run --cwd apps/ServerApplication typecheck`
+4. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2822`, `7122`, `7345` and no new sentinel errors
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

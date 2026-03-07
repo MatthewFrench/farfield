@@ -19,11 +19,28 @@ interface DeferredPromise<ValueType> {
   resolve: (value: ValueType) => void;
 }
 
-function createLiveStateSnapshot(): AgentThreadLiveState {
+function createLiveStateSnapshot(
+  conversationState: AgentThreadLiveState["conversationState"] = null,
+): AgentThreadLiveState {
   return {
     ownerClientId: null,
-    conversationState: null,
+    conversationState,
     liveStateError: null,
+  };
+}
+
+function createConversationState(
+  threadId: string,
+): NonNullable<AgentThreadLiveState["conversationState"]> {
+  return {
+    id: threadId,
+    title: null,
+    turns: [],
+    requests: [],
+    latestModel: null,
+    latestReasoningEffort: null,
+    latestCollaborationMode: null,
+    hasUnreadTurn: false,
   };
 }
 
@@ -207,6 +224,49 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     );
     expect(broadcastEvent.delta.streamEventsSinceSequenceUsed).toBeNull();
     expect(broadcastEvent.delta.streamEventsSnapshot.nextSequence).toBe(8);
+    expect(publisher.readStatistics()).toMatchObject({
+      scheduledPublishCount: 2,
+      broadcastCount: 1,
+      suppressedBroadcastCount: 1,
+    });
+  });
+
+  it("publishes a live-state-only delta when stream events are empty but live state changed", async () => {
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const broadcastSpy = vi.spyOn(eventStreamClientRegistry, "broadcast");
+    const liveStateSnapshots: AgentThreadLiveState[] = [
+      createLiveStateSnapshot(createConversationState("thread-1")),
+      createLiveStateSnapshot(createConversationState("thread-1")),
+    ];
+    const readThreadLiveState = vi.fn(async () => {
+      const nextSnapshot = liveStateSnapshots.shift();
+      if (!nextSnapshot) {
+        throw new Error("Expected live-state snapshot fixture");
+      }
+      return nextSnapshot;
+    });
+    const readThreadStreamEvents = vi.fn(async () =>
+      createStreamEventsSnapshot({
+        nextSequence: 5,
+        firstAvailableSequence: 0,
+        resetRequired: false,
+      }),
+    );
+    const publisher = new ThreadStreamDeltaEventPublisher({
+      eventStreamClientRegistry,
+      readThreadLiveState,
+      readThreadStreamEvents,
+    });
+
+    publisher.schedulePublish("thread-1");
+    await waitForScheduledPublish();
+
+    expect(broadcastSpy).toHaveBeenCalledTimes(1);
+
+    publisher.schedulePublish("thread-1");
+    await waitForScheduledPublish();
+
+    expect(broadcastSpy).toHaveBeenCalledTimes(1);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
       broadcastCount: 1,

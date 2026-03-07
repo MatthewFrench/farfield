@@ -54,6 +54,7 @@ export class ThreadStreamDeltaEventPublisher {
   private readonly inFlightThreadIdSet: Set<string>;
   private readonly pendingThreadIdSet: Set<string>;
   private readonly lastDeliveredSequenceByThreadId: Map<string, number>;
+  private readonly lastBroadcastLiveStateSignatureByThreadId: Map<string, string>;
   private scheduledPublishCount: number;
   private startedPublishCount: number;
   private completedPublishCount: number;
@@ -68,6 +69,7 @@ export class ThreadStreamDeltaEventPublisher {
     this.inFlightThreadIdSet = new Set<string>();
     this.pendingThreadIdSet = new Set<string>();
     this.lastDeliveredSequenceByThreadId = new Map<string, number>();
+    this.lastBroadcastLiveStateSignatureByThreadId = new Map<string, string>();
     this.scheduledPublishCount = 0;
     this.startedPublishCount = 0;
     this.completedPublishCount = 0;
@@ -149,7 +151,16 @@ export class ThreadStreamDeltaEventPublisher {
       this.lastDeliveredSequenceByThreadId.set(threadId, nextSinceSequence);
     }
 
-    if (shouldSuppressBroadcast(streamEventsSnapshot)) {
+    const liveStateSignature = buildLiveStateSignature(liveStateSnapshot);
+    const previousLiveStateSignature =
+      this.lastBroadcastLiveStateSignatureByThreadId.get(threadId) ?? null;
+    if (
+      shouldSuppressBroadcast({
+        liveStateSignature,
+        previousLiveStateSignature,
+        streamEventsSnapshot,
+      })
+    ) {
       this.suppressedBroadcastCount += 1;
       return;
     }
@@ -162,6 +173,7 @@ export class ThreadStreamDeltaEventPublisher {
         streamEventsSnapshot,
       }),
     );
+    this.lastBroadcastLiveStateSignatureByThreadId.set(threadId, liveStateSignature);
     this.broadcastCount += 1;
   }
 
@@ -194,8 +206,20 @@ export class ThreadStreamDeltaEventPublisher {
   }
 }
 
-function shouldSuppressBroadcast(streamEventsSnapshot: AgentThreadStreamEvents): boolean {
-  return streamEventsSnapshot.events.length === 0 && !streamEventsSnapshot.resetRequired;
+function shouldSuppressBroadcast(input: {
+  liveStateSignature: string;
+  previousLiveStateSignature: string | null;
+  streamEventsSnapshot: AgentThreadStreamEvents;
+}): boolean {
+  if (input.streamEventsSnapshot.events.length > 0 || input.streamEventsSnapshot.resetRequired) {
+    return false;
+  }
+
+  if (input.previousLiveStateSignature === null) {
+    return !hasMeaningfulLiveState(input.liveStateSignature);
+  }
+
+  return input.previousLiveStateSignature === input.liveStateSignature;
 }
 
 function resolveNextStreamEventsSinceSequence(
@@ -221,4 +245,18 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
     return error;
   }
   return String(error);
+}
+
+function buildLiveStateSignature(liveStateSnapshot: AgentThreadLiveState): string {
+  return JSON.stringify({
+    ownerClientId: liveStateSnapshot.ownerClientId,
+    conversationState: liveStateSnapshot.conversationState,
+    liveStateError: liveStateSnapshot.liveStateError,
+  });
+}
+
+function hasMeaningfulLiveState(liveStateSignature: string): boolean {
+  return (
+    liveStateSignature !== '{"ownerClientId":null,"conversationState":null,"liveStateError":null}'
+  );
 }
