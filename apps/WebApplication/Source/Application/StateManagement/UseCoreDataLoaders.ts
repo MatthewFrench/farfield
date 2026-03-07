@@ -111,6 +111,7 @@ function createArchivedThreadLoaderDependencies(
     threadListStateController: input.threadListStateController,
     threadListLimit: input.threadListLimit,
     archivedThreadListMaxPages: input.archivedThreadListMaxPages,
+    buildActionRequestOptions: input.buildActionRequestOptions,
     setIsArchivedThreadsLoading: input.setIsArchivedThreadsLoading,
     setArchivedThreads: input.setArchivedThreads,
     setArchivedThreadsTruncated: input.setArchivedThreadsTruncated,

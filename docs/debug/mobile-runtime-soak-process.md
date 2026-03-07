@@ -835,6 +835,33 @@ Verification evidence:
 10. live remote verification on `https://farfield.matthewfrench.io/threads/019cc17a-1b65-7ef3-9c15-e7cfc6494273` now redirects to `/`, shows no selected thread, and `/api/debug/client-errors?limit=10` stays empty after the correction
 11. live remote verification now reports `archivedHasMissingThread=false` for `019cc17a-1b65-7ef3-9c15-e7cfc6494273` in archived sidebar sync after the stale route is exercised once
 
+### March 7, 2026: Sidebar Cache Hits Now Revalidate Asynchronously
+
+Changed owner modules:
+
+1. [CoreDataStartupLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataStartupLoader.ts)
+2. [ArchivedThreadLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ArchivedThreadLoader.ts)
+3. [UseCoreDataLoaders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts)
+4. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+
+Implementation summary:
+
+1. startup active-thread loads still apply cached sidebar data immediately when available, but cached startup hits now schedule a deferred network revalidation using `startup-deferred.threads.active.revalidate`
+2. archived-thread loads now follow the same pattern: apply cached archived data immediately, then revalidate from network in the background without blocking the visible sidebar
+3. explicit active-thread refreshes remain network-first, so mutation-driven sidebar refresh paths still bypass cache when they already requested a tracked refresh
+
+User-visible impact:
+
+1. sidebar data now appears immediately on refresh while still getting a guaranteed freshness pass soon after load
+2. active and archived thread names/previews are less likely to stay stale just because the initial sidebar read hit cache
+3. this reduces the window where old cached sidebar data can linger until some unrelated invalidation or TTL expiry
+
+Verification evidence:
+
+1. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+2. `bun run --cwd apps/WebApplication typecheck`
+3. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1765`, `6442`, `6197`, zero new sentinel API/banner/page errors, and no visible runtime banner regressions
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

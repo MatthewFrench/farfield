@@ -428,15 +428,20 @@ describe("useCoreDataLoaders", () => {
     expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not schedule deferred thread revalidation after cache-first startup", async () => {
+  it("schedules deferred thread revalidation after cache-first startup", async () => {
     const harness = createHarness("chat");
     const cachedActiveThreadState: LoadActiveThreadStateResult = {
       ...ACTIVE_THREAD_STATE,
       loadedFromCache: true,
     };
+    const revalidatedActiveThreadState: LoadActiveThreadStateResult = {
+      ...ACTIVE_THREAD_STATE,
+      loadedFromCache: false,
+    };
     const loadActiveThreadStateSpy = vi
       .spyOn(harness.threadListStateController, "loadActiveThreadState")
-      .mockResolvedValue(cachedActiveThreadState);
+      .mockResolvedValueOnce(cachedActiveThreadState)
+      .mockResolvedValueOnce(revalidatedActiveThreadState);
     vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockResolvedValue(HEALTH_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
@@ -455,20 +460,18 @@ describe("useCoreDataLoaders", () => {
     await act(async () => {
       await vi.runOnlyPendingTimersAsync();
     });
-
-    await act(async () => {
-      await loaders.loadCoreData();
-    });
-    await act(async () => {
-      await vi.runOnlyPendingTimersAsync();
-    });
-
     expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(2);
     expect(
       harness.actionLog.filter(
         (actionName) => actionName === STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
       ),
-    ).toEqual([]);
+    ).toEqual([STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION]);
+    expect(loadActiveThreadStateSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        readFromCache: false,
+        actionName: STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
+      }),
+    );
   });
 
   it("does not report deferred startup request-cancellation errors", async () => {
@@ -735,5 +738,44 @@ describe("useCoreDataLoaders", () => {
     expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(1);
     expect(loadArchivedThreadStateSpy).toHaveBeenCalledTimes(1);
     expect(harness.input.lastCoreRefreshAtRef.current).toBeGreaterThan(0);
+  });
+
+  it("revalidates archived threads after serving cached archived data", async () => {
+    const harness = createHarness("chat");
+    const loadArchivedThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadArchivedThreadState")
+      .mockResolvedValueOnce({
+        didChangeArchivedThreads: true,
+        nextArchivedThreads: THREADS,
+        isTruncated: false,
+        loadedFromCache: true,
+      })
+      .mockResolvedValueOnce({
+        didChangeArchivedThreads: false,
+        nextArchivedThreads: THREADS,
+        isTruncated: false,
+        loadedFromCache: false,
+      });
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadArchivedThreads();
+    });
+
+    expect(loadArchivedThreadStateSpy).toHaveBeenCalledTimes(2);
+    expect(loadArchivedThreadStateSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        readFromCache: true,
+      }),
+    );
+    expect(loadArchivedThreadStateSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        readFromCache: false,
+        actionName: "runtime-refresh.threads.archived.revalidate",
+      }),
+    );
   });
 });

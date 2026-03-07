@@ -39,6 +39,7 @@ import {
   STARTUP_DEFERRED_HEALTH_OPERATION,
   STARTUP_DEFERRED_MODELS_OPERATION,
   STARTUP_DEFERRED_MODES_OPERATION,
+  STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
   STARTUP_DEFERRED_TRACE_STATUS_OPERATION,
 } from "./CoreDataStartupRequestProfile";
 
@@ -349,6 +350,7 @@ export class CoreDataStartupLoader {
     this.scheduleDeferredStartupReads({
       deferredStartupSequence,
       retryAttemptCount: 0,
+      shouldRevalidateActiveThreads: nextActiveThreadState.loadedFromCache,
       applySnapshotState,
       reportDeferredStartupFailure,
     });
@@ -361,6 +363,7 @@ export class CoreDataStartupLoader {
   private scheduleDeferredStartupReads(input: {
     deferredStartupSequence: number;
     retryAttemptCount: number;
+    shouldRevalidateActiveThreads: boolean;
     applySnapshotState: SnapshotStateApplier;
     reportDeferredStartupFailure: DeferredStartupFailureReporter;
   }): void {
@@ -376,6 +379,7 @@ export class CoreDataStartupLoader {
   private async runDeferredStartupReads(input: {
     deferredStartupSequence: number;
     retryAttemptCount: number;
+    shouldRevalidateActiveThreads: boolean;
     applySnapshotState: SnapshotStateApplier;
     reportDeferredStartupFailure: DeferredStartupFailureReporter;
   }): Promise<void> {
@@ -403,6 +407,9 @@ export class CoreDataStartupLoader {
     const startupDeferredDefaultsRequest = this.deps.buildActionRequestOptions(
       STARTUP_DEFERRED_DEFAULTS_OPERATION,
     );
+    const startupDeferredThreadsRevalidateRequest = this.deps.buildActionRequestOptions(
+      STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
+    );
 
     const capabilitiesPromise = this.deps.capabilitySnapshotCache.readSnapshot(
       () =>
@@ -428,6 +435,18 @@ export class CoreDataStartupLoader {
           },
         )
       : Promise.resolve<DebugWorkspaceDataSnapshot | null>(null);
+    const revalidateActiveThreadsPromise = input.shouldRevalidateActiveThreads
+      ? this.deps.threadListStateController.loadActiveThreadState(
+          createActiveThreadStateLoadRequest({
+            threadListLimit: this.deps.threadListLimit,
+            threadListMaxPages: this.deps.threadListMaxPages,
+            previousUnreadThreadIdentifiers: this.deps.unreadThreadIdsRef.current,
+            selectedThreadIdentifier: this.deps.selectedThreadIdRef.current,
+            readFromCache: false,
+            requestOptions: startupDeferredThreadsRevalidateRequest.requestOptions,
+          }),
+        )
+      : Promise.resolve<LoadActiveThreadStateResult | null>(null);
 
     // Deferred startup reads are intentionally parallel so non-critical hydration stays bounded by the slowest read.
     const freshHealthSnapshot = this.deps.deferredResourceCacheOwner.readHealthIfFresh(now);
@@ -438,6 +457,7 @@ export class CoreDataStartupLoader {
       nextCapabilitiesResult,
       nextTraceStatusResult,
       nextDebugWorkspaceDataResult,
+      nextRevalidatedActiveThreadsResult,
     ] = await Promise.allSettled([
       freshHealthSnapshot !== null
         ? Promise.resolve(freshHealthSnapshot)
@@ -462,6 +482,7 @@ export class CoreDataStartupLoader {
           )
         : Promise.resolve<TraceStatus | null>(null),
       debugWorkspaceDataPromise,
+      revalidateActiveThreadsPromise,
     ]);
 
     // If another startup pass advanced the sequence while these reads were in flight, discard stale completion.
@@ -510,6 +531,15 @@ export class CoreDataStartupLoader {
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
+    applyDeferredStartupSnapshotResult({
+      result: nextRevalidatedActiveThreadsResult,
+      operation: STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
+      toSnapshotPartial: (nextActiveThreadState) =>
+        nextActiveThreadState === null ? null : { nextActiveThreadState },
+      retryAttemptCount: input.retryAttemptCount,
+      applySnapshotState: input.applySnapshotState,
+      reportDeferredStartupFailure: input.reportDeferredStartupFailure,
+    });
 
     if (
       input.retryAttemptCount < DEFERRED_STARTUP_MAXIMUM_RETRY_ATTEMPTS &&
@@ -519,6 +549,7 @@ export class CoreDataStartupLoader {
         nextCapabilitiesResult,
         nextTraceStatusResult,
         nextDebugWorkspaceDataResult,
+        nextRevalidatedActiveThreadsResult,
       ].some(
         (result) =>
           result.status === "rejected" && shouldRetryDeferredStartupFailure(result.reason),
@@ -527,6 +558,7 @@ export class CoreDataStartupLoader {
       this.scheduleDeferredStartupReads({
         deferredStartupSequence: input.deferredStartupSequence,
         retryAttemptCount: input.retryAttemptCount + 1,
+        shouldRevalidateActiveThreads: input.shouldRevalidateActiveThreads,
         applySnapshotState: input.applySnapshotState,
         reportDeferredStartupFailure: input.reportDeferredStartupFailure,
       });
