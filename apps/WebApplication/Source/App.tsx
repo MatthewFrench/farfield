@@ -296,6 +296,7 @@ export function App(): React.JSX.Element {
 
   const {
     applyCachedSelectedThreadSnapshot,
+    hasAppliedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
   } = useSelectedThreadLoaders({
@@ -338,6 +339,7 @@ export function App(): React.JSX.Element {
     runtimeRequestHandlers,
     coreDataLoaders,
     applyCachedSelectedThreadSnapshot,
+    hasAppliedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
     streamEventCards,

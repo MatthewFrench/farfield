@@ -184,6 +184,7 @@ export interface UseEventStreamEffectsInput {
   eventRefreshScheduler: EventRefreshScheduler;
   eventStreamConnectionCoordinator: EventStreamConnectionCoordinator;
   eventStreamRefreshDecisionEngine: EventStreamRefreshDecisionReader;
+  hasAppliedSelectedThreadSnapshot: (threadId: string) => boolean;
   selectedThreadId: string | null;
   activeTabRef: MutableRefObject<"chat" | "debug">;
   selectedThreadIdRef: MutableRefObject<string | null>;
@@ -417,10 +418,16 @@ function useEventStreamConnectionLifecycleEffect(
         input.eventStreamConnectionCoordinator.start({
           eventRefreshScheduler: input.eventRefreshScheduler,
           eventStreamRefreshDecisionEngine: input.eventStreamRefreshDecisionEngine,
-          readSnapshot: () => ({
-            activeTab: input.activeTabRef.current,
-            selectedThreadId: input.selectedThreadIdRef.current,
-          }),
+          readSnapshot: () => {
+            const selectedThreadId = input.selectedThreadIdRef.current;
+            return {
+              activeTab: input.activeTabRef.current,
+              selectedThreadId,
+              selectedThreadHydrated:
+                selectedThreadId !== null &&
+                input.hasAppliedSelectedThreadSnapshot(selectedThreadId),
+            };
+          },
           executeScheduledRefresh: async (flags) => {
             if (!isScheduledRefreshDocumentVisible()) {
               return;
@@ -571,6 +578,7 @@ function useEventStreamConnectionLifecycleEffect(
     input.eventStreamConnectionCoordinator,
     input.eventStreamRefreshDecisionEngine,
     input.eventsConnectedRef,
+    input.hasAppliedSelectedThreadSnapshot,
     input.threadListStateController,
     input.capabilityServerClient,
     input.selectedAgentId,

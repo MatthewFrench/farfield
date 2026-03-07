@@ -19,6 +19,7 @@ export interface EventSourceLike {
 export interface EventStreamConnectionSnapshot {
   activeTab: "chat" | "debug";
   selectedThreadId: string | null;
+  selectedThreadHydrated: boolean;
 }
 
 export interface EventStreamConnectionCoordinatorStartInput {
@@ -65,11 +66,17 @@ function createNonNegativeReconnectDelayError(propertyName: string): Error {
   return new Error(`${RECONNECT_DELAY_VALIDATION_ERROR_PREFIX} ${propertyName}`);
 }
 
-function readInitialRefreshFlags(snapshot: EventStreamConnectionSnapshot): EventRefreshFlags {
+function readInitialRefreshFlags(input: {
+  snapshot: EventStreamConnectionSnapshot;
+  hasConnectedBefore: boolean;
+}): EventRefreshFlags {
+  const { snapshot, hasConnectedBefore } = input;
   return {
     refreshCore: true,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
-    refreshSelectedThread: Boolean(snapshot.selectedThreadId),
+    refreshSelectedThread: hasConnectedBefore
+      ? Boolean(snapshot.selectedThreadId)
+      : Boolean(snapshot.selectedThreadId) && !snapshot.selectedThreadHydrated,
     refreshNotificationProjections: true,
   };
 }
@@ -122,6 +129,7 @@ export class EventStreamConnectionCoordinator {
   private source: EventSourceLike | null;
   private context: EventStreamConnectionCoordinatorContext | null;
   private disposed: boolean;
+  private hasConnectedBefore: boolean;
 
   public constructor(dependencies?: EventStreamConnectionCoordinatorDependencies) {
     const initialReconnectDelayMilliseconds = readValidatedReconnectDelayMilliseconds(
@@ -152,6 +160,7 @@ export class EventStreamConnectionCoordinator {
     this.source = null;
     this.context = null;
     this.disposed = true;
+    this.hasConnectedBefore = false;
   }
 
   public start(input: EventStreamConnectionCoordinatorStartInput): void {
@@ -169,6 +178,7 @@ export class EventStreamConnectionCoordinator {
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.pendingEventMessageExecution = Promise.resolve();
     this.disposed = false;
+    this.hasConnectedBefore = false;
     this.connectEvents();
   }
 
@@ -186,6 +196,7 @@ export class EventStreamConnectionCoordinator {
     this.context = null;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.pendingEventMessageExecution = Promise.resolve();
+    this.hasConnectedBefore = false;
   }
 
   private connectEvents(): void {
@@ -213,7 +224,13 @@ export class EventStreamConnectionCoordinator {
     this.context.onConnectionStatusChange(true);
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     const snapshot = this.context.readSnapshot();
-    this.scheduleRefresh(readInitialRefreshFlags(snapshot));
+    this.scheduleRefresh(
+      readInitialRefreshFlags({
+        snapshot,
+        hasConnectedBefore: this.hasConnectedBefore,
+      }),
+    );
+    this.hasConnectedBefore = true;
   }
 
   private handleEventSourceMessage(event: MessageEvent<string>): void {

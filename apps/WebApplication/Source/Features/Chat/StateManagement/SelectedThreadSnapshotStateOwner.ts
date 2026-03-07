@@ -104,6 +104,10 @@ export class SelectedThreadSnapshotStateOwner {
     return this.readStreamEventsSinceSequenceForRead(threadId);
   }
 
+  public hasAppliedSnapshot(threadId: string): boolean {
+    return this.lastAppliedThreadId === threadId && this.latestSnapshotByThreadId.has(threadId);
+  }
+
   public shouldSkipSnapshotApply(threadId: string, signal?: AbortSignal): boolean {
     return Boolean(signal?.aborted) || this.deps.selectedThreadIdRef.current !== threadId;
   }

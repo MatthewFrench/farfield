@@ -142,6 +142,7 @@ describe("EventStreamConnectionCoordinator", () => {
     const snapshot: EventStreamConnectionSnapshot = {
       activeTab: "debug",
       selectedThreadId: "thread-1",
+      selectedThreadHydrated: false,
     };
 
     coordinator.start({
@@ -176,6 +177,108 @@ describe("EventStreamConnectionCoordinator", () => {
     expect(createdSources[0]?.closed).toBe(true);
   });
 
+  it("skips first-open selected-thread refresh when the selected thread is already hydrated", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+    const executedRefreshes: EventRefreshFlags[] = [];
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: "thread-1",
+        selectedThreadHydrated: true,
+      }),
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      applyThreadStreamDelta: () => {},
+      onConnectionStatusChange: () => {},
+    });
+
+    createdSources[0]?.onopen?.(new Event(EVENT_NAME_OPEN));
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(executedRefreshes).toEqual([
+      {
+        refreshCore: true,
+        refreshHistory: false,
+        refreshSelectedThread: false,
+        refreshNotificationProjections: true,
+      },
+    ]);
+
+    coordinator.stop();
+  });
+
+  it("refreshes hydrated selected thread again after a reconnect", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({
+      createdSources,
+      initialReconnectDelayMs: 25,
+      maximumReconnectDelayMs: 100,
+    });
+    const scheduler = new EventRefreshScheduler(20);
+    const decisionEngine = new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS);
+    const executedRefreshes: EventRefreshFlags[] = [];
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionEngine,
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: "thread-1",
+        selectedThreadHydrated: true,
+      }),
+      executeScheduledRefresh: async (refreshFlags) => {
+        executedRefreshes.push(refreshFlags);
+      },
+      applyThreadStreamDelta: () => {},
+      onConnectionStatusChange: () => {},
+    });
+
+    const firstSource = createdSources[0];
+    if (!firstSource) {
+      throw new Error("Expected initial event source instance");
+    }
+
+    firstSource.onopen?.(new Event(EVENT_NAME_OPEN));
+    await vi.advanceTimersByTimeAsync(20);
+
+    firstSource.onerror?.(new Event(EVENT_NAME_ERROR));
+    await vi.advanceTimersByTimeAsync(25);
+
+    const secondSource = createdSources[1];
+    if (!secondSource) {
+      throw new Error("Expected reconnect event source instance");
+    }
+
+    secondSource.onopen?.(new Event(EVENT_NAME_OPEN));
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(executedRefreshes).toEqual([
+      {
+        refreshCore: true,
+        refreshHistory: false,
+        refreshSelectedThread: false,
+        refreshNotificationProjections: true,
+      },
+      {
+        refreshCore: true,
+        refreshHistory: false,
+        refreshSelectedThread: true,
+        refreshNotificationProjections: true,
+      },
+    ]);
+
+    coordinator.stop();
+  });
+
   it("maps message payloads through decision engine before scheduling refresh", async () => {
     vi.useFakeTimers();
     const createdSources: TestEventSource[] = [];
@@ -186,6 +289,7 @@ describe("EventStreamConnectionCoordinator", () => {
     let snapshot: EventStreamConnectionSnapshot = {
       activeTab: "chat",
       selectedThreadId: "thread-1",
+      selectedThreadHydrated: false,
     };
 
     coordinator.start({
@@ -211,6 +315,7 @@ describe("EventStreamConnectionCoordinator", () => {
     snapshot = {
       activeTab: "debug",
       selectedThreadId: "thread-1",
+      selectedThreadHydrated: false,
     };
     source.onmessage?.(
       new MessageEvent<string>(EVENT_NAME_MESSAGE, {
@@ -246,6 +351,7 @@ describe("EventStreamConnectionCoordinator", () => {
       readSnapshot: () => ({
         activeTab: "chat",
         selectedThreadId: "thread-1",
+        selectedThreadHydrated: false,
       }),
       executeScheduledRefresh: async (refreshFlags) => {
         executedRefreshes.push(refreshFlags);
@@ -296,6 +402,7 @@ describe("EventStreamConnectionCoordinator", () => {
       readSnapshot: () => ({
         activeTab: "debug",
         selectedThreadId: "thread-1",
+        selectedThreadHydrated: false,
       }),
       executeScheduledRefresh: async (refreshFlags) => {
         executedRefreshes.push(refreshFlags);
@@ -349,6 +456,7 @@ describe("EventStreamConnectionCoordinator", () => {
       readSnapshot: () => ({
         activeTab: "chat",
         selectedThreadId: null,
+        selectedThreadHydrated: false,
       }),
       executeScheduledRefresh: async () => {},
       applyThreadStreamDelta: () => {},

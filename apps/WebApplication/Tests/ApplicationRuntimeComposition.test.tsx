@@ -411,6 +411,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
 
   const {
     applyCachedSelectedThreadSnapshot,
+    hasAppliedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
   } = useSelectedThreadLoaders({
@@ -457,6 +458,7 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     runtimeRequestHandlers,
     coreDataLoaders,
     applyCachedSelectedThreadSnapshot,
+    hasAppliedSelectedThreadSnapshot,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,
     streamEventCards,

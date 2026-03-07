@@ -75,6 +75,7 @@ export interface UseSelectedThreadLoadersInput {
 
 export interface SelectedThreadLoaders {
   applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
+  hasAppliedSelectedThreadSnapshot: (threadId: string) => boolean;
   loadSelectedThread: (
     threadId: string,
     options?: LoadSelectedThreadOptions,
@@ -202,6 +203,13 @@ export function useSelectedThreadLoaders(
       return true;
     },
     [input.selectedThreadSnapshotCacheStore, snapshotStateOwner],
+  );
+
+  const hasAppliedSelectedThreadSnapshot = useCallback(
+    (threadId: string): boolean => {
+      return snapshotStateOwner.hasAppliedSnapshot(threadId);
+    },
+    [snapshotStateOwner],
   );
 
   const loadSelectedThread = useCallback(
@@ -346,6 +354,7 @@ export function useSelectedThreadLoaders(
 
   return {
     applyCachedSelectedThreadSnapshot,
+    hasAppliedSelectedThreadSnapshot,
     loadSelectedThread,
     loadSelectedThreadTracked,
     applySelectedThreadStreamDelta,

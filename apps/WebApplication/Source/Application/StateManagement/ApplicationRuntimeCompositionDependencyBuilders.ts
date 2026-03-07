@@ -234,6 +234,7 @@ export function buildEventStreamEffectsInput(
     eventRefreshScheduler: applicationOwnerDependencies.eventRefreshScheduler,
     eventStreamConnectionCoordinator: applicationOwnerDependencies.eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: applicationOwnerDependencies.eventStreamRefreshDecisionEngine,
+    hasAppliedSelectedThreadSnapshot: input.hasAppliedSelectedThreadSnapshot,
     selectedThreadId: applicationShellState.selectedThreadId,
     activeTabRef: applicationShellState.activeTabRef,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,

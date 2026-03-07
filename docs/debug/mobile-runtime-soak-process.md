@@ -628,6 +628,32 @@ Verification evidence:
 1. [UseEventStreamEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseEventStreamEffects.test.tsx)
 2. real browser mobile-width run on `https://farfield.matthewfrench.io/` after `2026-03-07T08:43:09Z` settled with no visible banner and no fresh client-error entries, including no new `/api/notifications/events` runtime-request-error record
 
+### March 7, 2026: Event-Stream First Open Stops Re-Reading Already Hydrated Selected Thread
+
+Changed owner modules:
+
+1. [SelectedThreadSnapshotStateOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/SelectedThreadSnapshotStateOwner.ts)
+2. [UseSelectedThreadLoaders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseSelectedThreadLoaders.ts)
+3. [UseEventStreamEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseEventStreamEffects.ts)
+4. [EventStreamConnectionCoordinator.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/EventStreamConnectionCoordinator.ts)
+
+Implementation summary:
+
+1. selected-thread snapshot ownership now exposes whether the currently selected thread already has an applied snapshot
+2. the first EventSource open now skips the extra selected-thread refresh when that snapshot is already hydrated, while later reconnects still refresh selected thread state
+
+User-visible impact:
+
+1. opening a thread on mobile or remote browser now avoids one immediate extra `stream-events?sinceSequence=0` reread after the full selected-thread hydrate
+2. thread-open recovery stays intact on reconnects, but the initial open path does less redundant work and should feel less rough
+
+Verification evidence:
+
+1. [EventStreamConnectionCoordinator.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/EventStreamConnectionCoordinator.test.ts)
+2. [UseEventStreamEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseEventStreamEffects.test.tsx)
+3. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+4. real browser mobile-width thread-open run on `https://farfield.matthewfrench.io/threads/019cc4e3-c181-7341-bc1e-8fc70b578415` reduced the non-debug selected-thread read sequence to one `GET /api/threads/:threadId?includeTurns=true`, one `GET /live-state`, and one `GET /stream-events?limit=80`, with no follow-up `stream-events?sinceSequence=0` reread
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

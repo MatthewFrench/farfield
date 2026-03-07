@@ -550,6 +550,7 @@ function createBaseInput(
     eventRefreshScheduler: new EventRefreshScheduler(IMMEDIATE_EVENT_REFRESH_DELAY_MILLISECONDS),
     eventStreamConnectionCoordinator,
     eventStreamRefreshDecisionEngine: new EventStreamRefreshDecisionEngine(["history"]),
+    hasAppliedSelectedThreadSnapshot: () => false,
     selectedThreadId: "thread-1",
     activeTabRef: { current: "chat" },
     selectedThreadIdRef: { current: "thread-1" },
