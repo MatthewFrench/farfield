@@ -221,16 +221,21 @@ describe("useSelectedThreadLifecycleEffects", () => {
     });
   });
 
-  it("unsubscribes selected thread during unmount cleanup", async () => {
+  it("cancels active refresh during unmount cleanup without unsubscribing the selected thread", async () => {
     const lifecycle = createLifecycleInput("thread-cleanup");
     lifecycle.loadSelectedThreadRef.current = vi.fn(async () => {});
+    const cancelActiveRefreshSpy = vi.spyOn(
+      lifecycle.selectedThreadRefreshConcurrencyCoordinator,
+      "cancelActiveRefresh",
+    );
 
     const rendered = render(<LifecycleHarness input={lifecycle.input} />);
     rendered.unmount();
 
     await waitFor(() => {
-      expect(lifecycle.unsubscribeThread).toHaveBeenCalledWith("thread-cleanup");
+      expect(cancelActiveRefreshSpy).toHaveBeenCalledTimes(1);
     });
+    expect(lifecycle.unsubscribeThread).not.toHaveBeenCalled();
   });
 
   it("does not unsubscribe on callback-identity rerenders while thread selection is unchanged", async () => {
@@ -258,10 +263,8 @@ describe("useSelectedThreadLifecycleEffects", () => {
 
     rendered.unmount();
 
-    await waitFor(() => {
-      expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(0);
-      expect(replacementUnsubscribeThread).toHaveBeenCalledWith("thread-stable");
-    });
+    expect(lifecycle.unsubscribeThread).toHaveBeenCalledTimes(0);
+    expect(replacementUnsubscribeThread).toHaveBeenCalledTimes(0);
   });
 
   it("deduplicates unsubscribe requests for the same thread while a previous unsubscribe is in flight", async () => {

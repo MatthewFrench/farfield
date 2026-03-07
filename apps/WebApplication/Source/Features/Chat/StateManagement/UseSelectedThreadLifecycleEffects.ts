@@ -86,18 +86,12 @@ export function useSelectedThreadLifecycleEffects(
 
   useEffect(() => {
     return () => {
-      const selectedThreadIdentifier = input.selectedThreadIdRef.current;
-      if (selectedThreadIdentifier !== null && selectedThreadIdentifier.length > 0) {
-        // Unmount teardown should not surface unsubscribe failures to interactive error banners.
-        requestThreadUnsubscribe(selectedThreadIdentifier, false);
-      }
+      // Page teardown already closes the owning event-stream/session surfaces. Skipping
+      // explicit unmount unsubscribe avoids extra reload-path mutations without changing
+      // selection-switch cleanup semantics inside the running application session.
       input.selectedThreadRefreshConcurrencyCoordinator.cancelActiveRefresh();
     };
-  }, [
-    requestThreadUnsubscribe,
-    input.selectedThreadIdRef,
-    input.selectedThreadRefreshConcurrencyCoordinator,
-  ]);
+  }, [input.selectedThreadRefreshConcurrencyCoordinator]);
 
   useEffect(() => {
     const previousSelectedThreadIdentifier = previousSelectedThreadIdentifierRef.current;

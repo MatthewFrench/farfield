@@ -437,6 +437,29 @@ Verification evidence:
 1. [UseChatActionHandlers.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseChatActionHandlers.test.tsx)
 2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 
+### March 7, 2026: Selected-Thread Teardown Stops Unsubscribing On Unmount
+
+Changed owner modules:
+
+1. [UseSelectedThreadLifecycleEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects.ts)
+2. [UseSelectedThreadLifecycleEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLifecycleEffects.test.tsx)
+
+Implementation summary:
+
+1. selected-thread lifecycle cleanup now cancels in-flight refresh work during teardown without posting `/api/threads/:threadId/unsubscribe`
+2. explicit selection changes still unsubscribe the previous thread, so running-session thread switches keep their existing cleanup semantics
+
+User-visible impact:
+
+1. reload-heavy mobile flows avoid one extra thread-unsubscribe mutation per page teardown
+2. the real soak preserved assistant reply rendering while cutting unsubscribe churn from `11` to `8` requests in the observed Chromium run
+
+Verification evidence:
+
+1. [UseSelectedThreadLifecycleEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLifecycleEffects.test.tsx)
+2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+3. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
