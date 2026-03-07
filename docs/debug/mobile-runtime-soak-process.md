@@ -514,6 +514,28 @@ Verification evidence:
 3. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 4. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
 
+### March 7, 2026: Thread List Startup Clears Unreadable Persisted Snapshots
+
+Changed owner modules:
+
+1. [ThreadListStateController.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListStateController.ts)
+2. [ThreadOwnership.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadOwnership.test.ts)
+
+Implementation summary:
+
+1. thread-list controller reads from persisted snapshot storage now treat parse failures as stale cache data, clear the broken snapshot key, and continue with a network read
+2. invalid persisted sidebar snapshots no longer bubble through the runtime request error path during startup or refresh-baseline reads
+
+User-visible impact:
+
+1. browsers carrying older thread-list snapshot shapes should recover by dropping the stale cache instead of rendering a startup error banner
+2. sidebar startup can proceed from the network even when persisted thread-list storage contains obsolete schema data
+
+Verification evidence:
+
+1. [ThreadOwnership.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadOwnership.test.ts)
+2. [ThreadSidebarSyncApi.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadSidebarSyncApi.test.ts)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

@@ -202,8 +202,13 @@ class TestThreadDisplayNamePreferenceStore implements ThreadDisplayNamePersisten
 
 class TestThreadListSnapshotPersistenceStore implements ThreadListSnapshotPersistenceStore {
   private readonly snapshotByCacheKey = new Map<string, ThreadListResponse>();
+  private readonly clearedCacheKeys: string[] = [];
+  private readError: Error | null = null;
 
   public async readThreadListSnapshot(cacheKey: string): Promise<ThreadListResponse | null> {
+    if (this.readError !== null) {
+      throw this.readError;
+    }
     return this.snapshotByCacheKey.get(cacheKey) ?? null;
   }
 
@@ -215,7 +220,17 @@ class TestThreadListSnapshotPersistenceStore implements ThreadListSnapshotPersis
   }
 
   public async clearThreadListSnapshot(cacheKey: string): Promise<void> {
+    this.clearedCacheKeys.push(cacheKey);
     this.snapshotByCacheKey.delete(cacheKey);
+    this.readError = null;
+  }
+
+  public setReadError(error: Error): void {
+    this.readError = error;
+  }
+
+  public readClearedCacheKeys(): string[] {
+    return [...this.clearedCacheKeys];
   }
 }
 
@@ -626,6 +641,46 @@ describe("Thread ownership modules", () => {
     expect(cachedRead.loadedFromCache).toBe(true);
     expect(cachedRead.nextThreads).toEqual(active.data);
     expect(serverClient.getListRequestCount()).toBe(0);
+  });
+
+  it("ThreadListStateController clears unreadable persisted snapshots and reloads from network", async () => {
+    const active = buildThreadListResponse({
+      threadOneUpdatedAt: 1_700_000_000,
+      threadTwoUpdatedAt: 1_700_000_001,
+    });
+    const archived = buildThreadListResponse({
+      threadOneUpdatedAt: 1_600_000_000,
+      threadTwoUpdatedAt: 1_600_000_001,
+    });
+    const persistedSnapshotStore = new TestThreadListSnapshotPersistenceStore();
+    persistedSnapshotStore.setReadError(
+      new Error("thread-list-snapshot:read: invalid persisted response"),
+    );
+    const serverClient = new TestThreadServerClient({ active, archived });
+    const controller = new ThreadListStateController({
+      threadServerClient: serverClient,
+      threadQueryCache: new ThreadQueryCache(10_000, 8),
+      threadListSnapshotPersistenceStore: persistedSnapshotStore,
+      threadRefreshConcurrencyCoordinator: new ThreadRefreshConcurrencyCoordinator(),
+      threadListStateStore: new ThreadListStateStore(),
+      threadListPresentationStateResolver: new ThreadListPresentationStateResolver(),
+    });
+
+    const readResult = await controller.loadActiveThreadState({
+      limit: 80,
+      maxPages: 20,
+      sortKey: "updated_at",
+      previousUnreadThreadIdentifiers: {},
+      selectedThreadIdentifier: "thread-1",
+      readFromCache: true,
+    });
+
+    expect(readResult.loadedFromCache).toBe(false);
+    expect(readResult.nextThreads).toEqual(active.data);
+    expect(serverClient.getListRequestCount()).toBe(1);
+    expect(persistedSnapshotStore.readClearedCacheKeys()).toEqual([
+      ThreadListCacheKeyByName.activeThreads,
+    ]);
   });
 
   it("ThreadListStateController reuses cached baseline rows when sidebar sync reports notModified", async () => {

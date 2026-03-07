@@ -399,8 +399,7 @@ export class ThreadListStateController {
   private async readThreadListFromPersistentCache(
     cacheKey: string,
   ): Promise<ThreadListResponse | null> {
-    const persistedResponse =
-      await this.threadListSnapshotPersistenceStore.readThreadListSnapshot(cacheKey);
+    const persistedResponse = await this.readRecoverablePersistedThreadListSnapshot(cacheKey);
     if (persistedResponse === null) {
       return null;
     }
@@ -445,13 +444,27 @@ export class ThreadListStateController {
       return this.applyDisplayNamesToThreadListResponse(cachedResponse);
     }
 
-    const persistedCachedResponse =
-      await this.threadListSnapshotPersistenceStore.readThreadListSnapshot(cacheKey);
+    const persistedCachedResponse = await this.readRecoverablePersistedThreadListSnapshot(cacheKey);
     if (persistedCachedResponse === null) {
       return null;
     }
 
     return this.applyDisplayNamesToThreadListResponse(persistedCachedResponse);
+  }
+
+  private async readRecoverablePersistedThreadListSnapshot(
+    cacheKey: string,
+  ): Promise<ThreadListResponse | null> {
+    try {
+      return await this.threadListSnapshotPersistenceStore.readThreadListSnapshot(cacheKey);
+    } catch {
+      try {
+        await this.threadListSnapshotPersistenceStore.clearThreadListSnapshot(cacheKey);
+      } catch {
+        // Recovery still treats unreadable persisted snapshots as cache misses when eviction fails.
+      }
+      return null;
+    }
   }
 
   private async readThreadListFromServerWithSync(
