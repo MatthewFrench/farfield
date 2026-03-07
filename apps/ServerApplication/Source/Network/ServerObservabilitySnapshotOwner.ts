@@ -41,6 +41,12 @@ interface ServerObservabilityThreadConcurrencySnapshot {
   completedExecutionCount: number;
   failedExecutionCount: number;
   activeThreadCount: number;
+  inFlightThreadCount: number;
+  pendingExecutionCount: number;
+  blockedExecutionCount: number;
+  lastBlockedWaitMs: number;
+  p95BlockedWaitMs: number;
+  maxBlockedWaitMs: number;
 }
 
 interface ServerObservabilityPushDispatchConcurrencySnapshot {
@@ -123,6 +129,12 @@ export class ServerObservabilitySnapshotOwner {
           completedExecutionCount: threadConcurrencyStatistics.completedExecutionCount,
           failedExecutionCount: threadConcurrencyStatistics.failedExecutionCount,
           activeThreadCount: threadConcurrencyStatistics.activeThreadCount,
+          inFlightThreadCount: threadConcurrencyStatistics.inFlightThreadCount,
+          pendingExecutionCount: threadConcurrencyStatistics.pendingExecutionCount,
+          blockedExecutionCount: threadConcurrencyStatistics.blockedExecutionCount,
+          lastBlockedWaitMs: threadConcurrencyStatistics.lastBlockedWaitMs,
+          p95BlockedWaitMs: threadConcurrencyStatistics.p95BlockedWaitMs,
+          maxBlockedWaitMs: threadConcurrencyStatistics.maxBlockedWaitMs,
         },
         pushDispatch: {
           scheduledCheckCount: pushDispatchConcurrencyStatistics.scheduledCheckCount,

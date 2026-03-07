@@ -99,7 +99,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     ]);
 
     const statistics = coordinator.readStatistics();
-    expect(statistics).toEqual({
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 3,
       completedExecutionCount: 2,
       failedExecutionCount: 1,
@@ -107,6 +107,8 @@ describe("ThreadConcurrencyCoordinator", () => {
       inFlightThreadCount: 0,
       pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
+    expect(statistics.maxBlockedWaitMs).toBeGreaterThanOrEqual(0);
   });
 
   it("normalizes thread identifiers before applying per-thread serialization", async () => {
@@ -157,7 +159,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     });
 
     await Promise.resolve();
-    expect(coordinator.readStatistics()).toEqual({
+    expect(coordinator.readStatistics()).toMatchObject({
       queuedExecutionCount: 1,
       completedExecutionCount: 0,
       failedExecutionCount: 0,
@@ -179,7 +181,7 @@ describe("ThreadConcurrencyCoordinator", () => {
 
     await Promise.resolve();
     expect(threadTwoOperationStarted).toBe(true);
-    expect(coordinator.readStatistics()).toEqual({
+    expect(coordinator.readStatistics()).toMatchObject({
       queuedExecutionCount: 3,
       completedExecutionCount: 0,
       failedExecutionCount: 0,
@@ -192,7 +194,8 @@ describe("ThreadConcurrencyCoordinator", () => {
     releaseThreadOneOperation();
     await Promise.all([threadOneOperation, queuedThreadOneOperation, threadTwoOperation]);
 
-    expect(coordinator.readStatistics()).toEqual({
+    const completedStatistics = coordinator.readStatistics();
+    expect(completedStatistics).toMatchObject({
       queuedExecutionCount: 3,
       completedExecutionCount: 3,
       failedExecutionCount: 0,
@@ -200,6 +203,7 @@ describe("ThreadConcurrencyCoordinator", () => {
       inFlightThreadCount: 0,
       pendingExecutionCount: 0,
     });
+    expect(completedStatistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 
   it("rejects blank thread identifiers at the owner boundary", async () => {
@@ -209,13 +213,14 @@ describe("ThreadConcurrencyCoordinator", () => {
       "ThreadConcurrencyCoordinator requires non-empty threadId",
     );
 
-    expect(coordinator.readStatistics()).toEqual({
+    expect(coordinator.readStatistics()).toMatchObject({
       queuedExecutionCount: 0,
       completedExecutionCount: 0,
       failedExecutionCount: 0,
       activeThreadCount: 0,
       inFlightThreadCount: 0,
       pendingExecutionCount: 0,
+      blockedExecutionCount: 0,
     });
   });
 
@@ -232,7 +237,7 @@ describe("ThreadConcurrencyCoordinator", () => {
     expect(result).toBe("ok");
 
     const statistics = coordinator.readStatistics();
-    expect(statistics).toEqual({
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
@@ -240,5 +245,6 @@ describe("ThreadConcurrencyCoordinator", () => {
       inFlightThreadCount: 0,
       pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 });

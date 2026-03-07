@@ -369,6 +369,12 @@ export const FarfieldThreadConcurrencyStatisticsSchema = z
     completedExecutionCount: z.number().int().nonnegative(),
     failedExecutionCount: z.number().int().nonnegative(),
     activeThreadCount: z.number().int().nonnegative(),
+    inFlightThreadCount: z.number().int().nonnegative(),
+    pendingExecutionCount: z.number().int().nonnegative(),
+    blockedExecutionCount: z.number().int().nonnegative(),
+    lastBlockedWaitMs: z.number().nonnegative(),
+    p95BlockedWaitMs: z.number().nonnegative(),
+    maxBlockedWaitMs: z.number().nonnegative(),
   })
   .strict();
 
@@ -389,6 +395,11 @@ export const FarfieldPushMutationConcurrencyStatisticsSchema = z
     completedExecutionCount: z.number().int().nonnegative(),
     failedExecutionCount: z.number().int().nonnegative(),
     hasInFlightOperation: z.boolean(),
+    pendingExecutionCount: z.number().int().nonnegative(),
+    blockedExecutionCount: z.number().int().nonnegative(),
+    lastBlockedWaitMs: z.number().nonnegative(),
+    p95BlockedWaitMs: z.number().nonnegative(),
+    maxBlockedWaitMs: z.number().nonnegative(),
   })
   .strict();
 

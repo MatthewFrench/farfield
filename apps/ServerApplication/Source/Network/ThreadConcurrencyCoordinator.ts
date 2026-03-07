@@ -1,10 +1,19 @@
+import { performance } from "node:perf_hooks";
+import {
+  appendSampleWindowValue,
+  readNearestRankPercentile,
+  readSampleWindowMaximum,
+} from "./RequestTimingSampleWindow.js";
+
 const EMPTY_THREAD_IDENTIFIER_ERROR_MESSAGE =
   "ThreadConcurrencyCoordinator requires non-empty threadId";
 const MINIMUM_NORMALIZED_THREAD_IDENTIFIER_LENGTH = 1;
 const MINIMUM_PENDING_EXECUTION_COUNT = 0;
 const SINGLE_PENDING_EXECUTION_COUNT = 1;
+const BLOCKED_WAIT_SAMPLE_WINDOW_MAXIMUM = 240;
 
 interface QueuedThreadExecution {
+  enqueuedAtHighResolutionMilliseconds: number;
   previousTail: Promise<void>;
   chainedTail: Promise<void>;
   releaseCurrentTail: () => void;
@@ -17,6 +26,10 @@ export interface ThreadConcurrencyCoordinatorStatistics {
   activeThreadCount: number;
   inFlightThreadCount: number;
   pendingExecutionCount: number;
+  blockedExecutionCount: number;
+  lastBlockedWaitMs: number;
+  p95BlockedWaitMs: number;
+  maxBlockedWaitMs: number;
 }
 
 /**
@@ -31,6 +44,9 @@ export class ThreadConcurrencyCoordinator {
   private queuedExecutionCount: number;
   private completedExecutionCount: number;
   private failedExecutionCount: number;
+  private readonly blockedWaitSamplesMs: number[];
+  private blockedExecutionCount: number;
+  private lastBlockedWaitMs: number;
 
   public constructor() {
     this.tailByThreadId = new Map<string, Promise<void>>();
@@ -40,6 +56,9 @@ export class ThreadConcurrencyCoordinator {
     this.queuedExecutionCount = 0;
     this.completedExecutionCount = 0;
     this.failedExecutionCount = 0;
+    this.blockedWaitSamplesMs = [];
+    this.blockedExecutionCount = 0;
+    this.lastBlockedWaitMs = 0;
   }
 
   public async runExclusive<ResultType>(
@@ -52,6 +71,7 @@ export class ThreadConcurrencyCoordinator {
 
     try {
       await queuedExecution.previousTail;
+      this.recordBlockedWait(queuedExecution);
       this.inFlightThreadIdSet.add(normalizedThreadId);
       const result = await operation();
       this.completedExecutionCount += 1;
@@ -72,6 +92,13 @@ export class ThreadConcurrencyCoordinator {
       activeThreadCount: this.pendingExecutionCountByThreadId.size,
       inFlightThreadCount: this.inFlightThreadIdSet.size,
       pendingExecutionCount: this.pendingExecutionCount,
+      blockedExecutionCount: this.blockedExecutionCount,
+      lastBlockedWaitMs: this.lastBlockedWaitMs,
+      p95BlockedWaitMs: readNearestRankPercentile({
+        values: this.blockedWaitSamplesMs,
+        percentile: 95,
+      }),
+      maxBlockedWaitMs: readSampleWindowMaximum(this.blockedWaitSamplesMs),
     };
   }
 
@@ -84,6 +111,7 @@ export class ThreadConcurrencyCoordinator {
   }
 
   private enqueueThreadExecution(threadId: string): QueuedThreadExecution {
+    const enqueuedAtHighResolutionMilliseconds = performance.now();
     const previousTail = this.tailByThreadId.get(threadId) ?? Promise.resolve();
     let releaseCurrentTail: () => void = () => void 0;
     const currentTail = new Promise<void>((resolve) => {
@@ -96,10 +124,27 @@ export class ThreadConcurrencyCoordinator {
     this.tailByThreadId.set(threadId, chainedTail);
 
     return {
+      enqueuedAtHighResolutionMilliseconds,
       previousTail,
       chainedTail,
       releaseCurrentTail,
     };
+  }
+
+  private recordBlockedWait(queuedExecution: QueuedThreadExecution): void {
+    const blockedWaitMs = Math.max(
+      0,
+      performance.now() - queuedExecution.enqueuedAtHighResolutionMilliseconds,
+    );
+    this.lastBlockedWaitMs = blockedWaitMs;
+    appendSampleWindowValue(
+      this.blockedWaitSamplesMs,
+      blockedWaitMs,
+      BLOCKED_WAIT_SAMPLE_WINDOW_MAXIMUM,
+    );
+    if (blockedWaitMs > 0) {
+      this.blockedExecutionCount += 1;
+    }
   }
 
   private finishQueuedExecution(threadId: string, queuedExecution: QueuedThreadExecution): void {

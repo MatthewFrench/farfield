@@ -40,12 +40,15 @@ describe("PushMutationConcurrencyCoordinator", () => {
     expect(firstResult).toBe("first-result");
     expect(secondResult).toBe("second-result");
     expect(callOrder).toEqual(["first:start", "first:end", "second:start", "second:end"]);
-    expect(coordinator.readStatistics()).toMatchObject({
+    const statistics = coordinator.readStatistics();
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 2,
       failedExecutionCount: 0,
       hasInFlightOperation: false,
+      pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 
   it("records failed executions and continues processing", async () => {
@@ -59,12 +62,15 @@ describe("PushMutationConcurrencyCoordinator", () => {
 
     const value = await coordinator.runExclusive(async () => "next");
     expect(value).toBe("next");
-    expect(coordinator.readStatistics()).toMatchObject({
+    const statistics = coordinator.readStatistics();
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
       hasInFlightOperation: false,
+      pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 
   it("exposes in-flight status while operations are queued and waiting for completion", async () => {
@@ -78,7 +84,10 @@ describe("PushMutationConcurrencyCoordinator", () => {
     const secondOperation = coordinator.runExclusive(async () => "second-done");
 
     await Promise.resolve();
-    expect(coordinator.readStatistics().hasInFlightOperation).toBe(true);
+    expect(coordinator.readStatistics()).toMatchObject({
+      hasInFlightOperation: true,
+      pendingExecutionCount: 2,
+    });
 
     firstOperationGate.release();
     await Promise.all([firstOperation, secondOperation]);
@@ -111,12 +120,15 @@ describe("PushMutationConcurrencyCoordinator", () => {
     await expect(secondOperation).resolves.toBe("second-result");
 
     expect(callOrder).toEqual(["first:start", "first:fail", "second:start", "second:end"]);
-    expect(coordinator.readStatistics()).toMatchObject({
+    const statistics = coordinator.readStatistics();
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
       hasInFlightOperation: false,
+      pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 
   it("records synchronous throws as failures and drains queued operations", async () => {
@@ -129,11 +141,14 @@ describe("PushMutationConcurrencyCoordinator", () => {
 
     await expect(failingOperation).rejects.toThrow("synchronous failure");
     await expect(secondOperation).resolves.toBe("next");
-    expect(coordinator.readStatistics()).toMatchObject({
+    const statistics = coordinator.readStatistics();
+    expect(statistics).toMatchObject({
       queuedExecutionCount: 2,
       completedExecutionCount: 1,
       failedExecutionCount: 1,
       hasInFlightOperation: false,
+      pendingExecutionCount: 0,
     });
+    expect(statistics.blockedExecutionCount).toBeGreaterThanOrEqual(1);
   });
 });

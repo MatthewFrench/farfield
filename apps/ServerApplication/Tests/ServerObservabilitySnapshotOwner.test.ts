@@ -199,6 +199,12 @@ describe("ServerObservabilitySnapshotOwner", () => {
         completedExecutionCount: snapshot.concurrency.thread.completedExecutionCount,
         failedExecutionCount: snapshot.concurrency.thread.failedExecutionCount,
         activeThreadCount: snapshot.concurrency.thread.activeThreadCount,
+        inFlightThreadCount: snapshot.concurrency.thread.inFlightThreadCount,
+        pendingExecutionCount: snapshot.concurrency.thread.pendingExecutionCount,
+        blockedExecutionCount: snapshot.concurrency.thread.blockedExecutionCount,
+        lastBlockedWaitMs: snapshot.concurrency.thread.lastBlockedWaitMs,
+        p95BlockedWaitMs: snapshot.concurrency.thread.p95BlockedWaitMs,
+        maxBlockedWaitMs: snapshot.concurrency.thread.maxBlockedWaitMs,
       });
       expect(snapshot.concurrency.pushDispatch).toStrictEqual({
         scheduledCheckCount: snapshot.concurrency.pushDispatch.scheduledCheckCount,
@@ -208,6 +214,11 @@ describe("ServerObservabilitySnapshotOwner", () => {
         activeTimerCount: snapshot.concurrency.pushDispatch.activeTimerCount,
         inFlightThreadCount: snapshot.concurrency.pushDispatch.inFlightThreadCount,
       });
+      expect(snapshot.concurrency.pushMutation.pendingExecutionCount).toBeGreaterThanOrEqual(0);
+      expect(snapshot.concurrency.pushMutation.blockedExecutionCount).toBeGreaterThanOrEqual(0);
+      expect(snapshot.concurrency.pushMutation.lastBlockedWaitMs).toBeGreaterThanOrEqual(0);
+      expect(snapshot.concurrency.pushMutation.p95BlockedWaitMs).toBeGreaterThanOrEqual(0);
+      expect(snapshot.concurrency.pushMutation.maxBlockedWaitMs).toBeGreaterThanOrEqual(0);
       expect(snapshot.streaming.eventStream.activeClientCount).toBe(0);
       expect(snapshot.routing.threadAdapterResolver.unregisteredDiscoveryAttemptCount).toBe(0);
       expect(snapshot.routing.threadAdapterResolver.unregisteredDiscoveryMissCacheHitCount).toBe(0);
