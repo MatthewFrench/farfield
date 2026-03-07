@@ -100,6 +100,7 @@ export async function loadThreadListAggregationSnapshot(input: {
   listThreadsTimeoutMs: number;
   withTimeout: ThreadCollectionRouteWithTimeout;
   registerThreadAdapterOwnership: ThreadCollectionRouteThreadOwnershipRegistrar;
+  shouldIncludeThreadInList: (threadId: string) => boolean;
   sortItems: (left: ThreadListItemWithAgentId, right: ThreadListItemWithAgentId) => number;
 }): Promise<{
   mergedData: ThreadListItemWithAgentId[];
@@ -155,6 +156,9 @@ export async function loadThreadListAggregationSnapshot(input: {
     for (const thread of adapterResult.result.data) {
       listedThreadIdentifierSet.add(thread.id);
       input.registerThreadAdapterOwnership(thread.id, adapterResult.adapter.id);
+      if (!input.shouldIncludeThreadInList(thread.id)) {
+        continue;
+      }
       const isLoadedInMemory =
         adapterResult.loadedThreadIdentifierSet !== null
           ? adapterResult.loadedThreadIdentifierSet.has(thread.id)

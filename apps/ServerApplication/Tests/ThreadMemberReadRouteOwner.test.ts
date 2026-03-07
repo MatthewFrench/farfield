@@ -182,6 +182,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
+      markThreadUnreadableForListFiltering: () => {},
+      clearThreadUnreadableForListFiltering: () => {},
       invalidateThreadListAggregationCache: () => {},
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
@@ -288,6 +290,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
+      markThreadUnreadableForListFiltering: () => {},
+      clearThreadUnreadableForListFiltering: () => {},
       invalidateThreadListAggregationCache: () => {},
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
@@ -382,6 +386,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
+      markThreadUnreadableForListFiltering: () => {},
+      clearThreadUnreadableForListFiltering: () => {},
       invalidateThreadListAggregationCache: () => {},
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
@@ -474,6 +480,8 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
+      markThreadUnreadableForListFiltering: () => {},
+      clearThreadUnreadableForListFiltering: () => {},
       invalidateThreadListAggregationCache: () => {},
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
@@ -515,6 +523,9 @@ describe("ThreadMemberReadRouteOwner", () => {
 
     let capturedStatusCode: number | null = null;
     let capturedResponseBody: object | null = null;
+    const markThreadUnreadableForListFiltering = vi.fn<(threadId: string) => void>();
+    const invalidateThreadListAggregationCache =
+      vi.fn<(reason: string, details?: Record<string, string>) => void>();
 
     const dependencies: ThreadMemberRouteDependencies = {
       req: request,
@@ -536,7 +547,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
-      invalidateThreadListAggregationCache: () => {},
+      markThreadUnreadableForListFiltering,
+      clearThreadUnreadableForListFiltering: () => {},
+      invalidateThreadListAggregationCache,
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
@@ -559,6 +572,10 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(capturedResponseBody).toEqual({
       ok: false,
       error: "Thread not loaded in app-server: thread-404",
+      threadId: "thread-404",
+    });
+    expect(markThreadUnreadableForListFiltering).toHaveBeenCalledWith("thread-404");
+    expect(invalidateThreadListAggregationCache).toHaveBeenCalledWith("thread-missing-read", {
       threadId: "thread-404",
     });
   });
@@ -580,6 +597,9 @@ describe("ThreadMemberReadRouteOwner", () => {
 
     let capturedStatusCode: number | null = null;
     let capturedResponseBody: object | null = null;
+    const markThreadUnreadableForListFiltering = vi.fn<(threadId: string) => void>();
+    const invalidateThreadListAggregationCache =
+      vi.fn<(reason: string, details?: Record<string, string>) => void>();
 
     const dependencies: ThreadMemberRouteDependencies = {
       req: request,
@@ -601,7 +621,9 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedStatusCode = statusCode;
         capturedResponseBody = body;
       },
-      invalidateThreadListAggregationCache: () => {},
+      markThreadUnreadableForListFiltering,
+      clearThreadUnreadableForListFiltering: () => {},
+      invalidateThreadListAggregationCache,
       recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
@@ -624,6 +646,10 @@ describe("ThreadMemberReadRouteOwner", () => {
     expect(capturedResponseBody).toEqual({
       ok: false,
       error: "Thread not loaded in app-server: thread-404",
+      threadId: "thread-404",
+    });
+    expect(markThreadUnreadableForListFiltering).toHaveBeenCalledWith("thread-404");
+    expect(invalidateThreadListAggregationCache).toHaveBeenCalledWith("thread-missing-read", {
       threadId: "thread-404",
     });
   });

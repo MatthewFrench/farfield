@@ -105,6 +105,7 @@ export async function handleSidebarThreadSyncRoutes(
         listThreadsTimeoutMs: deps.listThreadsTimeoutMs,
         withTimeout: deps.withTimeout,
         registerThreadAdapterOwnership: deps.registerThreadAdapterOwnership,
+        shouldIncludeThreadInList: deps.shouldIncludeThreadInList,
         sortItems: (left, right) =>
           threadCollectionListQueryOwner.compareThreadListItems(
             left,

@@ -60,6 +60,7 @@ export class ThreadMemberReadRouteOwner {
 
       try {
         const result = await adapter.readThread({ threadId, includeTurns });
+        this.dependencies.clearThreadUnreadableForListFiltering(threadId);
         jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.success, {
           ok: true,
           ...result,
@@ -86,6 +87,7 @@ export class ThreadMemberReadRouteOwner {
 
       try {
         const liveState = await adapter.readLiveState(threadId);
+        this.dependencies.clearThreadUnreadableForListFiltering(threadId);
         jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.success, {
           ok: true,
           threadId,
@@ -124,6 +126,7 @@ export class ThreadMemberReadRouteOwner {
 
       try {
         const streamEvents = await adapter.readStreamEvents(threadId, parsedStreamEventsQuery.data);
+        this.dependencies.clearThreadUnreadableForListFiltering(threadId);
         jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.success, {
           ok: true,
           threadId,
@@ -149,8 +152,12 @@ export class ThreadMemberReadRouteOwner {
     if (!this.isMissingThreadError(error)) {
       return false;
     }
-    const { res, jsonResponse } = this.dependencies;
+    const { res, jsonResponse, invalidateThreadListAggregationCache } = this.dependencies;
     const { threadId } = this.context;
+    this.dependencies.markThreadUnreadableForListFiltering(threadId);
+    invalidateThreadListAggregationCache("thread-missing-read", {
+      threadId,
+    });
     jsonResponse(res, ThreadMemberReadRouteStatusCodeByName.notFound, {
       ok: false,
       error: `Thread not loaded in app-server: ${threadId}`,

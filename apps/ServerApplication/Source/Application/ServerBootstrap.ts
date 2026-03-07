@@ -33,6 +33,7 @@ import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordi
 import { ThreadListAggregationCache } from "../Network/ThreadListAggregationCache.js";
 import { ThreadSendProgressObservabilityOwner } from "../Network/ThreadSendProgressObservabilityOwner.js";
 import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
+import { ThreadUnreadableStateOwner } from "../Network/ThreadUnreadableStateOwner.js";
 import { configureLogger, logger } from "../Shared/Logging/Logger.js";
 import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
 import { ServerLifecycleCoordinator } from "./Bootstrap/ServerLifecycleCoordinator.js";
@@ -186,6 +187,7 @@ const sidebarThreadSyncSnapshotCache = new SidebarThreadSyncSnapshotCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
   runtimeConfiguration.threadListAggregationCacheMaximumEntries,
 );
+const threadUnreadableStateOwner = new ThreadUnreadableStateOwner();
 const threadConcurrencyCoordinator = new ThreadConcurrencyCoordinator();
 const browserSessionAuthOwner = new BrowserSessionAuthOwner({
   cookieName: runtimeConfiguration.apiSessionCookieName,
@@ -393,6 +395,7 @@ const serverRequestHandler = new ServerRequestHandler({
   replayAdapter: readCodexAdapter(),
   threadListAggregationCache,
   sidebarThreadSyncSnapshotCache,
+  threadUnreadableStateOwner,
   threadConcurrencyCoordinator,
   threadSendProgressObservabilityOwner,
   threadStreamDeltaEventPublisher,

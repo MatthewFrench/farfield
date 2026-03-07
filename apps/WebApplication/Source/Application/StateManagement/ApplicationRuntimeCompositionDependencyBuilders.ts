@@ -187,16 +187,16 @@ export function buildApplicationRefreshEffectsInput(
 export function buildSelectedThreadLifecycleEffectsInput(
   context: ApplicationRuntimeCompositionContext,
 ): UseSelectedThreadLifecycleEffectsInput {
-  const { applicationShellState, applicationOwnerDependencies, runtimeRequestHandlers } = context;
+  const {
+    applicationShellState,
+    applicationOwnerDependencies,
+    runtimeRequestHandlers,
+    coreDataLoaders,
+  } = context;
   return {
     selectedThreadId: applicationShellState.selectedThreadId,
     setSelectedThreadId: applicationShellState.setSelectedThreadId,
-    isSelectedThreadKnown: (threadId: string): boolean => {
-      return (
-        applicationShellState.threads.some((thread) => thread.id === threadId) ||
-        applicationShellState.archivedThreads.some((thread) => thread.id === threadId)
-      );
-    },
+    setErrorMessage: applicationShellState.setError,
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
@@ -207,6 +207,7 @@ export function buildSelectedThreadLifecycleEffectsInput(
     setReadThreadState: applicationShellState.setReadThreadState,
     setStreamEvents: applicationShellState.setStreamEvents,
     setIsSelectedThreadLoading: applicationShellState.setIsSelectedThreadLoading,
+    refreshThreadListsAfterSelectedThreadMissing: coreDataLoaders.loadCoreDataTracked,
     unsubscribeThread: async (threadId) => {
       await applicationOwnerDependencies.chatServerClient.unsubscribeThread(threadId);
     },

@@ -31,6 +31,7 @@ import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinato
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 import type { ThreadSendProgressObservabilityOwner } from "./ThreadSendProgressObservabilityOwner.js";
 import type { ThreadStreamDeltaEventPublisher } from "./ThreadStreamDeltaEventPublisher.js";
+import type { ThreadUnreadableStateOwner } from "./ThreadUnreadableStateOwner.js";
 
 const CLIENT_ERROR_RECORDED_LOG_EVENT = "client-error-recorded";
 
@@ -52,6 +53,7 @@ export interface ServerRequestRouteDispatchOwnerDependencies {
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
+  threadUnreadableStateOwner: ThreadUnreadableStateOwner;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   threadStreamDeltaEventPublisher: ThreadStreamDeltaEventPublisher;
@@ -182,6 +184,8 @@ export class ServerRequestRouteDispatchOwner {
         registerThreadAdapterOwnership: (threadId, agentId) => {
           this.deps.threadAdapterResolver.registerThreadOwner(threadId, agentId);
         },
+        shouldIncludeThreadInList: (threadId) =>
+          this.deps.threadUnreadableStateOwner.shouldIncludeThread(threadId),
         listThreadsTimeoutMs: this.deps.threadListAdapterTimeoutMs,
         normalizeOptionalString: this.deps.normalizeOptionalString,
         readJsonBody: this.deps.readJsonBody,
@@ -206,6 +210,8 @@ export class ServerRequestRouteDispatchOwner {
         registerThreadAdapterOwnership: (threadId, agentId) => {
           this.deps.threadAdapterResolver.registerThreadOwner(threadId, agentId);
         },
+        shouldIncludeThreadInList: (threadId) =>
+          this.deps.threadUnreadableStateOwner.shouldIncludeThread(threadId),
         parseInteger: this.deps.parseInteger,
         parseBoolean: this.deps.parseBoolean,
         normalizeOptionalString: this.deps.normalizeOptionalString,
@@ -218,6 +224,12 @@ export class ServerRequestRouteDispatchOwner {
         },
         readJsonBody: this.deps.readJsonBody,
         jsonResponse: this.deps.jsonResponse,
+        markThreadUnreadableForListFiltering: (threadId) => {
+          this.deps.threadUnreadableStateOwner.markThreadUnreadable(threadId);
+        },
+        clearThreadUnreadableForListFiltering: (threadId) => {
+          this.deps.threadUnreadableStateOwner.clearThreadUnreadable(threadId);
+        },
         invalidateThreadListAggregationCache: this.deps.invalidateThreadListAggregationCache,
         recordThreadSendAccepted: (threadId) => {
           this.deps.threadSendProgressObservabilityOwner.recordSendAccepted(threadId, Date.now());

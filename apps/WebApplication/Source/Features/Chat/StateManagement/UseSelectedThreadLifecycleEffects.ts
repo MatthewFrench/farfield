@@ -20,7 +20,7 @@ import type { LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 export interface UseSelectedThreadLifecycleEffectsInput {
   selectedThreadId: string | null;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
-  isSelectedThreadKnown: (threadId: string) => boolean;
+  setErrorMessage: Dispatch<SetStateAction<string>>;
   selectedThreadIdRef: MutableRefObject<string | null>;
   selectedThreadLoadTokenRef: MutableRefObject<number>;
   loadSelectedThreadRef: MutableRefObject<
@@ -32,8 +32,18 @@ export interface UseSelectedThreadLifecycleEffectsInput {
   setReadThreadState: Dispatch<SetStateAction<ChatReadThreadResponse | null>>;
   setStreamEvents: Dispatch<SetStateAction<ChatStreamEventsResponse["events"]>>;
   setIsSelectedThreadLoading: Dispatch<SetStateAction<boolean>>;
+  refreshThreadListsAfterSelectedThreadMissing: () => Promise<void>;
   unsubscribeThread: (threadId: string) => Promise<void>;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
+}
+
+const EMPTY_RUNTIME_ERROR_MESSAGE = "";
+
+function clearSelectedThreadSelection(input: UseSelectedThreadLifecycleEffectsInput): void {
+  const selectedThreadIdRef = input.selectedThreadIdRef;
+  input.setSelectedThreadId(null);
+  selectedThreadIdRef.current = null;
+  input.setErrorMessage(EMPTY_RUNTIME_ERROR_MESSAGE);
 }
 
 export function useSelectedThreadLifecycleEffects(
@@ -148,15 +158,13 @@ export function useSelectedThreadLifecycleEffects(
         }
         const message = toErrorMessage(error);
         if (isThreadNotLoadedReadError(message)) {
-          if (!cachedSnapshotApplied || !input.isSelectedThreadKnown(selectedThreadIdentifier)) {
-            const selectedThreadIdRef = input.selectedThreadIdRef;
-            input.setSelectedThreadId(null);
-            selectedThreadIdRef.current = null;
-            return;
-          }
-          // Preserve explicit user selection when the read path fails. Redirecting to another
-          // thread lets one thread's load failure override the requested view.
-          input.handleRuntimeRequestError(error);
+          clearSelectedThreadSelection(input);
+          void input.refreshThreadListsAfterSelectedThreadMissing().catch((refreshError) => {
+            if (refreshError instanceof Error && isRequestCanceledError(refreshError)) {
+              return;
+            }
+            input.handleRuntimeRequestError(refreshError);
+          });
           return;
         }
         input.handleRuntimeRequestError(error);
@@ -171,8 +179,10 @@ export function useSelectedThreadLifecycleEffects(
     input.handleRuntimeRequestError,
     input.loadSelectedThreadRef,
     input.applyCachedSelectedThreadSnapshot,
+    input.refreshThreadListsAfterSelectedThreadMissing,
     input.selectedThreadId,
     input.setSelectedThreadId,
+    input.setErrorMessage,
     input.selectedThreadIdRef,
     input.selectedThreadLoadTokenRef,
     input.selectedThreadRefreshConcurrencyCoordinator,

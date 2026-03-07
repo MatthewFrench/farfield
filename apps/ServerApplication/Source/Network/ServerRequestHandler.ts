@@ -39,6 +39,7 @@ import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinato
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
 import type { ThreadSendProgressObservabilityOwner } from "./ThreadSendProgressObservabilityOwner.js";
 import type { ThreadStreamDeltaEventPublisher } from "./ThreadStreamDeltaEventPublisher.js";
+import type { ThreadUnreadableStateOwner } from "./ThreadUnreadableStateOwner.js";
 
 const STATUS_CODE_BY_NAME = {
   successOk: 200,
@@ -82,6 +83,7 @@ export interface ServerRequestHandlerDependencies {
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
+  threadUnreadableStateOwner: ThreadUnreadableStateOwner;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   threadStreamDeltaEventPublisher: ThreadStreamDeltaEventPublisher;
@@ -185,6 +187,7 @@ export class ServerRequestHandler {
       replayAdapter: this.deps.replayAdapter,
       threadListAggregationCache: this.deps.threadListAggregationCache,
       sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
+      threadUnreadableStateOwner: this.deps.threadUnreadableStateOwner,
       threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
       threadSendProgressObservabilityOwner: this.deps.threadSendProgressObservabilityOwner,
       threadStreamDeltaEventPublisher: this.deps.threadStreamDeltaEventPublisher,

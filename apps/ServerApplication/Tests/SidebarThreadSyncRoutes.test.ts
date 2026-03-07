@@ -99,6 +99,7 @@ function createMockAgentAdapter(
 function createSidebarThreadSyncDependencies(input: {
   requestBody: JsonValue;
   listEnabledAdapters: () => AgentAdapter[];
+  shouldIncludeThreadInList?: (threadId: string) => boolean;
   onJsonResponse: (statusCode: number, body: object) => void;
   threadListAggregationCache?: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache?: SidebarThreadSyncSnapshotCache;
@@ -117,6 +118,7 @@ function createSidebarThreadSyncDependencies(input: {
       input.sidebarThreadSyncSnapshotCache ?? new SidebarThreadSyncSnapshotCache(1_000, 8),
     listEnabledAdapters: input.listEnabledAdapters,
     registerThreadAdapterOwnership: () => {},
+    shouldIncludeThreadInList: input.shouldIncludeThreadInList ?? (() => true),
     listThreadsTimeoutMs: 7_500,
     normalizeOptionalString: (value) => {
       if (value === null) {
@@ -307,6 +309,63 @@ describe("handleSidebarThreadSyncRoutes", () => {
       expect.objectContaining({
         id: "thread_active",
         isLoadedInMemory: true,
+      }),
+    ]);
+  });
+
+  it("filters unreadable thread identifiers from sidebar sync snapshots", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_visible",
+            preview: "visible",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          {
+            id: "thread_unreadable",
+            preview: "unreadable",
+            createdAt: 3,
+            updatedAt: 4,
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    const handled = await handleSidebarThreadSyncRoutes(
+      createSidebarThreadSyncDependencies({
+        requestBody: {
+          archived: true,
+          limit: 20,
+          maxPages: 2,
+          sortKey: "updated_at",
+          cwd: null,
+          knownSnapshotVersion: null,
+        },
+        listEnabledAdapters: () => [adapter],
+        shouldIncludeThreadInList: (threadId) => threadId !== "thread_unreadable",
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    const response = FarfieldSidebarThreadSyncResponseSchema.parse(capturedBody);
+    expect(response.syncStatus).toBe("snapshot");
+    if (response.syncStatus !== "snapshot") {
+      throw new Error("Expected snapshot sidebar sync response");
+    }
+    expect(response.threadList.data).toEqual([
+      expect.objectContaining({
+        id: "thread_visible",
       }),
     ]);
   });

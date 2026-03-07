@@ -25,6 +25,7 @@ export interface SidebarThreadSyncRouteDependencies {
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   listEnabledAdapters: () => AgentAdapter[];
   registerThreadAdapterOwnership: (threadId: string, agentId: AgentId) => void;
+  shouldIncludeThreadInList: (threadId: string) => boolean;
   listThreadsTimeoutMs: number;
   normalizeOptionalString: (value: string | null) => string | null;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;

@@ -112,6 +112,8 @@ export interface ThreadMemberRouteDependencies {
   resolveAdapterForThread: (threadId: string) => Promise<ResolvedThreadAdapterResult>;
   readJsonBody: (req: IncomingMessage) => Promise<JsonValue>;
   jsonResponse: (res: ServerResponse, statusCode: number, body: object) => void;
+  markThreadUnreadableForListFiltering: (threadId: string) => void;
+  clearThreadUnreadableForListFiltering: (threadId: string) => void;
   invalidateThreadListAggregationCache: (
     reason: string,
     details?: Record<string, JsonValue>,

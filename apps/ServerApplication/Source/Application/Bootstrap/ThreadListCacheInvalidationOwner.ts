@@ -26,6 +26,7 @@ const ThreadListInvalidationReasonValues = [
   "thread-review-started",
   "thread-unsubscribed",
   "thread-name-set",
+  "thread-missing-read",
   "thread-archived",
   "thread-unarchived",
 ] as const;
@@ -46,6 +47,7 @@ const ThreadListInvalidationScopeByReason: Readonly<
   "thread-review-started": "active",
   "thread-unsubscribed": "active",
   "thread-name-set": "all",
+  "thread-missing-read": "all",
   "thread-archived": "all",
   "thread-unarchived": "all",
 };

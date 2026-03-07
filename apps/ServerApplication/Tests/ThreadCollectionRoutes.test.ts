@@ -136,6 +136,7 @@ function createCollectionRouteDependencies(input: {
   url: URL;
   defaultWorkspace?: string;
   listEnabledAdapters: () => AgentAdapter[];
+  shouldIncludeThreadInList?: (threadId: string) => boolean;
   resolveCreateThreadAdapter?: ResolveCreateThreadAdapter;
   readJsonBody?: (req: IncomingMessage) => Promise<JsonValue>;
   onJsonResponse: (statusCode: number, body: object) => void;
@@ -157,6 +158,7 @@ function createCollectionRouteDependencies(input: {
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
     listEnabledAdapters: input.listEnabledAdapters,
     registerThreadAdapterOwnership: () => {},
+    shouldIncludeThreadInList: input.shouldIncludeThreadInList ?? (() => true),
     parseInteger: () => {
       throw new Error("ThreadCollectionRoutes should use schema parsing for query integers");
     },
@@ -758,6 +760,7 @@ describe("handleThreadCollectionRoutes", () => {
       createCollectionRouteDependencies({
         url: buildThreadCollectionRouteUrl("?limit=10"),
         listEnabledAdapters: () => [adapter],
+        shouldIncludeThreadInList: (threadId) => threadId !== "thread_unreadable",
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
@@ -809,6 +812,7 @@ describe("handleThreadCollectionRoutes", () => {
       createCollectionRouteDependencies({
         url: buildThreadCollectionRouteUrl("?limit=10"),
         listEnabledAdapters: () => [adapter],
+        shouldIncludeThreadInList: (threadId) => threadId !== "thread_unreadable",
         onJsonResponse: (statusCode, body) => {
           capturedStatusCode = statusCode;
           capturedBody = body;
@@ -827,6 +831,57 @@ describe("handleThreadCollectionRoutes", () => {
           isLoadedInMemory: true,
         },
       ],
+    });
+  });
+
+  it("filters unreadable thread identifiers from collection responses", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_visible",
+            preview: "visible",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          {
+            id: "thread_unreadable",
+            preview: "unreadable",
+            createdAt: 3,
+            updatedAt: 4,
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        shouldIncludeThreadInList: (threadId) => threadId !== "thread_unreadable",
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_visible",
+        },
+      ],
+    });
+    expect(capturedBody).not.toMatchObject({
+      data: [expect.objectContaining({ id: "thread_unreadable" })],
     });
   });
 

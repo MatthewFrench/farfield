@@ -283,6 +283,7 @@ async function handleThreadCollectionListRoute(
         listThreadsTimeoutMs,
         withTimeout,
         registerThreadAdapterOwnership,
+        shouldIncludeThreadInList: deps.shouldIncludeThreadInList,
         sortItems: (left, right) =>
           threadCollectionListQueryOwner.compareThreadListItems(left, right, sortKey),
       }),

@@ -791,6 +791,50 @@ Verification evidence:
 6. live remote verification on `https://farfield.matthewfrench.io` after restart showed `POST /api/sidebar/threads/sync` returning `activeCount=49`, `archivedCount=188`, and `duplicatedThreadIds=[]`
 7. live remote verification also opened `https://farfield.matthewfrench.io/threads/019cc584-3d22-7500-91f4-37199ccb1ade` from the active sidebar without a visible `runtime-request-error`, and `/api/debug/client-errors?limit=10` only contained restart-window `503` entries
 
+### March 7, 2026: Clear Stale Archived Thread Selections And Prune Proven-Missing Entries
+
+Changed owner modules:
+
+1. [UseSelectedThreadLifecycleEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects.ts)
+2. [ApplicationRuntimeCompositionDependencyBuilders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationRuntimeCompositionDependencyBuilders.ts)
+3. [UseSelectedThreadLifecycleEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLifecycleEffects.test.tsx)
+4. [ThreadUnreadableStateOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ThreadUnreadableStateOwner.ts)
+5. [ThreadMemberReadRouteOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberReadRouteOwner.ts)
+6. [ThreadListAggregationSnapshotLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadListAggregationSnapshotLoader.ts)
+7. [ServerRequestRouteDispatchOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestRouteDispatchOwner.ts)
+8. [ServerRequestHandler.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerRequestHandler.ts)
+9. [ServerBootstrap.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/ServerBootstrap.ts)
+10. [ThreadCollectionRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts)
+11. [SidebarThreadSyncRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/SidebarThreadSyncRoutes.test.ts)
+12. [ThreadMemberReadRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts)
+
+Implementation summary:
+
+1. selected-thread lifecycle recovery now treats plain read `404` and `thread not loaded` responses as stale selection even when the bad thread still exists in cached sidebar state
+2. the lifecycle owner clears the selected thread, clears the runtime error banner, and refreshes thread lists instead of preserving the stale archived selection and surfacing `runtime-request-error`
+3. the server now records thread IDs proven unreadable by direct read routes and filters them out of later `/api/threads` and `/api/sidebar/threads/sync` projections until a later successful direct read clears them
+4. missing-thread reads now invalidate thread-list caches with explicit all-scope invalidation so the archived sidebar can drop the stale entry promptly
+
+User-visible impact:
+
+1. tapping a stale archived thread no longer leaves the app stuck behind the red `runtime-request-error` banner
+2. after that stale thread is proven missing once, it is pruned out of archived sidebar data instead of remaining tappable on later reloads
+3. mobile remote sessions recover back to `No thread selected` / the root route instead of preserving a dead archived thread route
+
+Verification evidence:
+
+1. [UseSelectedThreadLifecycleEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLifecycleEffects.test.tsx)
+2. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+3. [ThreadCollectionRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts)
+4. [SidebarThreadSyncRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/SidebarThreadSyncRoutes.test.ts)
+5. [ThreadMemberReadRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts)
+6. [ThreadListCacheInvalidationOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadListCacheInvalidationOwner.test.ts)
+7. `bun run --cwd apps/WebApplication typecheck`
+8. `bun run --cwd apps/ServerApplication typecheck`
+9. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=5005`, `6777`, `6540`, one `149ms` freeze window, and zero new sentinel API/banner/page errors
+10. live remote verification on `https://farfield.matthewfrench.io/threads/019cc17a-1b65-7ef3-9c15-e7cfc6494273` now redirects to `/`, shows no selected thread, and `/api/debug/client-errors?limit=10` stays empty after the correction
+11. live remote verification now reports `archivedHasMissingThread=false` for `019cc17a-1b65-7ef3-9c15-e7cfc6494273` in archived sidebar sync after the stale route is exercised once
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

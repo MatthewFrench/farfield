@@ -37,6 +37,7 @@ export interface ThreadCollectionRouteDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
   listEnabledAdapters: () => AgentAdapter[];
   registerThreadAdapterOwnership: (threadId: string, agentId: AgentId) => void;
+  shouldIncludeThreadInList: (threadId: string) => boolean;
   parseInteger: (value: string | null, defaultValue: number) => number;
   parseBoolean: (value: string | null, defaultValue: boolean) => boolean;
   normalizeOptionalString: (value: string | null) => string | null;
