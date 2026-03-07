@@ -8,6 +8,7 @@ import {
 const INITIAL_ASYNCHRONOUS_REQUEST_SEQUENCE = 0;
 const THREAD_LIST_PRESENTATION_WORKER_NON_ERROR_REJECTION_MESSAGE =
   "Thread list presentation worker failed with a non-error rejection.";
+type ThreadListPresentationState = ApplicationDerivedState["threadListPresentationState"];
 
 interface UseThreadListPresentationDerivedStateInput {
   threads: UseApplicationDerivedStateInput["threads"];
@@ -17,20 +18,10 @@ interface UseThreadListPresentationDerivedStateInput {
   threadListStateController: UseApplicationDerivedStateInput["threadListStateController"];
 }
 
-function createInitialThreadListPresentationState(): ApplicationDerivedState["threadListPresentationState"] {
-  return {
-    selectedThread: null,
-    activeProjectGroups: [],
-    archivedProjectGroups: [],
-    archivedThreadIdentifiers: new Set<string>(),
-    archivedSectionThreadCount: 0,
-  };
-}
-
 export function useThreadListPresentationDerivedState(
   input: UseThreadListPresentationDerivedStateInput,
 ): {
-  threadListPresentationState: ApplicationDerivedState["threadListPresentationState"];
+  threadListPresentationState: ThreadListPresentationState;
   threadListPresentationError: Error | null;
 } {
   const {
@@ -40,18 +31,26 @@ export function useThreadListPresentationDerivedState(
     threadListPresentationWorkerOwner,
     threadListStateController,
   } = input;
+  const immediateThreadListPresentationState = useMemo<ThreadListPresentationState>(
+    () =>
+      threadListStateController.readThreadListPresentationState({
+        threads,
+        archivedThreads,
+        selectedThreadIdentifier: selectedThreadId,
+      }),
+    [archivedThreads, selectedThreadId, threadListStateController, threads],
+  );
   const threadListPresentationRequestSequenceReference = useRef<number>(
     INITIAL_ASYNCHRONOUS_REQUEST_SEQUENCE,
   );
   const [asynchronousThreadListPresentationState, setAsynchronousThreadListPresentationState] =
-    useState<ApplicationDerivedState["threadListPresentationState"]>(
-      createInitialThreadListPresentationState,
-    );
+    useState<ThreadListPresentationState | null>(null);
   const [asynchronousThreadListPresentationError, setAsynchronousThreadListPresentationError] =
     useState<Error | null>(null);
 
   useEffect(() => {
     if (!threadListPresentationWorkerOwner) {
+      setAsynchronousThreadListPresentationState(null);
       return;
     }
 
@@ -99,28 +98,11 @@ export function useThreadListPresentationDerivedState(
     };
   }, [archivedThreads, selectedThreadId, threadListPresentationWorkerOwner, threads]);
 
-  const inThreadThreadListPresentationState = useMemo<
-    ApplicationDerivedState["threadListPresentationState"] | null
-  >(() => {
-    if (threadListPresentationWorkerOwner) {
-      return null;
-    }
-    return threadListStateController.readThreadListPresentationState({
-      threads,
-      archivedThreads,
-      selectedThreadIdentifier: selectedThreadId,
-    });
-  }, [
-    archivedThreads,
-    selectedThreadId,
-    threadListPresentationWorkerOwner,
-    threadListStateController,
-    threads,
-  ]);
-
   return {
     threadListPresentationState:
-      inThreadThreadListPresentationState ?? asynchronousThreadListPresentationState,
+      threadListPresentationWorkerOwner === null
+        ? immediateThreadListPresentationState
+        : (asynchronousThreadListPresentationState ?? immediateThreadListPresentationState),
     threadListPresentationError: asynchronousThreadListPresentationError,
   };
 }

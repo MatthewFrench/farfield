@@ -893,6 +893,31 @@ Verification evidence:
 4. `bun run --cwd apps/WebApplication typecheck`
 5. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2158`, `6741`, `11752`, zero new sentinel API/banner/page errors, and no refresh-path banner regressions
 
+### March 7, 2026: Sidebar No Longer Starts Empty While Thread Presentation Worker Runs
+
+Changed owner modules:
+
+1. [UseThreadListPresentationDerivedState.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseThreadListPresentationDerivedState.ts)
+2. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+
+Implementation summary:
+
+1. worker-backed thread-list presentation now computes an immediate in-thread presentation state instead of starting from an empty placeholder state
+2. the worker result still applies later, but it no longer gates the initial existence of sidebar project groups and rows
+3. this removes one source of sidebar row pop-in where items appeared only after the presentation worker responded
+
+User-visible impact:
+
+1. sidebar thread rows and project groups appear immediately from current app state instead of popping in from an empty baseline
+2. mobile sidebar scrolling and initial reveal should feel less like the list is rendering late while content catches up asynchronously
+3. this reduces one avoidable main-thread/UI perception issue without weakening the worker optimization path
+
+Verification evidence:
+
+1. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+2. `bun run --cwd apps/WebApplication typecheck`
+3. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1842`, `7947`, `6709`, zero new sentinel API/banner/page errors, and freeze summary `count=1 totalFreezeMs=150`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

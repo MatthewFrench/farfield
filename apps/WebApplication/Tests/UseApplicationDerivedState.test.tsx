@@ -825,6 +825,37 @@ describe("useApplicationDerivedState", () => {
     expect(snapshotReference.current?.activeProjectGroups[0]?.key).toBe("new-project");
   });
 
+  it("exposes immediate thread-list presentation state before worker projection resolves", async () => {
+    const threadListWorkerOwner = new TestThreadListPresentationWorkerOwner();
+    const input: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      threads: [
+        {
+          ...buildThreadListItem("thread-immediate"),
+          cwd: "/workspace/immediate",
+          path: "/workspace/immediate",
+        },
+      ],
+      selectedThreadId: "thread-immediate",
+      threadListPresentationWorkerOwner: threadListWorkerOwner,
+    };
+    const snapshotReference: { current: ApplicationDerivedState | null } = {
+      current: null,
+    };
+
+    render(
+      <Harness
+        input={input}
+        onDerivedState={(derivedState) => {
+          snapshotReference.current = derivedState;
+        }}
+      />,
+    );
+
+    expect(snapshotReference.current?.activeProjectGroups.length).toBeGreaterThan(0);
+    expect(snapshotReference.current?.selectedThread?.id).toBe("thread-immediate");
+  });
+
   it("keeps the newest conversation flatten projection when an older response resolves later", async () => {
     const conversationItemFlattener = new ConversationItemFlattener();
     const conversationItemFlatteningWorkerOwner = new TestConversationItemFlatteningWorkerOwner();
