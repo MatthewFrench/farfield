@@ -1,3 +1,7 @@
+import {
+  beginGlobalPerformanceOperation,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 import { ThreadGroupSelectors } from "../DomainModel/ThreadGroupSelectors";
 import type { ThreadListItem, ThreadProjectGroup } from "../DomainModel/ThreadGroupTypes";
 import {
@@ -29,6 +33,8 @@ interface ProjectOrderEntry {
   originalIndex: number;
 }
 
+const THREAD_LIST_PRESENTATION_OPERATION = "thread-list-presentation-in-thread";
+
 /**
  * Owns presentational projections for active and archived thread list sections.
  * Grouping and merged archived counts are computed once here so UI owners consume a strict shape.
@@ -43,6 +49,11 @@ export class ThreadListPresentationStateResolver {
   }
 
   public readState(input: ThreadListPresentationStateInput): ThreadListPresentationStateResult {
+    const operationToken = beginGlobalPerformanceOperation(THREAD_LIST_PRESENTATION_OPERATION, {
+      activeThreadCount: input.threads.length,
+      archivedThreadCount: input.archivedThreads.length,
+      hasSelectedThreadIdentifier: input.selectedThreadIdentifier !== null,
+    });
     const selectedThread =
       input.threads.find((thread) => thread.id === input.selectedThreadIdentifier) ?? null;
     const groupedThreadsByProject = this.activeThreadProjectGroupingStateOwner.readProjectGroups(
@@ -68,13 +79,20 @@ export class ThreadListPresentationStateResolver {
     const archivedSectionThreadIdentifiers =
       this.buildGroupThreadIdentifierSet(archivedProjectGroups);
 
-    return {
+    const result = {
       selectedThread,
       activeProjectGroups,
       archivedProjectGroups,
       archivedThreadIdentifiers,
       archivedSectionThreadCount: archivedSectionThreadIdentifiers.size,
     };
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      activeProjectGroupCount: activeProjectGroups.length,
+      archivedProjectGroupCount: archivedProjectGroups.length,
+      archivedSectionThreadCount: archivedSectionThreadIdentifiers.size,
+      hasSelectedThread: selectedThread !== null,
+    });
+    return result;
   }
 
   public readComputationStatsSnapshot(): ThreadListPresentationComputationStatsSnapshot {

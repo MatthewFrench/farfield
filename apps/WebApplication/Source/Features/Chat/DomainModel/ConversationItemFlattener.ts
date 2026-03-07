@@ -1,5 +1,9 @@
 import { ThreadTurnSchema, TurnItemSchema } from "@farfield/protocol";
 import { z } from "zod";
+import {
+  beginGlobalPerformanceOperation,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 
 export type ConversationTurn = z.infer<typeof ThreadTurnSchema>;
 export type ConversationTurnItem = z.infer<typeof TurnItemSchema>;
@@ -9,6 +13,7 @@ const TOP_SPACING_FOR_NEW_TURN_PIXELS = 16;
 const TOP_SPACING_FOR_CONTINUING_TURN_PIXELS = 10;
 const TURN_STATUS_IN_PROGRESS = "in-progress";
 const TURN_STATUS_IN_PROGRESS_CAMEL_CASE = "inProgress";
+const CONVERSATION_ITEM_FLATTEN_OPERATION = "conversation-item-flatten-in-thread";
 
 export interface FlattenedConversationItem {
   key: string;
@@ -64,6 +69,10 @@ export class ConversationItemFlattener {
     turns: ConversationTurn[],
     isGenerating: boolean,
   ): FlattenedConversationItem[] {
+    const operationToken = beginGlobalPerformanceOperation(CONVERSATION_ITEM_FLATTEN_OPERATION, {
+      turnCount: turns.length,
+      isGenerating,
+    });
     const flattened: FlattenedConversationItem[] = [];
     let previousRenderedTurnIndex = -1;
 
@@ -105,13 +114,20 @@ export class ConversationItemFlattener {
 
     const lastItemIndex = flattened.length - 1;
     if (lastItemIndex < 0) {
+      completeGlobalPerformanceOperation(operationToken, "succeeded", {
+        flattenedItemCount: 0,
+      });
       return flattened;
     }
 
-    return flattened.map((flattenedItem, flattenedItemIndex) => ({
+    const result = flattened.map((flattenedItem, flattenedItemIndex) => ({
       ...flattenedItem,
       isLast: flattenedItemIndex === lastItemIndex,
     }));
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      flattenedItemCount: result.length,
+    });
+    return result;
   }
 
   private shouldRenderConversationItem(item: ConversationTurnItem): boolean {

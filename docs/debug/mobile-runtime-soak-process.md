@@ -948,6 +948,43 @@ Verification evidence:
 5. `bun run --cwd apps/WebApplication typecheck`
 6. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2710`, `7304`, `6108`, zero new sentinel API/banner/page errors, and freeze summary `count=1 totalFreezeMs=167`
 
+### March 7, 2026: Former Worker Work Now Emits Named In-Thread Performance Operations
+
+Changed owner modules:
+
+1. [EventStreamRefreshDecisionEngine.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/EventStreamRefreshDecisionEngine.ts)
+2. [UseApplicationDebugIssueDerivedState.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationDebugIssueDerivedState.ts)
+3. [ConversationItemFlattener.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DomainModel/ConversationItemFlattener.ts)
+4. [ThreadListPresentationStateResolver.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver.ts)
+5. [FarfieldHttpResponseDecodeOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Shared/Transport/FarfieldHttpResponseDecodeOwner.ts)
+
+Implementation summary:
+
+1. the client performance probe now records named in-thread operations for the work that was previously delegated to optional web workers
+2. current operation names include:
+   `event-stream-refresh-decision-in-thread`
+   `debug-issue-derive-in-thread`
+   `conversation-item-flatten-in-thread`
+   `thread-list-presentation-in-thread`
+   `http-response-decode-in-thread`
+3. this makes freeze artifacts and manual browser probe snapshots easier to correlate with concrete in-thread computation surfaces instead of only broad request or commit timing
+
+User-visible impact:
+
+1. no direct user-facing behavior changed from this telemetry alone
+2. freeze debugging is easier because formerly worker-owned work now appears under explicit names in the client performance probe
+
+Verification evidence:
+
+1. [EventStreamRefreshDecisionEngine.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/EventStreamRefreshDecisionEngine.test.ts)
+2. [FarfieldHttpResponseDecodeWorkerOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/FarfieldHttpResponseDecodeWorkerOwner.test.ts)
+3. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+4. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+5. [ThreadListPane.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadListPane.test.tsx)
+6. [UseApplicationShellViewProperties.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts)
+7. `bun run --cwd apps/WebApplication typecheck`
+8. manual browser probe on Saturday, March 7, 2026, showed client performance operation names including `conversation-item-flatten-in-thread`, `debug-issue-derive-in-thread`, `event-stream-refresh-decision-in-thread`, and `http-response-decode-in-thread`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

@@ -3,6 +3,10 @@ import {
   type FarfieldThreadStreamDelta,
 } from "@farfield/protocol";
 import { z } from "zod";
+import {
+  beginGlobalPerformanceOperation,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
 
 const DEBUG_ACTIVE_TAB = "debug";
 const EVENT_TYPE_RUNTIME_STATE_CHANGED = "runtime-state-changed";
@@ -117,6 +121,7 @@ const EVENT_STREAM_DELTA_THREAD_IDENTIFIER_ENVELOPE_SCHEMA = z
       .passthrough(),
   })
   .strict();
+const EVENT_STREAM_REFRESH_DECISION_OPERATION = "event-stream-refresh-decision-in-thread";
 
 export interface EventStreamRefreshDecisionInput {
   activeTab: "chat" | "debug";
@@ -150,6 +155,14 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
   }
 
   public readDecision(input: EventStreamRefreshDecisionInput): EventStreamRefreshDecision {
+    const operationToken = beginGlobalPerformanceOperation(
+      EVENT_STREAM_REFRESH_DECISION_OPERATION,
+      {
+        activeTab: input.activeTab,
+        hasSelectedThreadId: input.selectedThreadId !== null,
+        eventDataLength: input.eventData.length,
+      },
+    );
     let refreshCore = false;
     let refreshHistory = false;
     let refreshSelectedThread = false;
@@ -257,12 +270,20 @@ export class EventStreamRefreshDecisionEngine implements EventStreamRefreshDecis
       refreshHistory = refreshHistoryForDebugTab;
     }
 
-    return {
+    const decision = {
       refreshCore,
       refreshHistory,
       refreshSelectedThread,
       refreshNotificationProjections,
       threadStreamDelta,
     };
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      refreshCore,
+      refreshHistory,
+      refreshSelectedThread,
+      refreshNotificationProjections,
+      hasThreadStreamDelta: threadStreamDelta !== null,
+    });
+    return decision;
   }
 }

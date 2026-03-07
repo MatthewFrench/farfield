@@ -4,6 +4,10 @@ import {
   StructuredDataValueSchema,
 } from "@/Shared/Contracts/StructuredDataValue";
 import {
+  beginGlobalPerformanceOperation,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
+import {
   type FarfieldHttpResponseDecodeWorkerRequest,
   type FarfieldHttpResponseDecodeWorkerResponse,
   safeParseFarfieldHttpResponseDecodeWorkerResponse,
@@ -57,6 +61,7 @@ const WORKER_FAILURE_RESPONSE_ERROR_MESSAGE_PREFIX =
 const WORKER_INVALID_RESPONSE_ERROR_MESSAGE_PREFIX =
   "Farfield HTTP response decode worker returned an invalid response";
 const INITIAL_REQUEST_IDENTIFIER = 1;
+const HTTP_RESPONSE_DECODE_OPERATION = "http-response-decode-in-thread";
 
 function buildWorkerResponseErrorMessage(reason: string): string {
   return `${WORKER_RESPONSE_ERROR_MESSAGE_PREFIX}: ${reason}`;
@@ -68,41 +73,60 @@ export interface FarfieldHttpResponseDecodeReader {
 
 export class FarfieldHttpResponseDecodeInThreadOwner implements FarfieldHttpResponseDecodeReader {
   public async readDecodedPayload(parseText: string): Promise<FarfieldHttpResponseDecodeResult> {
+    const operationToken = beginGlobalPerformanceOperation(HTTP_RESPONSE_DECODE_OPERATION, {
+      parseTextLength: parseText.length,
+    });
     let rawJsonData: StructuredDataValue;
     try {
       rawJsonData = JSON.parse(parseText);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      return {
+      const result: FarfieldHttpResponseDecodeFailure = {
         kind: "failure",
         reasonKind: "invalid-json",
         reason,
       };
+      completeGlobalPerformanceOperation(operationToken, "failed", {
+        reasonKind: result.reasonKind,
+      });
+      return result;
     }
 
     const parsedStructuredData = StructuredDataValueSchema.safeParse(rawJsonData);
     if (!parsedStructuredData.success) {
-      return {
+      const result: FarfieldHttpResponseDecodeFailure = {
         kind: "failure",
         reasonKind: "invalid-structured-data",
         reason: parsedStructuredData.error.message,
       };
+      completeGlobalPerformanceOperation(operationToken, "failed", {
+        reasonKind: result.reasonKind,
+      });
+      return result;
     }
 
     const parsedEnvelope = ApiEnvelopeSchema.safeParse(parsedStructuredData.data);
     if (!parsedEnvelope.success) {
-      return {
+      const result: FarfieldHttpResponseDecodeFailure = {
         kind: "failure",
         reasonKind: "invalid-envelope",
         reason: parsedEnvelope.error.message,
       };
+      completeGlobalPerformanceOperation(operationToken, "failed", {
+        reasonKind: result.reasonKind,
+      });
+      return result;
     }
 
-    return {
+    const result: FarfieldHttpResponseDecodeSuccess = {
       kind: "success",
       data: parsedStructuredData.data,
       envelopeOk: parsedEnvelope.data.ok,
     };
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      envelopeOk: result.envelopeOk,
+    });
+    return result;
   }
 }
 

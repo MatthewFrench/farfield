@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DebugIssueDerivationResult } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerContracts";
 import { DEBUG_ISSUE_DERIVATION_WORKER_DISPOSED_ERROR_MESSAGE } from "@/Features/Debugging/StateManagement/DebugIssueDerivationWorkerOwner";
 import {
+  beginGlobalPerformanceOperation,
+  completeGlobalPerformanceOperation,
+} from "@/Shared/Performance/ClientPerformanceFreezeProbeOwner";
+import {
   type ApplicationDerivedState,
   type UseApplicationDerivedStateInput,
 } from "./UseApplicationDerivedStateContracts";
@@ -35,6 +39,7 @@ const INITIAL_ASYNCHRONOUS_DERIVED_STATE: ApplicationDebugIssueDerivedState = {
 };
 
 const INITIAL_REQUEST_SEQUENCE = 0;
+const DEBUG_ISSUE_DERIVATION_OPERATION = "debug-issue-derive-in-thread";
 
 function mapAsynchronousResultToDerivedState(
   result: DebugIssueDerivationResult,
@@ -117,6 +122,12 @@ export function useApplicationDebugIssueDerivedState(
       return null;
     }
 
+    const operationToken = beginGlobalPerformanceOperation(DEBUG_ISSUE_DERIVATION_OPERATION, {
+      debugErrorCount: input.debugErrors.length,
+      historyEntryCount: input.history.length,
+      filterQueryLength: input.debugIssueFilterQuery.length,
+    });
+
     const debugErrorIssues = input.debugIssueStateResolver.readDebugErrorIssues(input.debugErrors);
     const debugWarningIssues = input.debugIssueStateResolver.readDebugWarningIssues(input.history);
     const runtimeRequestErrorOperationMetrics =
@@ -135,7 +146,7 @@ export function useApplicationDebugIssueDerivedState(
       selectedIssueIdentifier: input.selectedDebugIssueId,
     });
 
-    return {
+    const result = {
       debugErrorIssues,
       debugWarningIssues,
       debugIssues,
@@ -143,6 +154,12 @@ export function useApplicationDebugIssueDerivedState(
       filteredDebugIssues,
       selectedDebugIssue,
     };
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      debugIssueCount: debugIssues.length,
+      filteredDebugIssueCount: filteredDebugIssues.length,
+      hasSelectedDebugIssue: selectedDebugIssue !== null,
+    });
+    return result;
   }, [
     debugIssueDerivationWorkerOwner,
     input.debugErrors,
