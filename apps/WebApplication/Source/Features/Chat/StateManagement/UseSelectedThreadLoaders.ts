@@ -24,7 +24,10 @@ import {
 import { ConversationSyncSignatureBuilder } from "../DomainModel/ConversationSyncSignatureBuilder";
 import { resolveReadCapabilitiesForThread } from "../DomainModel/SelectedThreadReadCapabilitiesResolver";
 import { ReadThreadStateMerger } from "./ReadThreadStateMerger";
-import { SelectedThreadDataRefreshCoordinator } from "./SelectedThreadDataRefreshCoordinator";
+import {
+  SelectedThreadDataRefreshCoordinator,
+  type SelectedThreadDataRefreshResult,
+} from "./SelectedThreadDataRefreshCoordinator";
 import {
   SelectedThreadRefreshConcurrencyCoordinator,
   type SelectedThreadRefreshRequest,
@@ -146,6 +149,23 @@ function shouldUseStreamDeltaRefreshWithoutReadThread(
   return input.streamEventsSinceSequence !== null;
 }
 
+function shouldReissueSelectedThreadLoadWithReadThread(input: {
+  includeReadThreadRequested: boolean;
+  includeReadThreadUsedForRefresh: boolean;
+  snapshot: SelectedThreadDataRefreshResult;
+}): boolean {
+  if (!input.includeReadThreadRequested) {
+    return false;
+  }
+  if (input.includeReadThreadUsedForRefresh) {
+    return false;
+  }
+  return (
+    input.snapshot.liveStateSnapshot.conversationState === null &&
+    input.snapshot.readThreadSnapshot === null
+  );
+}
+
 /**
  * Thin composition hook for selected-thread loading orchestration.
  * Mutable state updates and cursor tracking are owned by SelectedThreadSnapshotStateOwner.
@@ -240,17 +260,35 @@ export function useSelectedThreadLoaders(
         ...(signal ? { signal } : {}),
       });
 
+      const selectedThreadSnapshot = shouldReissueSelectedThreadLoadWithReadThread({
+        includeReadThreadRequested: includeReadThread,
+        includeReadThreadUsedForRefresh: includeReadThreadForRefresh,
+        snapshot,
+      })
+        ? await input.selectedThreadDataRefreshCoordinator.readSnapshot({
+            threadId,
+            includeTurns,
+            includeReadThread,
+            canReadLiveState: readCapabilities.canReadLiveState,
+            canReadStreamEvents: readCapabilities.canReadStreamEvents,
+            streamEventsSinceSequence: null,
+            baselineLiveStateSnapshot: null,
+            chatClient: input.chatServerClient,
+            ...(signal ? { signal } : {}),
+          })
+        : snapshot;
+
       if (snapshotStateOwner.shouldSkipSnapshotApply(threadId, signal)) {
         return;
       }
 
       snapshotStateOwner.applySnapshots({
         threadId,
-        liveStateSnapshot: snapshot.liveStateSnapshot,
-        streamEventsSnapshot: snapshot.streamEventsSnapshot,
-        streamEventsSinceSequenceUsed: snapshot.streamEventsSinceSequenceUsed,
-        readThreadSnapshot: snapshot.readThreadSnapshot,
-        includeTurnsUsedForRead: snapshot.includeTurnsUsedForRead,
+        liveStateSnapshot: selectedThreadSnapshot.liveStateSnapshot,
+        streamEventsSnapshot: selectedThreadSnapshot.streamEventsSnapshot,
+        streamEventsSinceSequenceUsed: selectedThreadSnapshot.streamEventsSinceSequenceUsed,
+        readThreadSnapshot: selectedThreadSnapshot.readThreadSnapshot,
+        includeTurnsUsedForRead: selectedThreadSnapshot.includeTurnsUsedForRead,
       });
     },
     [

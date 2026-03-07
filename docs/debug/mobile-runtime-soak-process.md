@@ -536,6 +536,27 @@ Verification evidence:
 1. [ThreadOwnership.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadOwnership.test.ts)
 2. [ThreadSidebarSyncApi.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadSidebarSyncApi.test.ts)
 
+### March 7, 2026: Selected Thread Reissues Full Read When Delta-Only Refresh Returns No Snapshot
+
+Changed owner modules:
+
+1. [UseSelectedThreadLoaders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseSelectedThreadLoaders.ts)
+2. [UseSelectedThreadLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLoaders.test.tsx)
+
+Implementation summary:
+
+1. selected-thread loading now retries once with an explicit thread read when the delta-only refresh path returns neither live conversation state nor a read-thread snapshot
+2. this keeps the incremental path for healthy stream-cursor cases, but avoids settling into a route-selected thread with no hydrated thread state after restart or stale-cache recovery
+
+User-visible impact:
+
+1. after a dev-stack restart, a thread URL is less likely to degrade into a `No thread selected` style state driven only by `stream-events?sinceSequence=0`
+2. manual thread re-entry can recover with a full read instead of remaining stuck on empty selected-thread state
+
+Verification evidence:
+
+1. [UseSelectedThreadLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseSelectedThreadLoaders.test.tsx)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
