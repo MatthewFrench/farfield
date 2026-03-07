@@ -93,6 +93,7 @@ export interface UseChatActionHandlersInput {
   setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   selectedThreadIdRef: MutableRefObject<string | null>;
+  eventsConnectedRef: MutableRefObject<boolean>;
   pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   readLastAppliedModeSignature: () => string;
   writeLastAppliedModeSignature: (modeSignature: string) => void;
@@ -259,11 +260,31 @@ function createSubmitToolCallRequestResponseHandler(
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
   const refreshThreadData = useCallback(
-    async (threadId: string): Promise<void> => {
+    async (threadId: string, preferStreamDrivenSelectedThreadRefresh: boolean): Promise<void> => {
+      if (
+        preferStreamDrivenSelectedThreadRefresh &&
+        input.eventsConnectedRef.current &&
+        input.selectedThreadIdRef.current === threadId
+      ) {
+        void input.refreshActiveThreadListTracked();
+        return;
+      }
       await input.refreshActiveThreadListTracked();
       await input.onReloadSelectedThread(threadId);
     },
-    [input.onReloadSelectedThread, input.refreshActiveThreadListTracked],
+    [
+      input.eventsConnectedRef,
+      input.onReloadSelectedThread,
+      input.refreshActiveThreadListTracked,
+      input.selectedThreadIdRef,
+    ],
+  );
+
+  const refreshExistingThreadData = useCallback(
+    async (threadId: string): Promise<void> => {
+      await refreshThreadData(threadId, true);
+    },
+    [refreshThreadData],
   );
 
   const handleThreadSelected = (threadId: string): void => {
@@ -278,6 +299,8 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
 
   const submitMessage = useCallback(
     async (draft: string) => {
+      const selectedThreadAlreadyExisted =
+        input.selectedThreadId !== null && input.selectedThreadId.length > 0;
       await input.chatRequestActionCoordinator.sendMessage({
         draft,
         selectedThreadId: input.selectedThreadId,
@@ -289,7 +312,9 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         chatClient: input.chatClient,
         threadMutationClient: input.threadMutationClient,
         onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-        onRefreshThreadData: refreshThreadData,
+        onRefreshThreadData: async (threadId) => {
+          await refreshThreadData(threadId, selectedThreadAlreadyExisted);
+        },
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
     },
@@ -300,12 +325,12 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       handleThreadSelected,
       markThreadPendingMaterialization,
       input.onInvalidateActiveThreadQuery,
-      refreshThreadData,
       input.reportTrackedUserInterfaceError,
       input.selectedAgentId,
       input.selectedThreadId,
       input.setIsBusy,
       input.threadMutationClient,
+      refreshThreadData,
     ],
   );
 
@@ -349,7 +374,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         onSetBusy: input.setIsBusy,
         chatClient: input.chatClient,
         onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-        onRefreshThreadData: refreshThreadData,
+        onRefreshThreadData: refreshExistingThreadData,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
     },
@@ -358,10 +383,10 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       input.chatClient,
       input.chatRequestActionCoordinator,
       input.onInvalidateActiveThreadQuery,
-      refreshThreadData,
       input.reportTrackedUserInterfaceError,
       input.selectedThreadId,
       input.setIsBusy,
+      refreshExistingThreadData,
     ],
   );
 
@@ -381,7 +406,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
+      onRefreshThreadData: refreshExistingThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
     });
   }, [
@@ -392,10 +417,10 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
     input.pendingUserInputAnswerBuilder,
-    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy,
+    refreshExistingThreadData,
   ]);
 
   const skipPendingRequest = useCallback(async () => {
@@ -409,7 +434,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
+      onRefreshThreadData: refreshExistingThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
     });
   }, [
@@ -418,10 +443,10 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatClient,
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
-    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy,
+    refreshExistingThreadData,
   ]);
 
   const submitAuthTokenRefreshRequest = useCallback(
@@ -441,7 +466,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         onSetBusy: input.setIsBusy,
         chatClient: input.chatClient,
         onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-        onRefreshThreadData: refreshThreadData,
+        onRefreshThreadData: refreshExistingThreadData,
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
     },
@@ -451,36 +476,36 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       input.chatClient,
       input.chatRequestActionCoordinator,
       input.onInvalidateActiveThreadQuery,
-      refreshThreadData,
       input.reportTrackedUserInterfaceError,
       input.selectedThreadId,
       input.setIsBusy,
+      refreshExistingThreadData,
     ],
   );
 
   const submitApplyPatchApprovalRequest = createSubmitApplyPatchApprovalRequestHandler(
     input,
-    refreshThreadData,
+    refreshExistingThreadData,
   );
 
   const submitCommandExecutionApprovalRequest = createSubmitCommandExecutionApprovalRequestHandler(
     input,
-    refreshThreadData,
+    refreshExistingThreadData,
   );
 
   const submitExecuteCommandApprovalRequest = createSubmitExecuteCommandApprovalRequestHandler(
     input,
-    refreshThreadData,
+    refreshExistingThreadData,
   );
 
   const submitFileChangeApprovalRequest = createSubmitFileChangeApprovalRequestHandler(
     input,
-    refreshThreadData,
+    refreshExistingThreadData,
   );
 
   const submitToolCallRequestResponse = createSubmitToolCallRequestResponseHandler(
     input,
-    refreshThreadData,
+    refreshExistingThreadData,
   );
 
   const runInterrupt = useCallback(async () => {
@@ -490,7 +515,7 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       onSetBusy: input.setIsBusy,
       chatClient: input.chatClient,
       onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
+      onRefreshThreadData: refreshExistingThreadData,
       reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
     });
   }, [
@@ -498,10 +523,10 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     input.chatClient,
     input.chatRequestActionCoordinator,
     input.onInvalidateActiveThreadQuery,
-    refreshThreadData,
     input.reportTrackedUserInterfaceError,
     input.selectedThreadId,
     input.setIsBusy,
+    refreshExistingThreadData,
   ]);
 
   const handleAnswerChange = useCallback(

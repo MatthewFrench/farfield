@@ -415,6 +415,28 @@ Verification evidence:
 
 1. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 
+### March 7, 2026: Connected Chat Actions Stop Blocking On Explicit Selected-Thread Reload
+
+Changed owner modules:
+
+1. [UseChatActionHandlers.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseChatActionHandlers.ts)
+2. [ApplicationRuntimeCompositionDependencyBuilders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ApplicationRuntimeCompositionDependencyBuilders.ts)
+
+Implementation summary:
+
+1. connected selected-thread chat actions now prefer the live stream path and stop waiting on an explicit selected-thread reload before clearing the action path
+2. active thread-list refresh still runs, but it no longer blocks the common connected-thread send path
+
+User-visible impact:
+
+1. sends, steers, and approval responses on an already-open connected thread return control faster
+2. the app avoids one more blocking selected-thread reread in the common connected-thread case
+
+Verification evidence:
+
+1. [UseChatActionHandlers.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseChatActionHandlers.test.tsx)
+2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
@@ -430,6 +452,7 @@ As of Saturday, March 7, 2026:
 7. for thread/sidebar/chat/reload/mobile-runtime changes, this can now be treated as an expected verification path unless a task explicitly cannot use the real stack
 8. the latest multi-agent Chromium rerun removed the setup-time managed-thread read `500` burst, but steady-state managed-thread reread volume and occasional warm-iteration outliers still need reduction
 9. the latest Chromium rerun with substep timing showed the dominant iteration cost is currently the send-and-wait path, not sidebar open or reload restore
+10. the latest connected-thread send-path change reduced the `POST /api/threads/:threadId/messages` duration and shortened later iteration send timings, although total route volume still varies run to run
 
 ### March 7, 2026: Soak Enforces Server Observability Budgets
 

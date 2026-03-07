@@ -215,6 +215,9 @@ function createTestInput(overrides: TestInputOverrides = {}) {
   const selectedThreadIdRef: MutableRefObject<string | null> = {
     current: selectedThreadId,
   };
+  const eventsConnectedRef: MutableRefObject<boolean> = {
+    current: true,
+  };
   const refreshActiveThreadListTracked = vi.fn(async () => {});
   const onReloadSelectedThread = vi.fn(async (_threadId: string) => {});
   const onInvalidateActiveThreadQuery = vi.fn();
@@ -244,6 +247,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     setIsModeSyncing,
     setSelectedThreadId,
     selectedThreadIdRef,
+    eventsConnectedRef,
     pendingThreadMaterializationCoordinator,
     readLastAppliedModeSignature: () => "",
     writeLastAppliedModeSignature: (_modeSignature) => {},
@@ -264,6 +268,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     collaborationModeActionCoordinator,
     pendingThreadMaterializationCoordinator,
     pendingUserInputAnswerBuilder,
+    eventsConnectedRef,
     refreshActiveThreadListTracked,
     onReloadSelectedThread,
     setSelectedThreadId,
@@ -384,9 +389,11 @@ describe("UseChatActionHandlers", () => {
     const {
       input,
       chatRequestActionCoordinator,
+      eventsConnectedRef,
       refreshActiveThreadListTracked,
       onReloadSelectedThread,
     } = createTestInput();
+    eventsConnectedRef.current = false;
     const sendMessageSpy = vi
       .spyOn(chatRequestActionCoordinator, "sendMessage")
       .mockImplementation(async (nextInput) => {
@@ -421,6 +428,48 @@ describe("UseChatActionHandlers", () => {
     expect(refreshActiveThreadListTracked.mock.invocationCallOrder[0]).toBeLessThan(
       onReloadSelectedThread.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
+  });
+
+  it("skips selected-thread reload after chat refresh when events are connected for the active thread", async () => {
+    const {
+      input,
+      chatRequestActionCoordinator,
+      eventsConnectedRef,
+      refreshActiveThreadListTracked,
+      onReloadSelectedThread,
+    } = createTestInput();
+    eventsConnectedRef.current = true;
+    const sendMessageSpy = vi
+      .spyOn(chatRequestActionCoordinator, "sendMessage")
+      .mockImplementation(async (nextInput) => {
+        await nextInput.onRefreshThreadData(DEFAULT_THREAD_IDENTIFIER);
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null) {
+      throw new Error("expected handlers to be ready");
+    }
+    await handlers.submitMessage("hello world");
+
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
+    expect(onReloadSelectedThread).not.toHaveBeenCalled();
   });
 
   it("builds pending user input answers and submits the derived payload", async () => {

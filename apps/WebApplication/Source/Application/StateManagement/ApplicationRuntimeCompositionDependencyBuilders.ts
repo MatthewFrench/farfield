@@ -346,6 +346,7 @@ export function buildApplicationChatFeatureCompositionInput(
       setIsModeSyncing: applicationShellState.setIsModeSyncing,
       setSelectedThreadId: applicationShellState.setSelectedThreadId,
       selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
+      eventsConnectedRef: applicationShellState.eventsConnectedRef,
       pendingThreadMaterializationCoordinator:
         applicationShellState.pendingThreadMaterializationCoordinator,
       readLastAppliedModeSignature: dependencies.readLastAppliedModeSignature,
