@@ -1,3 +1,4 @@
+import type { AgentUnsubscribeThreadStatus } from "../../Agents/Types.js";
 import {
   isThreadMemberSubresourceRoute,
   ThreadMemberMutationActionByName,
@@ -15,6 +16,7 @@ export interface ThreadMemberUnsubscribeMutationRouteOwnerOptions {
 const ThreadMemberUnsubscribeRouteStatusCodeByName = {
   success: 200,
   badRequest: 400,
+  internalError: 500,
 } as const;
 
 const ThreadMemberUnsubscribeStatusByName = {
@@ -44,7 +46,6 @@ export class ThreadMemberUnsubscribeMutationRouteOwner {
       threadConcurrencyCoordinator,
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
-      invalidateThreadListAggregationCache,
       jsonResponse,
     } = this.dependencies;
     const { adapter, agentId, threadId } = this.context;
@@ -84,44 +85,37 @@ export class ThreadMemberUnsubscribeMutationRouteOwner {
       const status = await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
         return unsubscribeThread({ threadId });
       });
-      pushActionEventWithRequestContext(
+      this.writeSuccessResponse(status);
+    } catch (error) {
+      const shouldTreatAsNotLoaded = this.shouldTreatAsNotLoaded(error);
+      if (shouldTreatAsNotLoaded) {
+        this.writeSuccessResponse(ThreadMemberUnsubscribeStatusByName.notLoaded);
+        return true;
+      }
+
+      const message = pushActionErrorWithRequestContext(
         ThreadMemberMutationActionByName.threadUnsubscribe,
-        "success",
+        error,
         {
           agentId,
           threadId,
-          status,
         },
       );
-      invalidateThreadListAggregationCache("thread-unsubscribed", {
-        agentId,
-        threadId,
-        status,
-      });
-      jsonResponse(this.dependencies.res, ThreadMemberUnsubscribeRouteStatusCodeByName.success, {
-        ok: true,
-        threadId,
-        status,
-      });
-    } catch (error) {
-      const shouldTreatAsNotLoaded = this.shouldTreatAsNotLoaded(error);
-      if (!shouldTreatAsNotLoaded) {
-        pushActionErrorWithRequestContext(
-          ThreadMemberMutationActionByName.threadUnsubscribe,
-          error,
-          {
-            agentId,
-            threadId,
-          },
-        );
-      }
-      this.writeNotLoadedResponse();
+      jsonResponse(
+        this.dependencies.res,
+        ThreadMemberUnsubscribeRouteStatusCodeByName.internalError,
+        {
+          ok: false,
+          error: message,
+          threadId,
+        },
+      );
     }
 
     return true;
   }
 
-  private writeNotLoadedResponse(): void {
+  private writeSuccessResponse(status: AgentUnsubscribeThreadStatus): void {
     const {
       pushActionEventWithRequestContext,
       invalidateThreadListAggregationCache,
@@ -129,7 +123,6 @@ export class ThreadMemberUnsubscribeMutationRouteOwner {
       res,
     } = this.dependencies;
     const { agentId, threadId } = this.context;
-    const status = ThreadMemberUnsubscribeStatusByName.notLoaded;
 
     pushActionEventWithRequestContext(
       ThreadMemberMutationActionByName.threadUnsubscribe,

@@ -29,6 +29,8 @@ const ThreadMemberReadRouteErrorByName = {
   invalidStreamEventQueryParameters: "Invalid stream event query parameters",
 } as const;
 
+const ThreadMemberReadRouteConversationNotFoundPattern = /conversation not found/i;
+
 const ThreadMemberReadRouteUnsupportedCapabilityName = {
   liveThreadState: "live thread state",
   streamEvents: "stream events",
@@ -65,7 +67,7 @@ export class ThreadMemberReadRouteOwner {
         });
         return true;
       } catch (error) {
-        if (error instanceof Error && this.tryWriteThreadNotLoadedResponse(error)) {
+        if (error instanceof Error && this.tryWriteMissingThreadResponse(error)) {
           return true;
         }
         throw error;
@@ -93,7 +95,7 @@ export class ThreadMemberReadRouteOwner {
         });
         return true;
       } catch (error) {
-        if (error instanceof Error && this.tryWriteThreadNotLoadedResponse(error)) {
+        if (error instanceof Error && this.tryWriteMissingThreadResponse(error)) {
           return true;
         }
         throw error;
@@ -133,7 +135,7 @@ export class ThreadMemberReadRouteOwner {
         });
         return true;
       } catch (error) {
-        if (error instanceof Error && this.tryWriteThreadNotLoadedResponse(error)) {
+        if (error instanceof Error && this.tryWriteMissingThreadResponse(error)) {
           return true;
         }
         throw error;
@@ -143,8 +145,8 @@ export class ThreadMemberReadRouteOwner {
     return false;
   }
 
-  private tryWriteThreadNotLoadedResponse(error: Error): boolean {
-    if (!this.isThreadNotLoadedError(error)) {
+  private tryWriteMissingThreadResponse(error: Error): boolean {
+    if (!this.isMissingThreadError(error)) {
       return false;
     }
     const { res, jsonResponse } = this.dependencies;
@@ -157,13 +159,25 @@ export class ThreadMemberReadRouteOwner {
     return true;
   }
 
-  // Keep "thread not loaded" normalization centralized so read/live/stream contracts stay aligned.
+  // Keep missing-thread normalization centralized so read/live/stream contracts stay aligned.
+  private isMissingThreadError(error: Error): boolean {
+    return this.isThreadNotLoadedError(error) || this.isConversationNotFoundError(error);
+  }
+
   private isThreadNotLoadedError(error: Error): boolean {
     const classifyThreadNotLoadedError = this.context.adapter.isThreadNotLoadedError;
     if (!classifyThreadNotLoadedError) {
       return false;
     }
     return classifyThreadNotLoadedError(error);
+  }
+
+  private isConversationNotFoundError(error: Error): boolean {
+    const classifyConversationNotFoundError = this.context.adapter.isConversationNotFoundError;
+    if (classifyConversationNotFoundError) {
+      return classifyConversationNotFoundError(error);
+    }
+    return ThreadMemberReadRouteConversationNotFoundPattern.test(error.message);
   }
 
   private writeUnsupportedCapabilityResponse(capability: string): boolean {

@@ -552,4 +552,67 @@ describe("ThreadMemberReadRouteOwner", () => {
       threadId: "thread-404",
     });
   });
+
+  it("maps adapter-owned conversation-not-found errors to a 404 thread response", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "GET";
+
+    const conversationNotFoundError = new Error("conversation-not-found");
+    const adapter: AgentAdapter = {
+      ...createUnsupportedAgentAdapter(),
+      async readThread(): Promise<AgentReadThreadResult> {
+        throw conversationNotFoundError;
+      },
+      isConversationNotFoundError: (error) => {
+        return error === conversationNotFoundError;
+      },
+    };
+
+    let capturedStatusCode: number | null = null;
+    let capturedResponseBody: object | null = null;
+
+    const dependencies: ThreadMemberRouteDependencies = {
+      req: request,
+      res: response,
+      segments: ["api", "threads", "thread-404"],
+      url: new URL("http://localhost/api/threads/thread-404"),
+      parseInteger: () => {
+        throw new Error("Not used in thread-read route-owner test");
+      },
+      parseBoolean: () => true,
+      threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+      resolveAdapterForThread: async () => ({
+        ok: true,
+        adapter,
+        agentId: "codex",
+      }),
+      readJsonBody: async () => ({}),
+      jsonResponse: (_res, statusCode, body) => {
+        capturedStatusCode = statusCode;
+        capturedResponseBody = body;
+      },
+      invalidateThreadListAggregationCache: () => {},
+      pushActionEventWithRequestContext: () => {},
+      pushActionErrorWithRequestContext: () => "action-error-id",
+    };
+    const context: ThreadMemberResolvedRouteContext = {
+      threadId: "thread-404",
+      adapter,
+      agentId: "codex",
+    };
+
+    const owner = new ThreadMemberReadRouteOwner({
+      dependencies,
+      context,
+    });
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(404);
+    expect(capturedResponseBody).toEqual({
+      ok: false,
+      error: "Thread not loaded in app-server: thread-404",
+      threadId: "thread-404",
+    });
+  });
 });

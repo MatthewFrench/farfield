@@ -485,6 +485,32 @@ Verification evidence:
 2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 3. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
 
+### March 7, 2026: Thread Read And Unsubscribe Routes Keep Missing-Thread Errors Explicit
+
+Changed owner modules:
+
+1. [ThreadMemberReadRouteOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberReadRouteOwner.ts)
+2. [ThreadMemberUnsubscribeMutationRouteOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberUnsubscribeMutationRouteOwner.ts)
+3. [ThreadMemberReadRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts)
+4. [ThreadMemberMutationRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts)
+
+Implementation summary:
+
+1. thread read routes now normalize adapter-owned `conversation not found` errors to the same `404` missing-thread contract already used for `thread not loaded`
+2. unsubscribe routes still coerce known missing-thread cases to `notLoaded`, but unrelated unsubscribe failures now return `500` instead of being rewritten into a fake success
+
+User-visible impact:
+
+1. mobile read flows get a more consistent missing-thread response contract when Codex reports either missing-thread variant
+2. real unsubscribe failures are now visible to clients and logs instead of silently looking like successful cleanup
+
+Verification evidence:
+
+1. [ThreadMemberReadRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberReadRouteOwner.test.ts)
+2. [ThreadMemberMutationRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts)
+3. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+4. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

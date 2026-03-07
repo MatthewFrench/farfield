@@ -1138,7 +1138,7 @@ describe("ThreadMemberMutationRouteOwner", () => {
     });
   });
 
-  it("normalizes unexpected unsubscribe failures into notLoaded status for client stability", async () => {
+  it("returns a 500 response for unexpected unsubscribe failures", async () => {
     const { request, response } = createMockRequestResponsePair();
     request.method = "POST";
 
@@ -1151,6 +1151,10 @@ describe("ThreadMemberMutationRouteOwner", () => {
 
     let capturedStatusCode: number | null = null;
     let capturedBody: object | null = null;
+    const actionEvents: Array<{
+      action: string;
+      stage: "attempt" | "success" | "error";
+    }> = [];
 
     const owner = new ThreadMemberMutationRouteOwner({
       dependencies: createDependencies({
@@ -1162,7 +1166,9 @@ describe("ThreadMemberMutationRouteOwner", () => {
           capturedStatusCode = statusCode;
           capturedBody = body;
         },
-        pushActionEventWithRequestContext: () => {},
+        pushActionEventWithRequestContext: (action, stage) => {
+          actionEvents.push({ action, stage });
+        },
       }),
       context: createContext(adapter),
     });
@@ -1170,11 +1176,17 @@ describe("ThreadMemberMutationRouteOwner", () => {
     const handled = await owner.handle();
 
     expect(handled).toBe(true);
-    expect(capturedStatusCode).toBe(200);
+    expect(actionEvents).toEqual([
+      {
+        action: ThreadMemberMutationActionByName.threadUnsubscribe,
+        stage: "attempt",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(500);
     expect(capturedBody).toEqual({
-      ok: true,
+      ok: false,
+      error: "action-error-id",
       threadId: "thread-1",
-      status: "notLoaded",
     });
   });
 
