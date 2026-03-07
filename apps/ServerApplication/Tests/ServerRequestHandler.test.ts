@@ -29,6 +29,8 @@ import { ServerRequestUtilityOwner } from "../Source/Network/ServerRequestUtilit
 import { SidebarThreadSyncSnapshotCache } from "../Source/Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
+import { ThreadSendProgressObservabilityOwner } from "../Source/Network/ThreadSendProgressObservabilityOwner.js";
+import { ThreadStreamDeltaEventPublisher } from "../Source/Network/ThreadStreamDeltaEventPublisher.js";
 
 interface JsonResponseCall {
   statusCode: number;
@@ -73,10 +75,27 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
   const tempDirectoryPath = mkdtempSync(path.join(tmpdir(), "server-request-handler-test-"));
   const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
   const requestObservabilityOwner = new RequestObservabilityOwner(8, 8, 32, 32);
+  const threadSendProgressObservabilityOwner = new ThreadSendProgressObservabilityOwner();
   const utilityOwner = new ServerRequestUtilityOwner();
   const agentRegistry = new AgentRegistry([]);
   const threadAdapterResolver = new ThreadAdapterResolver(agentRegistry, new ThreadIndex());
   const jsonResponseCalls: JsonResponseCall[] = [];
+  const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
+    eventStreamClientRegistry,
+    threadSendProgressObservabilityOwner,
+    readThreadLiveState: async () => ({
+      ownerClientId: null,
+      conversationState: null,
+      liveStateError: null,
+    }),
+    readThreadStreamEvents: async () => ({
+      ownerClientId: null,
+      events: [],
+      nextSequence: 0,
+      firstAvailableSequence: 0,
+      resetRequired: false,
+    }),
+  });
 
   const dependencies: ServerRequestHandlerDependencies = {
     host: "localhost",
@@ -114,6 +133,8 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 8),
     sidebarThreadSyncSnapshotCache: new SidebarThreadSyncSnapshotCache(1_000, 8),
     threadConcurrencyCoordinator: new ThreadConcurrencyCoordinator(),
+    threadSendProgressObservabilityOwner,
+    threadStreamDeltaEventPublisher,
     eventStreamClientRegistry,
     runtimeStateOwner: createRuntimeStateOwner(),
     activityHistoryService: new ActivityHistoryService(32, eventStreamClientRegistry),

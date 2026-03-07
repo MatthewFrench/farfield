@@ -37,6 +37,7 @@ import { ServerRequestRouteDispatchOwner } from "./ServerRequestRouteDispatchOwn
 import type { SidebarThreadSyncSnapshotCache } from "./SidebarThreadSyncSnapshotCache.js";
 import type { ThreadConcurrencyCoordinator } from "./ThreadConcurrencyCoordinator.js";
 import type { ThreadListAggregationCache } from "./ThreadListAggregationCache.js";
+import type { ThreadSendProgressObservabilityOwner } from "./ThreadSendProgressObservabilityOwner.js";
 import type { ThreadStreamDeltaEventPublisher } from "./ThreadStreamDeltaEventPublisher.js";
 
 const STATUS_CODE_BY_NAME = {
@@ -82,6 +83,7 @@ export interface ServerRequestHandlerDependencies {
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
+  threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   threadStreamDeltaEventPublisher: ThreadStreamDeltaEventPublisher;
   eventStreamClientRegistry: EventStreamClientRegistry;
   runtimeStateOwner: RuntimeStateSnapshotReader;
@@ -184,6 +186,7 @@ export class ServerRequestHandler {
       threadListAggregationCache: this.deps.threadListAggregationCache,
       sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
       threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
+      threadSendProgressObservabilityOwner: this.deps.threadSendProgressObservabilityOwner,
       threadStreamDeltaEventPublisher: this.deps.threadStreamDeltaEventPublisher,
       eventStreamClientRegistry: this.deps.eventStreamClientRegistry,
       runtimeStateOwner: this.deps.runtimeStateOwner,

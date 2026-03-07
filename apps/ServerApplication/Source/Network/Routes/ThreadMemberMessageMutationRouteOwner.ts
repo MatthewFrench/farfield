@@ -29,6 +29,7 @@ export class ThreadMemberMessageMutationRouteOwner {
       pushActionEventWithRequestContext,
       pushActionErrorWithRequestContext,
       invalidateThreadListAggregationCache,
+      recordThreadSendAccepted,
       scheduleThreadStreamDeltaPublish,
       jsonResponse,
     } = this.dependencies;
@@ -83,6 +84,7 @@ export class ThreadMemberMessageMutationRouteOwner {
       agentId,
       threadId,
     });
+    recordThreadSendAccepted(threadId);
     invalidateThreadListAggregationCache("thread-message-sent", {
       threadId,
       agentId,

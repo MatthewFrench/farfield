@@ -2,6 +2,7 @@ import type { FarfieldEventStreamEvent, FarfieldThreadStreamDeltaEvent } from "@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Source/Agents/Types.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
+import { ThreadSendProgressObservabilityOwner } from "../Source/Network/ThreadSendProgressObservabilityOwner.js";
 import { ThreadStreamDeltaEventPublisher } from "../Source/Network/ThreadStreamDeltaEventPublisher.js";
 
 const THREAD_STREAM_DELTA_EVENT_TYPE: FarfieldThreadStreamDeltaEvent["type"] =
@@ -117,6 +118,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState,
       readThreadStreamEvents,
     });
@@ -192,6 +194,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState,
       readThreadStreamEvents,
     });
@@ -254,6 +257,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState,
       readThreadStreamEvents,
     });
@@ -294,6 +298,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     });
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState,
       readThreadStreamEvents,
     });
@@ -346,6 +351,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     );
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState,
       readThreadStreamEvents,
     });
@@ -392,6 +398,7 @@ describe("ThreadStreamDeltaEventPublisher", () => {
   it("ignores blank thread identifiers", () => {
     const publisher = new ThreadStreamDeltaEventPublisher({
       eventStreamClientRegistry: new EventStreamClientRegistry(1_000),
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
       readThreadLiveState: async () => createLiveStateSnapshot(),
       readThreadStreamEvents: async () =>
         createStreamEventsSnapshot({

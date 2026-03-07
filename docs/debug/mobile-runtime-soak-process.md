@@ -730,6 +730,35 @@ Verification evidence:
 7. `bun run --cwd apps/ServerApplication typecheck`
 8. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1885`, `5365`, `8477` and no new sentinel errors
 
+### March 7, 2026: Debug Observability Now Measures Send-To-Progression Milestones
+
+Changed owner modules:
+
+1. [ThreadSendProgressObservabilityOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ThreadSendProgressObservabilityOwner.ts)
+2. [ThreadStreamDeltaEventPublisher.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ThreadStreamDeltaEventPublisher.ts)
+3. [ThreadMemberMessageMutationRouteOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadMemberMessageMutationRouteOwner.ts)
+4. [ServerObservabilitySnapshotOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/ServerObservabilitySnapshotOwner.ts)
+5. [FarfieldServer.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Source/FarfieldServer.ts)
+
+Implementation summary:
+
+1. server debug observability now records accepted send, first inbound `thread-stream-state-changed`, first published `thread-stream-delta`, and first assistant-visible progress as one bounded per-thread progression timeline
+2. `/api/debug/observability` now exposes summarized `threadSendProgression` metrics so later latency work can distinguish Farfield-side delay from upstream Codex/app-server delay
+
+User-visible impact:
+
+1. this is a diagnostics-only improvement, but it makes the remaining send latency measurable instead of inferred from coarse soak timings alone
+2. follow-up latency work can now target the actual slow segment instead of continuing to guess between route latency, publish latency, and upstream turn execution latency
+
+Verification evidence:
+
+1. [ThreadSendProgressObservabilityOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadSendProgressObservabilityOwner.test.ts)
+2. [ThreadStreamDeltaEventPublisher.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadStreamDeltaEventPublisher.test.ts)
+3. [ServerObservabilitySnapshotOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerObservabilitySnapshotOwner.test.ts)
+4. [ProtocolAppServerSchemas.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Tests/ProtocolAppServerSchemas.test.ts)
+5. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2230`, `6244`, `6949` and no new sentinel errors
+6. direct local probe after `POST /api/threads/:threadId/messages` recorded `lastAcceptedToFirstInboundThreadStreamStateChangedMs=141` and `lastAcceptedToFirstPublishedThreadDeltaMs=177` in `/api/debug/observability`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

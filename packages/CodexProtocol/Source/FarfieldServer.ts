@@ -515,6 +515,24 @@ export const FarfieldEventLoopLagStatisticsSchema = z
   })
   .strict();
 
+export const FarfieldThreadSendProgressObservabilityStatisticsSchema = z
+  .object({
+    activeThreadCount: z.number().int().nonnegative(),
+    inboundSampleCount: z.number().int().nonnegative(),
+    publishedDeltaSampleCount: z.number().int().nonnegative(),
+    assistantVisibleSampleCount: z.number().int().nonnegative(),
+    lastAcceptedToFirstInboundThreadStreamStateChangedMs: z.number().nonnegative(),
+    p50AcceptedToFirstInboundThreadStreamStateChangedMs: z.number().nonnegative(),
+    p95AcceptedToFirstInboundThreadStreamStateChangedMs: z.number().nonnegative(),
+    lastAcceptedToFirstPublishedThreadDeltaMs: z.number().nonnegative(),
+    p50AcceptedToFirstPublishedThreadDeltaMs: z.number().nonnegative(),
+    p95AcceptedToFirstPublishedThreadDeltaMs: z.number().nonnegative(),
+    lastAcceptedToFirstAssistantVisibleProgressMs: z.number().nonnegative(),
+    p50AcceptedToFirstAssistantVisibleProgressMs: z.number().nonnegative(),
+    p95AcceptedToFirstAssistantVisibleProgressMs: z.number().nonnegative(),
+  })
+  .strict();
+
 export const FarfieldDebugObservabilitySnapshotSchema = z
   .object({
     recordedAt: z.string().datetime(),
@@ -545,6 +563,7 @@ export const FarfieldDebugObservabilitySnapshotSchema = z
       .object({
         requestRouting: FarfieldRequestObservabilitySnapshotSchema,
         eventLoop: FarfieldEventLoopLagStatisticsSchema,
+        threadSendProgression: FarfieldThreadSendProgressObservabilityStatisticsSchema,
       })
       .strict(),
   })

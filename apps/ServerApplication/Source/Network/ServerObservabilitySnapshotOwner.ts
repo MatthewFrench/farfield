@@ -29,6 +29,10 @@ import type {
   ThreadListAggregationCache,
   ThreadListAggregationCacheStatistics,
 } from "./ThreadListAggregationCache.js";
+import type {
+  ThreadSendProgressObservabilityOwner,
+  ThreadSendProgressObservabilityStatistics,
+} from "./ThreadSendProgressObservabilityOwner.js";
 
 const DEFAULT_READ_NOW_ISO_STRING = (): string => new Date().toISOString();
 
@@ -68,6 +72,7 @@ export interface ServerObservabilitySnapshot {
   performance: {
     requestRouting: RequestObservabilitySnapshot;
     eventLoop: EventLoopLagStatistics;
+    threadSendProgression: ThreadSendProgressObservabilityStatistics;
   };
 }
 
@@ -81,6 +86,7 @@ export interface ServerObservabilitySnapshotOwnerDependencies {
   threadAdapterResolver: ThreadAdapterResolver;
   requestObservabilityOwner: RequestObservabilityOwner;
   eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
+  threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   readNowIsoString?: () => string;
 }
 
@@ -137,6 +143,8 @@ export class ServerObservabilitySnapshotOwner {
       performance: {
         requestRouting: this.dependencies.requestObservabilityOwner.readSnapshot(),
         eventLoop: this.dependencies.eventLoopLagObservabilityOwner.readStatistics(),
+        threadSendProgression:
+          this.dependencies.threadSendProgressObservabilityOwner.readStatistics(),
       },
     };
 

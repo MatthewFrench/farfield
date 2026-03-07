@@ -111,6 +111,7 @@ function createThreadRouteDependencies(input: {
       input.onJsonResponse(statusCode, body);
     },
     invalidateThreadListAggregationCache: () => {},
+    recordThreadSendAccepted: () => {},
     scheduleThreadStreamDeltaPublish: () => {},
     pushActionEventWithRequestContext: () => {},
     pushActionErrorWithRequestContext: () => "action-error-id",

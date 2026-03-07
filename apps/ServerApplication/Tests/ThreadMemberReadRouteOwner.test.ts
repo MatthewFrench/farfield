@@ -183,6 +183,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
@@ -288,6 +289,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
@@ -381,6 +383,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
@@ -472,6 +475,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
@@ -533,6 +537,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",
@@ -597,6 +602,7 @@ describe("ThreadMemberReadRouteOwner", () => {
         capturedResponseBody = body;
       },
       invalidateThreadListAggregationCache: () => {},
+      recordThreadSendAccepted: () => {},
       scheduleThreadStreamDeltaPublish: () => {},
       pushActionEventWithRequestContext: () => {},
       pushActionErrorWithRequestContext: () => "action-error-id",

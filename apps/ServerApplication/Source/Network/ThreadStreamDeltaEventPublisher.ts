@@ -2,6 +2,7 @@ import type { FarfieldThreadStreamDeltaEvent } from "@farfield/protocol";
 import type { AgentThreadLiveState, AgentThreadStreamEvents } from "../Agents/Types.js";
 import { logger } from "../Shared/Logging/Logger.js";
 import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
+import type { ThreadSendProgressObservabilityOwner } from "./ThreadSendProgressObservabilityOwner.js";
 
 // Stream deltas stay bounded to keep per-publish work predictable under bursty traffic.
 const THREAD_STREAM_DELTA_STREAM_EVENT_LIMIT = 400;
@@ -23,6 +24,7 @@ export interface ThreadStreamDeltaEventPublisherStatistics {
 
 export interface ThreadStreamDeltaEventPublisherDependencies {
   eventStreamClientRegistry: EventStreamClientRegistry;
+  threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   readThreadLiveState: (threadId: string) => Promise<AgentThreadLiveState>;
   readThreadStreamEvents: (
     threadId: string,
@@ -45,6 +47,7 @@ interface ThreadStreamDeltaEventBuildInput {
  */
 export class ThreadStreamDeltaEventPublisher {
   private readonly eventStreamClientRegistry: EventStreamClientRegistry;
+  private readonly threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
   private readonly readThreadLiveState: (threadId: string) => Promise<AgentThreadLiveState>;
   private readonly readThreadStreamEvents: (
     threadId: string,
@@ -64,6 +67,7 @@ export class ThreadStreamDeltaEventPublisher {
 
   public constructor(dependencies: ThreadStreamDeltaEventPublisherDependencies) {
     this.eventStreamClientRegistry = dependencies.eventStreamClientRegistry;
+    this.threadSendProgressObservabilityOwner = dependencies.threadSendProgressObservabilityOwner;
     this.readThreadLiveState = dependencies.readThreadLiveState;
     this.readThreadStreamEvents = dependencies.readThreadStreamEvents;
     this.inFlightThreadIdSet = new Set<string>();
@@ -172,6 +176,16 @@ export class ThreadStreamDeltaEventPublisher {
         liveStateSnapshot,
         streamEventsSnapshot,
       }),
+    );
+    const nowEpochMilliseconds = Date.now();
+    this.threadSendProgressObservabilityOwner.recordFirstPublishedThreadDelta(
+      threadId,
+      nowEpochMilliseconds,
+    );
+    this.threadSendProgressObservabilityOwner.recordFirstAssistantVisibleProgress(
+      threadId,
+      nowEpochMilliseconds,
+      liveStateSnapshot,
     );
     this.lastBroadcastLiveStateSignatureByThreadId.set(threadId, liveStateSignature);
     this.broadcastCount += 1;

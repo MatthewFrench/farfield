@@ -31,6 +31,7 @@ import { ServerRequestUtilityOwner } from "../Network/ServerRequestUtilityOwner.
 import { SidebarThreadSyncSnapshotCache } from "../Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Network/ThreadListAggregationCache.js";
+import { ThreadSendProgressObservabilityOwner } from "../Network/ThreadSendProgressObservabilityOwner.js";
 import { ThreadStreamDeltaEventPublisher } from "../Network/ThreadStreamDeltaEventPublisher.js";
 import { configureLogger, logger } from "../Shared/Logging/Logger.js";
 import { ServerBootstrapUtilityOwner } from "./Bootstrap/ServerBootstrapUtilityOwner.js";
@@ -143,6 +144,7 @@ process.on("exit", () => {
   eventLoopLagObservabilityOwner.stop();
 });
 const requestObservabilityOwner = new RequestObservabilityOwner();
+const threadSendProgressObservabilityOwner = new ThreadSendProgressObservabilityOwner();
 const activityHistoryService = new ActivityHistoryService(
   runtimeConfiguration.historyLimit,
   eventStreamClientRegistry,
@@ -244,6 +246,7 @@ const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinato
 );
 const threadStreamDeltaEventPublisher = new ThreadStreamDeltaEventPublisher({
   eventStreamClientRegistry,
+  threadSendProgressObservabilityOwner,
   readThreadLiveState: async (threadId) => {
     const codexAdapter = readCodexAdapter();
     if (!codexAdapter) {
@@ -323,6 +326,10 @@ agentRuntimeOwner = new AgentRuntimeOwner({
     );
   },
   onThreadStreamStateChanged: (threadId) => {
+    threadSendProgressObservabilityOwner.recordFirstInboundThreadStreamStateChanged(
+      threadId,
+      Date.now(),
+    );
     invalidateThreadListAggregationCache(THREAD_STREAM_STATE_CHANGED_METHOD, {
       threadId,
     });
@@ -342,6 +349,7 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   threadAdapterResolver,
   requestObservabilityOwner,
   eventLoopLagObservabilityOwner,
+  threadSendProgressObservabilityOwner,
 });
 
 function broadcastRuntimeState(): void {
@@ -386,6 +394,7 @@ const serverRequestHandler = new ServerRequestHandler({
   threadListAggregationCache,
   sidebarThreadSyncSnapshotCache,
   threadConcurrencyCoordinator,
+  threadSendProgressObservabilityOwner,
   threadStreamDeltaEventPublisher,
   eventStreamClientRegistry,
   runtimeStateOwner,

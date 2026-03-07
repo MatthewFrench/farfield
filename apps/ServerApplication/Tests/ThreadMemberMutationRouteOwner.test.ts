@@ -211,6 +211,7 @@ function createDependencies(input: {
   readJsonBody: ThreadMemberRouteDependencies["readJsonBody"];
   onJsonResponse: (statusCode: number, body: object) => void;
   pushActionEventWithRequestContext: ThreadMemberRouteDependencies["pushActionEventWithRequestContext"];
+  recordThreadSendAccepted?: (threadId: string) => void;
   scheduleThreadStreamDeltaPublish?: (threadId: string) => void;
 }): ThreadMemberRouteDependencies {
   return {
@@ -242,6 +243,7 @@ function createDependencies(input: {
       input.onJsonResponse(statusCode, body);
     },
     invalidateThreadListAggregationCache: () => {},
+    recordThreadSendAccepted: input.recordThreadSendAccepted ?? (() => {}),
     scheduleThreadStreamDeltaPublish: input.scheduleThreadStreamDeltaPublish ?? (() => {}),
     pushActionEventWithRequestContext: input.pushActionEventWithRequestContext,
     pushActionErrorWithRequestContext: () => "action-error-id",

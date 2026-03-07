@@ -12,6 +12,7 @@ import { ServerObservabilitySnapshotOwner } from "../Source/Network/ServerObserv
 import { SidebarThreadSyncSnapshotCache } from "../Source/Network/SidebarThreadSyncSnapshotCache.js";
 import { ThreadConcurrencyCoordinator } from "../Source/Network/ThreadConcurrencyCoordinator.js";
 import { ThreadListAggregationCache } from "../Source/Network/ThreadListAggregationCache.js";
+import { ThreadSendProgressObservabilityOwner } from "../Source/Network/ThreadSendProgressObservabilityOwner.js";
 
 const OBSERVABILITY_RECORDED_AT_TIMESTAMP = "2026-02-25T00:00:00.000Z";
 const THREAD_LIST_CACHE_TIME_TO_LIVE_MILLISECONDS = 1_000;
@@ -33,6 +34,7 @@ interface ServerObservabilitySnapshotOwnerFixture {
   threadAdapterResolver: ThreadAdapterResolver;
   eventStreamClientRegistry: EventStreamClientRegistry;
   eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
+  threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
 }
 
 function createFixture(
@@ -64,6 +66,7 @@ function createFixture(
     REQUEST_OBSERVABILITY_MAX_SAMPLES_PER_ROUTE,
     REQUEST_OBSERVABILITY_MAX_STARTUP_REQUEST_ENTRIES,
   );
+  const threadSendProgressObservabilityOwner = new ThreadSendProgressObservabilityOwner();
   const threadAdapterResolver = new ThreadAdapterResolver(new AgentRegistry([]), new ThreadIndex());
 
   eventLoopLagObservabilityOwner.start();
@@ -78,6 +81,7 @@ function createFixture(
     threadAdapterResolver,
     requestObservabilityOwner,
     eventLoopLagObservabilityOwner,
+    threadSendProgressObservabilityOwner,
     readNowIsoString,
   });
 
@@ -91,6 +95,7 @@ function createFixture(
     threadAdapterResolver,
     eventStreamClientRegistry,
     eventLoopLagObservabilityOwner,
+    threadSendProgressObservabilityOwner,
   };
 }
 
@@ -171,6 +176,15 @@ describe("ServerObservabilitySnapshotOwner", () => {
         queueDelayMs: 1,
         completedAt: OBSERVABILITY_RECORDED_AT_TIMESTAMP,
       });
+      fixture.threadSendProgressObservabilityOwner.recordSendAccepted("thread_1", 1_000);
+      fixture.threadSendProgressObservabilityOwner.recordFirstInboundThreadStreamStateChanged(
+        "thread_1",
+        1_120,
+      );
+      fixture.threadSendProgressObservabilityOwner.recordFirstPublishedThreadDelta(
+        "thread_1",
+        1_140,
+      );
 
       const snapshot = fixture.owner.readSnapshot();
 
@@ -207,6 +221,13 @@ describe("ServerObservabilitySnapshotOwner", () => {
       expect(snapshot.performance.eventLoop.sampleIntervalMs).toBe(
         EVENT_LOOP_SAMPLE_INTERVAL_MILLISECONDS,
       );
+      expect(
+        snapshot.performance.threadSendProgression
+          .lastAcceptedToFirstInboundThreadStreamStateChangedMs,
+      ).toBe(120);
+      expect(
+        snapshot.performance.threadSendProgression.lastAcceptedToFirstPublishedThreadDeltaMs,
+      ).toBe(140);
     } finally {
       disposeFixture(fixture);
     }
