@@ -7,7 +7,7 @@ export const SignalTypeSchema = z.enum([
   "api-failure",
   "banner-event",
   "debug-error",
-  "loading-timeout"
+  "loading-timeout",
 ]);
 
 const SignalMatcherSchema = z
@@ -17,7 +17,7 @@ const SignalMatcherSchema = z
     urlIncludes: z.string().min(1).optional(),
     textIncludes: z.string().min(1).optional(),
     surfaceEquals: z.string().min(1).optional(),
-    statusEquals: z.number().int().min(100).max(599).optional()
+    statusEquals: z.number().int().min(100).max(599).optional(),
   })
   .strict()
   .refine(
@@ -28,11 +28,11 @@ const SignalMatcherSchema = z
           matcher.urlIncludes ??
           matcher.textIncludes ??
           matcher.surfaceEquals ??
-          matcher.statusEquals
+          matcher.statusEquals,
       ),
     {
-      message: "Signal allowlist matcher must include at least one condition"
-    }
+      message: "Signal allowlist matcher must include at least one condition",
+    },
   );
 
 export const SignalAllowlistEntrySchema = z
@@ -44,7 +44,7 @@ export const SignalAllowlistEntrySchema = z
     owner: z.string().min(1),
     createdAt: z.string().datetime(),
     expiresAt: z.string().datetime(),
-    trackingIssue: z.string().min(1)
+    trackingIssue: z.string().min(1),
   })
   .strict();
 
@@ -63,7 +63,21 @@ export interface SignalMatchInput {
   status: number | null;
 }
 
-const RAW_SIGNAL_ALLOWLIST: z.input<typeof SignalAllowlistSchema> = [];
+const RAW_SIGNAL_ALLOWLIST: z.input<typeof SignalAllowlistSchema> = [
+  {
+    id: "webkit-debug-client-errors-access-control-page-error",
+    signalType: "page-error",
+    matcher: {
+      messageIncludes: "/api/debug/client-errors due to access control checks.",
+    },
+    reason:
+      "WebKit real-app soak can emit a page error for the debug client-errors endpoint even when sentinel debug/api signals remain clean.",
+    owner: "@farfield",
+    createdAt: "2026-03-07T00:05:00.000Z",
+    expiresAt: "2026-04-07T00:00:00.000Z",
+    trackingIssue: "runtime-soak-webkit-client-errors-access-control",
+  },
+];
 
 function includesIfPresent(haystack: string, needle: string | undefined): boolean {
   if (!needle) {
@@ -81,7 +95,7 @@ function parseAllowlist(referenceAt: Date): SignalAllowlistEntry[] {
     }
     if (expiry < referenceAt) {
       throw new Error(
-        `Allowlist entry ${entry.id} expired at ${entry.expiresAt}. Remove or renew with justification.`
+        `Allowlist entry ${entry.id} expired at ${entry.expiresAt}. Remove or renew with justification.`,
       );
     }
   }
@@ -119,7 +133,7 @@ function matchesEntry(input: SignalMatchInput, entry: SignalAllowlistEntry): boo
 
 export function findMatchingSignalAllowlistEntry(
   input: SignalMatchInput,
-  referenceAt = new Date()
+  referenceAt = new Date(),
 ): SignalAllowlistEntry | null {
   const entries = parseAllowlist(referenceAt);
   for (const entry of entries) {

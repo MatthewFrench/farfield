@@ -28,14 +28,63 @@ const ArchiveThreadEnvelopeSchema = z
   })
   .strict();
 
+const SendManagedThreadMessageEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+  })
+  .strict();
+
 const ApiErrorEnvelopeSchema = z
   .object({
     ok: z.literal(false),
     error: z.string().min(1),
   })
   .strict();
+const ManagedThreadReadEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    thread: z
+      .object({
+        id: z.string().min(1),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+const ManagedThreadCompletionReadEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    thread: z
+      .object({
+        turns: z.array(
+          z
+            .object({
+              status: z.string().min(1),
+            })
+            .passthrough(),
+        ),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+const ManagedThreadListEnvelopeSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
 const THREAD_BASELINE_FETCH_MAXIMUM_ATTEMPTS = 12;
 const THREAD_BASELINE_FETCH_RETRY_DELAY_MILLISECONDS = 500;
+const MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS = 60;
+const MANAGED_THREAD_READINESS_RETRY_DELAY_MILLISECONDS = 500;
+const TURN_IN_PROGRESS_STATUS = "inProgress";
+const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
 
 function isManagedThreadAlreadyGone(errorMessage: string): boolean {
   return (
@@ -43,6 +92,10 @@ function isManagedThreadAlreadyGone(errorMessage: string): boolean {
     /thread .* is not registered/i.test(errorMessage) ||
     /thread not loaded in app-server/i.test(errorMessage)
   );
+}
+
+function isManagedThreadStillMaterializing(errorMessage: string): boolean {
+  return /includeTurns is unavailable before first user message/i.test(errorMessage);
 }
 
 function parseApiPath(url: string): string | null {
@@ -174,12 +227,13 @@ export class RealAppStateIsolationGuard {
   public async createManagedThread(input?: {
     agentId?: "codex" | "opencode";
     cwd?: string;
+    ephemeral?: boolean;
   }): Promise<string> {
     const response = await this.request.post("/api/threads", {
       data: {
         ...(input?.agentId ? { agentId: input.agentId } : {}),
         ...(input?.cwd ? { cwd: input.cwd } : {}),
-        ephemeral: true,
+        ephemeral: input?.ephemeral ?? true,
       },
     });
 
@@ -193,6 +247,229 @@ export class RealAppStateIsolationGuard {
     const parsed = CreateThreadEnvelopeSchema.parse(payload);
     this.managedThreadIds.add(parsed.threadId);
     return parsed.threadId;
+  }
+
+  public async sendManagedThreadMessage(threadId: string, text: string): Promise<void> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(
+        `Managed thread message send requires a registered managed thread: ${threadId}`,
+      );
+    }
+
+    const trimmedText = text.trim();
+    if (trimmedText.length === 0) {
+      throw new Error("Managed thread message send requires non-empty text.");
+    }
+
+    const response = await this.request.post(
+      `/api/threads/${encodeURIComponent(threadId)}/messages`,
+      {
+        data: {
+          text: trimmedText,
+        },
+      },
+    );
+    const payload = await response.json();
+
+    if (!response.ok()) {
+      const parsedError = ApiErrorEnvelopeSchema.safeParse(payload);
+      if (parsedError.success) {
+        throw new Error(
+          `Managed thread message send failed: POST /api/threads/${threadId}/messages -> ${parsedError.data.error}`,
+        );
+      }
+      throw new Error(
+        `Managed thread message send failed: POST /api/threads/${threadId}/messages -> HTTP ${String(response.status())}`,
+      );
+    }
+
+    const parsed = SendManagedThreadMessageEnvelopeSchema.parse(payload);
+    if (parsed.threadId !== threadId) {
+      throw new Error(
+        `Managed thread message send returned mismatched threadId: expected ${threadId}, got ${parsed.threadId}`,
+      );
+    }
+  }
+
+  public async waitForManagedThreadReadiness(threadId: string): Promise<void> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(`Managed thread readiness requires a registered managed thread: ${threadId}`);
+    }
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      const isFinalAttempt = attemptIndex + 1 >= MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      const response = await this.request.get(
+        `/api/threads/${encodeURIComponent(threadId)}?includeTurns=true`,
+      );
+      const payload = await response.json();
+
+      if (response.ok()) {
+        const parsed = ManagedThreadReadEnvelopeSchema.parse(payload);
+        if (parsed.thread.id !== threadId) {
+          throw new Error(
+            `Managed thread readiness returned mismatched threadId: expected ${threadId}, got ${parsed.thread.id}`,
+          );
+        }
+        return;
+      }
+
+      const parsedError = ApiErrorEnvelopeSchema.safeParse(payload);
+      if (!isFinalAttempt) {
+        await delay(MANAGED_THREAD_READINESS_RETRY_DELAY_MILLISECONDS);
+        continue;
+      }
+
+      if (parsedError.success && isManagedThreadStillMaterializing(parsedError.data.error)) {
+        throw new Error(
+          `Managed thread readiness timed out waiting for materialization: ${threadId}`,
+        );
+      }
+
+      if (parsedError.success) {
+        throw new Error(
+          `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=true -> ${parsedError.data.error}`,
+        );
+      }
+
+      throw new Error(
+        `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=true -> HTTP ${String(response.status())}`,
+      );
+    }
+  }
+
+  public async waitForManagedThreadInActiveList(threadId: string): Promise<void> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(
+        `Managed thread list visibility requires a registered managed thread: ${threadId}`,
+      );
+    }
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      const isFinalAttempt = attemptIndex + 1 >= MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      const response = await this.request.get(
+        "/api/threads?limit=200&archived=false&all=true&maxPages=20",
+      );
+      const payload = await response.json();
+
+      if (response.ok()) {
+        const parsed = ManagedThreadListEnvelopeSchema.parse(payload);
+        if (parsed.data.some((thread) => thread.id === threadId)) {
+          return;
+        }
+      }
+
+      if (isFinalAttempt) {
+        throw new Error(
+          `Managed thread list visibility timed out waiting for active list entry: ${threadId}`,
+        );
+      }
+
+      await delay(MANAGED_THREAD_READINESS_RETRY_DELAY_MILLISECONDS);
+    }
+  }
+
+  public async waitForManagedThreadTurnCompletion(threadId: string): Promise<void> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(
+        `Managed thread turn completion requires a registered managed thread: ${threadId}`,
+      );
+    }
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      const isFinalAttempt = attemptIndex + 1 >= MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      const response = await this.request.get(
+        `/api/threads/${encodeURIComponent(threadId)}?includeTurns=true`,
+      );
+      const payload = await response.json();
+
+      if (response.ok()) {
+        const parsed = ManagedThreadCompletionReadEnvelopeSchema.parse(payload);
+        const lastTurn = parsed.thread.turns.at(-1);
+        if (
+          lastTurn !== undefined &&
+          lastTurn.status !== TURN_IN_PROGRESS_STATUS &&
+          lastTurn.status !== TURN_IN_PROGRESS_UNDERSCORE_STATUS
+        ) {
+          return;
+        }
+      }
+
+      if (isFinalAttempt) {
+        throw new Error(
+          `Managed thread turn completion timed out waiting for a non-running last turn: ${threadId}`,
+        );
+      }
+
+      await delay(MANAGED_THREAD_READINESS_RETRY_DELAY_MILLISECONDS);
+    }
+  }
+
+  public async readManagedThreadTurnCount(threadId: string): Promise<number> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(`Managed thread turn count requires a registered managed thread: ${threadId}`);
+    }
+
+    const response = await this.request.get(
+      `/api/threads/${encodeURIComponent(threadId)}?includeTurns=true`,
+    );
+    const payload = await response.json();
+    if (!response.ok()) {
+      const parsedError = ApiErrorEnvelopeSchema.safeParse(payload);
+      if (parsedError.success) {
+        throw new Error(
+          `Managed thread turn count failed: GET /api/threads/${threadId}?includeTurns=true -> ${parsedError.data.error}`,
+        );
+      }
+      throw new Error(
+        `Managed thread turn count failed: GET /api/threads/${threadId}?includeTurns=true -> HTTP ${String(response.status())}`,
+      );
+    }
+
+    const parsed = ManagedThreadCompletionReadEnvelopeSchema.parse(payload);
+    return parsed.thread.turns.length;
+  }
+
+  public async waitForManagedThreadTurnCount(
+    threadId: string,
+    minimumTurnCount: number,
+  ): Promise<void> {
+    if (!this.managedThreadIds.has(threadId)) {
+      throw new Error(
+        `Managed thread turn count wait requires a registered managed thread: ${threadId}`,
+      );
+    }
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      const isFinalAttempt = attemptIndex + 1 >= MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
+      const turnCount = await this.readManagedThreadTurnCount(threadId);
+      if (turnCount >= minimumTurnCount) {
+        return;
+      }
+
+      if (isFinalAttempt) {
+        throw new Error(
+          `Managed thread turn count timed out waiting for at least ${String(minimumTurnCount)} turns: ${threadId}`,
+        );
+      }
+
+      await delay(MANAGED_THREAD_READINESS_RETRY_DELAY_MILLISECONDS);
+    }
   }
 
   public assertNoViolations(): void {

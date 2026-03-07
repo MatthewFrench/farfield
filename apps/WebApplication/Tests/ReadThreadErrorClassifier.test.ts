@@ -10,6 +10,11 @@ describe("ReadThreadErrorClassifier", () => {
     expect(isTransientReadThreadError("thread not loaded in app-server")).toBe(true);
     expect(
       isTransientReadThreadError(
+        "Request failed for /api/threads/thread-404?includeTurns=true status=404",
+      ),
+    ).toBe(true);
+    expect(
+      isTransientReadThreadError(
         "app-server error -32600: thread abc is not materialized yet; includeTurns is unavailable before first user message",
       ),
     ).toBe(true);
@@ -19,6 +24,11 @@ describe("ReadThreadErrorClassifier", () => {
 
   it("identifies thread-not-loaded errors specifically", () => {
     expect(isThreadNotLoadedReadError("thread not loaded in app-server")).toBe(true);
+    expect(
+      isThreadNotLoadedReadError(
+        "Request failed for /api/threads/thread-404?includeTurns=true status=404",
+      ),
+    ).toBe(true);
     expect(isThreadNotLoadedReadError("conversation not found")).toBe(false);
   });
 });

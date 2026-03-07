@@ -55,6 +55,7 @@ function createMockAgentAdapter(
   listThreads: (input: AgentListThreadsInput) => Promise<AgentListThreadsResult>,
   createThread?: (input: AgentCreateThreadInput) => Promise<AgentCreateThreadResult>,
   listLoadedThreads?: () => Promise<AgentListLoadedThreadsResult>,
+  readThread?: (input: AgentReadThreadInput) => Promise<AgentReadThreadResult>,
 ): AgentAdapter {
   return {
     id: agentId,
@@ -102,8 +103,11 @@ function createMockAgentAdapter(
       }
       return await createThread(input);
     },
-    async readThread(_input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
-      throw new Error("Not used in thread collection route test");
+    async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
+      if (!readThread) {
+        throw new Error("Not used in thread collection route test");
+      }
+      return readThread(input);
     },
     async sendMessage(_input: AgentSendMessageInput): Promise<void> {
       throw new Error("Not used in thread collection route test");
@@ -772,6 +776,86 @@ describe("handleThreadCollectionRoutes", () => {
         },
         {
           id: "thread_loaded",
+          isLoadedInMemory: true,
+        },
+      ],
+    });
+  });
+
+  it("backfills loaded readable threads that are missing from adapter list results", async () => {
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [
+          {
+            id: "thread_listed",
+            preview: "listed",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+        ],
+        nextCursor: null,
+      }),
+      undefined,
+      async (): Promise<AgentListLoadedThreadsResult> => ({
+        data: ["thread_listed", "thread_backfilled"],
+        nextCursor: null,
+      }),
+      async (): Promise<AgentReadThreadResult> => ({
+        thread: {
+          id: "thread_backfilled",
+          createdAt: 3,
+          updatedAt: 10,
+          cwd: "/tmp/project",
+          requests: [],
+          turns: [
+            {
+              id: "turn-backfilled",
+              status: "inProgress",
+              items: [
+                {
+                  type: "userMessage",
+                  id: "item-backfilled",
+                  content: [
+                    {
+                      type: "text",
+                      text: "Backfilled user message preview",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const handled = await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        url: buildThreadCollectionRouteUrl("?limit=10"),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_backfilled",
+          preview: "Backfilled user message preview",
+          isLoadedInMemory: true,
+        },
+        {
+          id: "thread_listed",
+          preview: "listed",
           isLoadedInMemory: true,
         },
       ],

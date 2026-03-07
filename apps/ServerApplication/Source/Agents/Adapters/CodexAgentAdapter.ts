@@ -100,11 +100,13 @@ import type {
 } from "../Types.js";
 import {
   APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT,
+  APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT,
   CODEX_AGENT_CAPABILITIES,
   CODEX_AGENT_IDENTIFIER,
   CODEX_AGENT_LABEL,
   type CodexAgentRuntimeState,
   type CodexIpcFrameEvent,
+  isAppServerErrorMatchingMessageFragment,
   isInvalidRequestErrorMatchingMessageFragment,
 } from "./CodexAgentAdapterContracts.js";
 import { wireCodexAgentAdapterIpcIngress } from "./CodexAgentAdapterIpcIngressWiring.js";
@@ -228,16 +230,28 @@ export class CodexAgentAdapter implements AgentAdapter {
   }
 
   public isThreadNotLoadedError(error: Error): boolean {
-    return isInvalidRequestErrorMatchingMessageFragment(
-      error,
-      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotLoaded,
+    return (
+      isInvalidRequestErrorMatchingMessageFragment(
+        error,
+        APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotLoaded,
+      ) ||
+      isAppServerErrorMatchingMessageFragment(
+        error,
+        APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT.threadRolloutMissing,
+      )
     );
   }
 
   public isConversationNotFoundError<ErrorType>(error: ErrorType): boolean {
-    return isInvalidRequestErrorMatchingMessageFragment(
-      error,
-      APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.conversationNotFound,
+    return (
+      isInvalidRequestErrorMatchingMessageFragment(
+        error,
+        APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.conversationNotFound,
+      ) ||
+      isInvalidRequestErrorMatchingMessageFragment(
+        error,
+        APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT.threadNotFound,
+      )
     );
   }
 

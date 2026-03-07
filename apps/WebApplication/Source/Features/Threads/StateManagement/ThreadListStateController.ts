@@ -239,6 +239,15 @@ export class ThreadListStateController {
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.activeThreads);
   }
 
+  public async prepareActiveThreadQueryForExplicitRefresh(): Promise<void> {
+    // Explicit user refreshes must bypass retained active-thread baselines so newly created or
+    // externally mutated threads do not remain hidden behind persisted cache snapshots.
+    this.threadQueryCache.invalidate(ThreadListCacheKeyByName.activeThreads);
+    await this.threadListSnapshotPersistenceStore.clearThreadListSnapshot(
+      ThreadListCacheKeyByName.activeThreads,
+    );
+  }
+
   public invalidateArchivedThreadQuery(): void {
     // Keep the last snapshot as a sync baseline; invalidation should only revoke freshness.
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);

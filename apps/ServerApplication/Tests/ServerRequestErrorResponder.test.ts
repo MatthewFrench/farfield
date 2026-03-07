@@ -286,6 +286,28 @@ describe("ServerRequestErrorResponder", () => {
     ]);
   });
 
+  it("omits null action metadata from recorded server error details", () => {
+    const harness = createHarness(() => false);
+    const { req, res } = createHttpPair({ method: "GET", url: "/api/threads" });
+
+    harness.responder.respond({
+      req,
+      res,
+      error: new Error("request handler crashed"),
+      context: {
+        requestId: "request_3b",
+        actionId: null,
+        actionName: null,
+      },
+    });
+
+    expect(harness.recordedServerErrors).toHaveLength(1);
+    expect(harness.recordedServerErrors[0]?.details).toEqual({
+      method: "GET",
+      errorCategory: "internal",
+    });
+  });
+
   it("does not write a second error payload when response headers were already sent", () => {
     const harness = createHarness(() => false);
     const { req, res } = createHttpPair({ method: "GET", url: "/api/threads" });

@@ -18,6 +18,7 @@ This plan is setup and workflow only. It does not include turning manual session
 - Backend server runs on `127.0.0.1:4311` (`apps/ServerApplication/Source/Application/ServerBootstrap.ts`).
 - Frontend proxies `/api` and `/events` to backend (`apps/WebApplication/vite.config.ts`).
 - API token injection in dev proxy is restricted to trusted origins (`localhost` defaults, configurable via `VITE_DEV_PROXY_TRUSTED_ORIGINS`) when `API_TOKEN` or `PUSH_API_TOKEN` is set (`apps/WebApplication/vite.config.ts`).
+- Same-host browser requests from remote devices are trusted by the dev proxy, but originless requests remain loopback-only so command-line traffic does not inherit protected API access accidentally.
 - When `API_TOKEN` is configured, `/events` requires the same token as `/api/*`; browser flows should run through the trusted dev proxy/Caddy path.
 - `scripts/tooling/with-env.mjs` already loads `.env` and `.env.local` for wrapped commands.
 

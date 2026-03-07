@@ -7,14 +7,30 @@ import {
   type DebugErrorSeverity,
   parseDebugErrorEvent,
 } from "@farfield/protocol";
+import { z } from "zod";
 import { logger } from "../../Shared/Logging/Logger.js";
 
 const ERROR_IDENTIFIER_PREFIX = "error_";
 const MALFORMED_LINE_LOG_EVENT = "client-error-store-skip-malformed-line";
 const MALFORMED_LINE_NUMBER_SAMPLE_LIMIT = 5;
 const LIST_LIMIT_MINIMUM = 1;
+const LATEST_SESSION_LOG_FILE_NAME = "latest-session.ndjson";
+const LATEST_SESSION_METADATA_FILE_NAME = "latest-session.json";
 const TEXT_FILE_ENCODING = "utf8";
 const NDJSON_LINE_BREAK = "\n";
+const JSON_INDENT_SPACES = 2;
+
+const ClientErrorSessionMetadataSchema = z
+  .object({
+    sessionId: z.string().trim().min(1),
+    sessionLogPath: z.string().trim().min(1),
+    latestSessionLogPath: z.string().trim().min(1),
+    entryCount: z.number().int().nonnegative(),
+    updatedAt: z.string().datetime(),
+  })
+  .strict();
+
+type ClientErrorSessionMetadata = z.infer<typeof ClientErrorSessionMetadataSchema>;
 
 interface RecordServerErrorInput {
   source: string;
@@ -56,6 +72,8 @@ interface MalformedLineSummary {
  */
 export class ClientErrorStore {
   private readonly filePath: string;
+  private readonly latestSessionLogPath: string;
+  private readonly latestSessionMetadataPath: string;
   private readonly sessionId: string;
   private readonly maxEntries: number;
   private events: DebugErrorEvent[];
@@ -73,6 +91,12 @@ export class ClientErrorStore {
     }
 
     this.filePath = path.resolve(filePath);
+    const sessionDirectoryPath = path.dirname(this.filePath);
+    this.latestSessionLogPath = path.join(sessionDirectoryPath, LATEST_SESSION_LOG_FILE_NAME);
+    this.latestSessionMetadataPath = path.join(
+      sessionDirectoryPath,
+      LATEST_SESSION_METADATA_FILE_NAME,
+    );
     this.sessionId = sessionId;
     this.maxEntries = maxEntries;
     this.events = [];
@@ -80,6 +104,7 @@ export class ClientErrorStore {
 
     this.ensureFile();
     this.loadExisting();
+    this.writeLatestSessionArtifacts(this.buildSerializedEventsContent());
   }
 
   public getSessionId(): string {
@@ -88,6 +113,14 @@ export class ClientErrorStore {
 
   public getSessionLogPath(): string {
     return this.filePath;
+  }
+
+  public getLatestSessionLogPath(): string {
+    return this.latestSessionLogPath;
+  }
+
+  public getLatestSessionMetadataPath(): string {
+    return this.latestSessionMetadataPath;
   }
 
   public getCount(): number {
@@ -199,6 +232,7 @@ export class ClientErrorStore {
     this.events = [];
     this.byId.clear();
     fs.writeFileSync(this.filePath, "", TEXT_FILE_ENCODING);
+    this.writeLatestSessionArtifacts("");
     return clearedCount;
   }
 
@@ -283,11 +317,12 @@ export class ClientErrorStore {
   }
 
   private appendEvent(event: DebugErrorEvent): void {
-    fs.appendFileSync(
-      this.filePath,
-      `${this.serializeEvent(event)}${NDJSON_LINE_BREAK}`,
-      TEXT_FILE_ENCODING,
-    );
+    const serializedEventLine = `${this.serializeEvent(event)}${NDJSON_LINE_BREAK}`;
+    fs.appendFileSync(this.filePath, serializedEventLine, TEXT_FILE_ENCODING);
+    if (this.latestSessionLogPath !== this.filePath) {
+      fs.appendFileSync(this.latestSessionLogPath, serializedEventLine, TEXT_FILE_ENCODING);
+    }
+    this.writeLatestSessionMetadata();
   }
 
   private serializeEvent(event: DebugErrorEvent): string {
@@ -311,11 +346,43 @@ export class ClientErrorStore {
   }
 
   private writeAllEvents(): void {
+    const serializedEventsContent = this.buildSerializedEventsContent();
+    fs.writeFileSync(this.filePath, serializedEventsContent, TEXT_FILE_ENCODING);
+    this.writeLatestSessionArtifacts(serializedEventsContent);
+  }
+
+  private buildSerializedEventsContent(): string {
     const lines = this.events.map((event) => this.serializeEvent(event)).join(NDJSON_LINE_BREAK);
     if (lines.length === 0) {
-      fs.writeFileSync(this.filePath, "", TEXT_FILE_ENCODING);
-      return;
+      return "";
     }
-    fs.writeFileSync(this.filePath, `${lines}${NDJSON_LINE_BREAK}`, TEXT_FILE_ENCODING);
+    return `${lines}${NDJSON_LINE_BREAK}`;
+  }
+
+  private writeLatestSessionArtifacts(serializedEventsContent: string): void {
+    if (this.latestSessionLogPath !== this.filePath) {
+      fs.writeFileSync(this.latestSessionLogPath, serializedEventsContent, TEXT_FILE_ENCODING);
+    }
+    this.writeLatestSessionMetadata();
+  }
+
+  private writeLatestSessionMetadata(): void {
+    const metadata = this.createLatestSessionMetadata();
+    fs.writeFileSync(
+      this.latestSessionMetadataPath,
+      `${JSON.stringify(metadata, null, JSON_INDENT_SPACES)}${NDJSON_LINE_BREAK}`,
+      TEXT_FILE_ENCODING,
+    );
+  }
+
+  private createLatestSessionMetadata(): ClientErrorSessionMetadata {
+    const latestRecordedAt = this.events.at(-1)?.recordedAt ?? new Date().toISOString();
+    return ClientErrorSessionMetadataSchema.parse({
+      sessionId: this.sessionId,
+      sessionLogPath: this.filePath,
+      latestSessionLogPath: this.latestSessionLogPath,
+      entryCount: this.events.length,
+      updatedAt: latestRecordedAt,
+    });
   }
 }

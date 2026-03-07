@@ -160,6 +160,7 @@ export class ServerRequestErrorResponder {
     }
 
     try {
+      const serverErrorEventDetails = this.createServerErrorEventDetails(logInput);
       this.deps.recordServerErrorEvent({
         source: SERVER_ERROR_SOURCE,
         operation: HTTP_REQUEST_OPERATION,
@@ -170,12 +171,7 @@ export class ServerRequestErrorResponder {
         requestId: logInput.requestId,
         threadId: null,
         url: requestUrl,
-        details: {
-          method: logInput.method,
-          actionId: logInput.actionId,
-          actionName: logInput.actionName,
-          errorCategory: logInput.errorCategory,
-        },
+        details: serverErrorEventDetails,
       });
     } catch (recordError) {
       logger.error(
@@ -236,6 +232,22 @@ export class ServerRequestErrorResponder {
       error: classification.runtimeErrorMessage,
       errorCategory: classification.category,
     };
+  }
+
+  private createServerErrorEventDetails(
+    logInput: ServerRequestErrorLogInput,
+  ): Record<string, string> {
+    const details: Record<string, string> = {
+      method: logInput.method,
+      errorCategory: logInput.errorCategory,
+    };
+    if (logInput.actionId !== null) {
+      details["actionId"] = logInput.actionId;
+    }
+    if (logInput.actionName !== null) {
+      details["actionName"] = logInput.actionName;
+    }
+    return details;
   }
 
   private writeErrorResponse(input: {

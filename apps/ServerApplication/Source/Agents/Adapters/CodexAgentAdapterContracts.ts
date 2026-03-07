@@ -8,6 +8,10 @@ export const APP_SERVER_INVALID_REQUEST_ERROR_CODE = -32600;
 export const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
   threadNotLoaded: "thread not loaded",
   conversationNotFound: "conversation not found",
+  threadNotFound: "thread not found",
+} as const;
+export const APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT = {
+  threadRolloutMissing: "failed to locate rollout for thread",
 } as const;
 
 export interface CodexAgentRuntimeState {
@@ -69,6 +73,17 @@ export function isInvalidRequestErrorMatchingMessageFragment<ErrorType>(
   }
 
   if (error.code !== APP_SERVER_INVALID_REQUEST_ERROR_CODE) {
+    return false;
+  }
+
+  return error.message.includes(messageFragment);
+}
+
+export function isAppServerErrorMatchingMessageFragment<ErrorType>(
+  error: ErrorType,
+  messageFragment: string,
+): boolean {
+  if (!(error instanceof AppServerRpcError)) {
     return false;
   }
 

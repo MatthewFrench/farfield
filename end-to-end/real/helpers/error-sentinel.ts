@@ -276,6 +276,19 @@ export class ErrorSentinel {
     this.bannerEvents = await this.readBannerEvents();
   }
 
+  public async markCurrentDebugErrorsAsBaseline(): Promise<void> {
+    if (!this.enforceDebugErrorEndpointReads) {
+      return;
+    }
+
+    const allEvents = await this.fetchDebugErrors();
+    this.baselineErrorIds.clear();
+    for (const event of allEvents) {
+      this.baselineErrorIds.add(event.errorId);
+    }
+    this.newErrorEvents = [];
+  }
+
   public async assertNoUnexpectedClientErrors(): Promise<void> {
     await this.refresh();
 

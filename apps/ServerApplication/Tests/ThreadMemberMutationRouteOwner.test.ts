@@ -259,6 +259,11 @@ interface ContextBoundUnsubscribeAdapter extends AgentAdapter {
   unsubscribeThread(input: AgentUnsubscribeThreadInput): Promise<AgentUnsubscribeThreadStatus>;
 }
 
+interface ContextBoundArchiveAdapter extends AgentAdapter {
+  observedThreadIds: string[];
+  archiveThread(input: { threadId: string }): Promise<void>;
+}
+
 describe("ThreadMemberMutationRouteOwner", () => {
   it("handles send-message mutations with deterministic action and response mapping", async () => {
     const { request, response } = createMockRequestResponsePair();
@@ -562,6 +567,46 @@ describe("ThreadMemberMutationRouteOwner", () => {
       ok: true,
       threadId: "thread-2",
       sourceThreadId: "thread-1",
+    });
+  });
+
+  it("calls archiveThread with adapter context when provided as an instance method", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+    const adapter: ContextBoundArchiveAdapter = {
+      ...createAgentAdapter({}),
+      observedThreadIds: [],
+      async archiveThread(input: { threadId: string }): Promise<void> {
+        this.observedThreadIds.push(input.threadId);
+      },
+    };
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "archive"],
+        readJsonBody: async () => ({}),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(adapter.observedThreadIds).toEqual(["thread-1"]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
     });
   });
 

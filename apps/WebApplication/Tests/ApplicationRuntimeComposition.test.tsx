@@ -64,12 +64,6 @@ interface ApplicationSynchronizationEffectsCapture {
   loadHistoryDetail: (historyEntryId: string) => Promise<void>;
 }
 
-interface SelectedThreadLifecycleEffectsCapture {
-  readNextSelectedThreadIdentifierAfterLoadFailure: (
-    failedThreadIdentifier: string,
-  ) => string | null;
-}
-
 interface ApplicationShellCompositionCapture {
   chatFeatureComposition: ChatFeatureCompositionMock;
   debugFeatureComposition: DebugFeatureCompositionMock;
@@ -186,6 +180,7 @@ import {
 } from "../Source/Application/StateManagement/UseCoreDataLoaders";
 import { ConversationSyncSignatureBuilder } from "../Source/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
 import { ModeSelectionStateResolver } from "../Source/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import type { UseSelectedThreadLifecycleEffectsInput } from "../Source/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
 import {
   type SelectedThreadLoaders,
   useSelectedThreadLoaders,
@@ -206,7 +201,7 @@ let latestRuntimeHarnessSnapshot: RuntimeHarnessSnapshot | null = null;
 let applicationRefreshEffectsCapture: ApplicationRefreshEffectsCapture | null = null;
 let applicationSynchronizationEffectsCapture: ApplicationSynchronizationEffectsCapture | null =
   null;
-let selectedThreadLifecycleEffectsCapture: SelectedThreadLifecycleEffectsCapture | null = null;
+let selectedThreadLifecycleEffectsCapture: UseSelectedThreadLifecycleEffectsInput | null = null;
 let applicationShellCompositionCapture: ApplicationShellCompositionCapture | null = null;
 
 let pushFeatureCompositionMock: PushFeatureCompositionMock;
@@ -501,7 +496,7 @@ describe("useApplicationRuntimeComposition", () => {
 
     hookMocks.useViewportShellEffects.mockImplementation((): void => {});
     hookMocks.useSelectedThreadLifecycleEffects.mockImplementation(
-      (input: SelectedThreadLifecycleEffectsCapture): void => {
+      (input: UseSelectedThreadLifecycleEffectsInput): void => {
         selectedThreadLifecycleEffectsCapture = input;
       },
     );
@@ -609,50 +604,15 @@ describe("useApplicationRuntimeComposition", () => {
     );
   });
 
-  it("wires selected-thread load-failure recovery to choose the next available thread", () => {
+  it("wires selected-thread lifecycle effects", () => {
     render(<RuntimeCompositionHarness />);
-    const harnessSnapshot = latestRuntimeHarnessSnapshot;
-    if (!harnessSnapshot) {
-      throw new Error("Expected runtime harness snapshot to be captured");
-    }
-
-    act(() => {
-      harnessSnapshot.applicationShellState.setThreads([
-        {
-          id: "thread-2",
-          preview: "second",
-          createdAt: 2,
-          updatedAt: 2,
-          agentId: "codex",
-          hasUnreadTurn: null,
-          isProjectRemoved: false,
-        },
-        {
-          id: "thread-1",
-          preview: "first",
-          createdAt: 1,
-          updatedAt: 1,
-          agentId: "codex",
-          hasUnreadTurn: null,
-          isProjectRemoved: false,
-        },
-      ]);
-    });
 
     const lifecycleEffectsInput = selectedThreadLifecycleEffectsCapture;
     if (!lifecycleEffectsInput) {
       throw new Error("Expected selected-thread lifecycle input to be captured");
     }
 
-    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("thread-2")).toBe(
-      "thread-1",
-    );
-    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("thread-1")).toBe(
-      "thread-2",
-    );
-    expect(lifecycleEffectsInput.readNextSelectedThreadIdentifierAfterLoadFailure("missing")).toBe(
-      "thread-2",
-    );
+    expect(lifecycleEffectsInput.selectedThreadId).toBeNull();
   });
 
   it("reads current loader refs for each runtime refresh invocation", async () => {

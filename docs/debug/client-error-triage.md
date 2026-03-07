@@ -6,6 +6,8 @@ Farfield records both client-side and server-side errors to a session NDJSON log
 
 - Runtime directory: `.runtime/logs/errors/`
 - Session log filename pattern: `session-<iso-timestamp>-<pid>.ndjson`
+- Stable current-session mirror: `.runtime/logs/errors/latest-session.ndjson`
+- Stable current-session metadata: `.runtime/logs/errors/latest-session.json`
 - One JSON object per line, validated by `DebugErrorEventSchema` in `@farfield/protocol`
 
 ## Fastest way to inspect errors
@@ -41,6 +43,12 @@ Farfield records both client-side and server-side errors to a session NDJSON log
 # Show newest session logs
 ls -lt .runtime/logs/errors
 
+# Read the active session log without guessing the timestamped filename
+tail -n 200 .runtime/logs/errors/latest-session.ndjson
+
+# Read the active session metadata
+cat .runtime/logs/errors/latest-session.json
+
 # Read recent events from the newest session log
 tail -n 200 "$(ls -t .runtime/logs/errors/session-*.ndjson | head -n 1)"
 
@@ -70,4 +78,5 @@ Each event includes:
 1. Start from `errorId` shown in the red banner.
 2. Open Debug tab and inspect the full event.
 3. Correlate timestamp/operation with Debug History and Stream Events.
-4. If needed, parse `.runtime/logs/errors/session-*.ndjson` for full-session context.
+4. Use `.runtime/logs/errors/latest-session.ndjson` for current-session context.
+5. If needed, parse `.runtime/logs/errors/session-*.ndjson` for older session context.

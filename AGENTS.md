@@ -365,18 +365,34 @@ Important files (non-exhaustive) and why they matter:
 - `bun run test`
 - `bun run lint`
 
+## Runtime Soak
+
+For runtime-sensitive web changes (thread selection/opening, sidebar behavior, chat reload/send/readback, selected-thread synchronization, and mobile runtime issues), use the runtime soak process documented in:
+
+- `/Users/matthewfrench/GitHub/farfield/docs/debug/mobile-runtime-soak-process.md`
+
+During iteration, prefer:
+
+- `E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-soak`
+- `E2E_REAL_PERFORMANCE_BUDGET_MODE=warn bun run end-to-end:real:mobile-soak:webkit`
+
+The soak must use the real product path: real stack, real data, real rendering, and no Playwright route stubbing for product API endpoints inside the soak scenario. If it fails, inspect `.runtime/end-to-end-sentinel/latest.ndjson`, `.runtime/end-to-end-performance/latest.json`, and the Playwright `test-results/real-app/**/trace.zip` artifacts before changing code. When soak-driven fixes land, update the process doc with the implementation summary and explicit user-visible impact.
+In multi-agent soak runs, watcher agents must inspect every emitted non-debug request lifecycle event for the exercised feature steps, explain which user action triggered it, and flag excessive request count, over-broad route scope, obviously over-wide data reads, slow timing, queue-delay spikes, intermittent errors, and visible user-experience roughness even when a hard budget still passes.
+
 ## Client Error Session Log
 
 Browser crash reports and server-side runtime debug errors are written to an NDJSON session log.
 
 - Default path: `<workspace>/.runtime/logs/errors/session-<timestamp>-<pid>.ndjson`
+- Stable current-session mirror: `<workspace>/.runtime/logs/errors/latest-session.ndjson`
+- Stable current-session metadata: `<workspace>/.runtime/logs/errors/latest-session.json`
 - Override path: set `DEBUG_CLIENT_ERROR_LOG_PATH`
 - Entry limit: set `DEBUG_CLIENT_ERROR_MAX_ENTRIES` (default `2000`)
 
 How to use this log:
 
 1. Trigger or reproduce the issue.
-2. Open the current session file above, or download it from `GET /api/debug/client-errors/session-log`.
+2. Open `latest-session.ndjson` for the active server session, or download it from `GET /api/debug/client-errors/session-log`.
 3. Correlate by `requestId`, `threadId`, `operation`, and `recordedAt`.
 
 Why this file is valuable:

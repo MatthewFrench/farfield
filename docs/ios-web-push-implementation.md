@@ -237,6 +237,7 @@ Protect `/api/*` with an optional shared secret header.
    - When `API_TOKEN` is unset, `/api/*` remains open for development compatibility.
 4. Validation remains strict and explicit; auth check happens before body parsing.
 5. `/events` uses the same token requirement when `API_TOKEN` is set. In browser flows, trusted reverse proxies inject `X-Farfield-Token` upstream.
+6. The Vite dev proxy trusts same-host browser origins for remote-device testing, while originless requests remain loopback-only.
 
 ### Event hook integration
 

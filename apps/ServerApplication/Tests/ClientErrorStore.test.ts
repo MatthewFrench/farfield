@@ -42,6 +42,8 @@ describe("ClientErrorStore", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
     const store = new ClientErrorStore(logPath, "session_1", 20);
+    const latestSessionLogPath = path.join(directory, "latest-session.ndjson");
+    const latestSessionMetadataPath = path.join(directory, "latest-session.json");
 
     const clientEvent = store.recordClientError({
       source: "web-app",
@@ -83,6 +85,23 @@ describe("ClientErrorStore", () => {
     expect(lines.length).toBe(2);
     expect(lines[0]).toContain('"origin":"client"');
     expect(lines[1]).toContain('"origin":"server"');
+
+    const latestRaw = fs.readFileSync(latestSessionLogPath, "utf8").trim();
+    expect(latestRaw).toBe(raw);
+    const latestSessionMetadata = JSON.parse(
+      fs.readFileSync(latestSessionMetadataPath, "utf8"),
+    ) as {
+      sessionId: string;
+      sessionLogPath: string;
+      latestSessionLogPath: string;
+      entryCount: number;
+      updatedAt: string;
+    };
+    expect(latestSessionMetadata.sessionId).toBe("session_1");
+    expect(latestSessionMetadata.sessionLogPath).toBe(path.resolve(logPath));
+    expect(latestSessionMetadata.latestSessionLogPath).toBe(path.resolve(latestSessionLogPath));
+    expect(latestSessionMetadata.entryCount).toBe(2);
+    expect(latestSessionMetadata.updatedAt).toBe(serverEvent.recordedAt);
 
     const reloadedStore = new ClientErrorStore(logPath, "session_1", 20);
     expect(reloadedStore.getCount()).toBe(2);
@@ -156,6 +175,8 @@ describe("ClientErrorStore", () => {
     const directory = makeTempDir();
     const logPath = path.join(directory, "session.ndjson");
     const store = new ClientErrorStore(logPath, "session_2", 2);
+    const latestSessionLogPath = path.join(directory, "latest-session.ndjson");
+    const latestSessionMetadataPath = path.join(directory, "latest-session.json");
 
     store.recordClientError({
       source: "web-app",
@@ -169,6 +190,15 @@ describe("ClientErrorStore", () => {
     expect(store.getCount()).toBe(0);
     expect(store.list(10)).toEqual([]);
     expect(fs.readFileSync(logPath, "utf8")).toBe("");
+    expect(fs.readFileSync(latestSessionLogPath, "utf8")).toBe("");
+    const latestSessionMetadata = JSON.parse(
+      fs.readFileSync(latestSessionMetadataPath, "utf8"),
+    ) as {
+      entryCount: number;
+      sessionId: string;
+    };
+    expect(latestSessionMetadata.entryCount).toBe(0);
+    expect(latestSessionMetadata.sessionId).toBe("session_2");
   });
 
   it("skips malformed ndjson lines while loading existing events", () => {

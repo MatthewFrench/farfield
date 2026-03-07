@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createElement,
   type Dispatch,
@@ -117,6 +117,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const enablePushNotificationsFromToolbarSpy = vi.fn(async (): Promise<void> => {});
   const refreshPushSettingsDiagnosticsSpy = vi.fn(async (): Promise<void> => {});
   const sendPushTestNotificationFromSettingsSpy = vi.fn(async (): Promise<void> => {});
+  const prepareActiveThreadQueryForExplicitRefreshSpy = vi.fn(async (): Promise<void> => {});
   const refreshCoreDataAndSelectedThreadSpy = vi.fn(async (): Promise<void> => {});
   const setActiveTabSpy = vi.fn((): void => {});
   const toggleThemeSpy = vi.fn((): void => {});
@@ -267,6 +268,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     enablePushNotificationsFromToolbar: enablePushNotificationsFromToolbarSpy,
     refreshPushSettingsDiagnostics: refreshPushSettingsDiagnosticsSpy,
     sendPushTestNotificationFromSettings: sendPushTestNotificationFromSettingsSpy,
+    prepareActiveThreadQueryForExplicitRefresh: prepareActiveThreadQueryForExplicitRefreshSpy,
     refreshCoreDataAndSelectedThread: refreshCoreDataAndSelectedThreadSpy,
     setActiveTab: setActiveTabSpy,
     toggleTheme: toggleThemeSpy,
@@ -442,6 +444,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     enablePushNotificationsFromToolbarSpy,
     refreshPushSettingsDiagnosticsSpy,
     sendPushTestNotificationFromSettingsSpy,
+    prepareActiveThreadQueryForExplicitRefreshSpy,
     refreshCoreDataAndSelectedThreadSpy,
     setActiveTabSpy,
     toggleThemeSpy,
@@ -554,7 +557,7 @@ describe("useApplicationShellViewProperties", () => {
     cleanup();
   });
 
-  it("wires header and settings actions to the expected owner callbacks", () => {
+  it("wires header and settings actions to the expected owner callbacks", async () => {
     const fixture = createUseApplicationShellViewPropertiesFixture();
     const viewProperties = renderViewProperties(fixture.input);
     const headerProperties = viewProperties.applicationHeaderBarProperties;
@@ -568,8 +571,11 @@ describe("useApplicationShellViewProperties", () => {
     expect(fixture.setDesktopSidebarOpenSpy).toHaveBeenCalledWith(true);
     expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
 
-    settingsProperties.onRefreshData();
-    expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
+    void settingsProperties.onRefreshData();
+    expect(fixture.prepareActiveThreadQueryForExplicitRefreshSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
+    });
 
     settingsProperties.onToggleTheme();
     expect(fixture.toggleThemeSpy).toHaveBeenCalledTimes(1);

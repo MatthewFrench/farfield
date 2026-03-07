@@ -245,6 +245,10 @@ function buildApplicationShellViewPropertiesInput(
     refreshPushSettingsDiagnostics: input.pushFeatureComposition.refreshPushSettingsDiagnostics,
     sendPushTestNotificationFromSettings:
       input.pushFeatureComposition.sendPushTestNotificationFromSettings,
+    prepareActiveThreadQueryForExplicitRefresh:
+      input.threadListStateController.prepareActiveThreadQueryForExplicitRefresh.bind(
+        input.threadListStateController,
+      ),
     refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,
     setActiveTab: applicationShellState.setActiveTab,
     toggleTheme: input.toggleTheme,

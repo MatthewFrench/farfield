@@ -23,7 +23,7 @@ interface ThreadCollectionProjectionSourceTurn {
 
 export interface ThreadCollectionListItemProjectionSource {
   id: string;
-  preview: string;
+  preview?: string | undefined;
   createdAt: number;
   updatedAt: number;
   cwd?: string | undefined;
@@ -64,6 +64,10 @@ function readThreadDisplayName(
     normalizeOptionalText(thread.title) ??
     normalizeOptionalText(thread.name)
   );
+}
+
+function readThreadPreview(thread: ThreadCollectionListItemProjectionSource): string {
+  return normalizeOptionalText(thread.preview) ?? readLastUserMessage(thread.turns) ?? "";
 }
 
 function readLatestTurnItemType(
@@ -153,7 +157,7 @@ export function projectThreadListItemFromAgentThreadListItem(
 ): FarfieldThreadListItem {
   return {
     id: input.thread.id,
-    preview: input.thread.preview,
+    preview: readThreadPreview(input.thread),
     displayName: readThreadDisplayName(input.thread),
     lastUserMessage: readLastUserMessage(input.thread.turns),
     latestActivityIsUserMessage: readThreadLatestActivityIsUserMessage(input.thread),

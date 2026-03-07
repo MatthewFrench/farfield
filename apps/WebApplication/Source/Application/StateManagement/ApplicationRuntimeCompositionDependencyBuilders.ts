@@ -190,12 +190,6 @@ export function buildSelectedThreadLifecycleEffectsInput(
   const { applicationShellState, applicationOwnerDependencies, runtimeRequestHandlers } = context;
   return {
     selectedThreadId: applicationShellState.selectedThreadId,
-    readNextSelectedThreadIdentifierAfterLoadFailure: (failedThreadIdentifier) => {
-      const nextActiveThread = applicationShellState.threads.find(
-        (thread) => thread.id !== failedThreadIdentifier,
-      );
-      return nextActiveThread?.id ?? null;
-    },
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
@@ -206,7 +200,6 @@ export function buildSelectedThreadLifecycleEffectsInput(
     setReadThreadState: applicationShellState.setReadThreadState,
     setStreamEvents: applicationShellState.setStreamEvents,
     setIsSelectedThreadLoading: applicationShellState.setIsSelectedThreadLoading,
-    setSelectedThreadId: applicationShellState.setSelectedThreadId,
     unsubscribeThread: async (threadId) => {
       await applicationOwnerDependencies.chatServerClient.unsubscribeThread(threadId);
     },

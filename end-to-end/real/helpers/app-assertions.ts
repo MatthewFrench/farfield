@@ -1,4 +1,7 @@
-import { DebugErrorListResponseSchema } from "@farfield/protocol";
+import {
+  DebugErrorListResponseSchema,
+  FarfieldDebugObservabilityEnvelopeSchema,
+} from "@farfield/protocol";
 import { expect, type Page } from "@playwright/test";
 import { z } from "zod";
 import type { ErrorSentinel } from "./error-sentinel";
@@ -34,6 +37,26 @@ export interface RuntimeRequestErrorOperationSpikeAssertionInput {
   baselineOperationCounts: RuntimeRequestErrorOperationCountSnapshot;
   currentOperationCounts: RuntimeRequestErrorOperationCountSnapshot;
   maximumIncreasePerOperation: number;
+}
+
+export interface RequestObservabilityRouteSnapshot {
+  requestCount: number;
+  lastDurationMs: number;
+  lastQueueDelayMs: number;
+}
+
+export interface RequestObservabilitySnapshot {
+  totalErrorCount: number;
+  routeSnapshotByKey: Record<string, RequestObservabilityRouteSnapshot>;
+}
+
+export interface RequestObservabilityBudgetAssertionInput {
+  baselineSnapshot: RequestObservabilitySnapshot;
+  currentSnapshot: RequestObservabilitySnapshot;
+  maximumRequestErrorIncrease: number;
+  maximumLastDurationMs: number;
+  maximumLastQueueDelayMs: number;
+  ignoredRouteKeys?: string[];
 }
 
 function readRuntimeRequestOperationLabel(
@@ -233,6 +256,76 @@ export async function captureRuntimeRequestErrorOperationCounts(
   return readRuntimeRequestErrorOperationCountSnapshot(parsedEnvelope.data);
 }
 
+function buildRequestObservabilityRouteKey(input: { method: string; route: string }): string {
+  return `${input.method} ${input.route}`;
+}
+
+export async function captureRequestObservabilitySnapshot(
+  page: Page,
+): Promise<RequestObservabilitySnapshot> {
+  const response = await page.request.get("/api/debug/observability");
+  expect(response.ok()).toBe(true);
+
+  const payload = await response.json();
+  const parsedEnvelope = FarfieldDebugObservabilityEnvelopeSchema.parse(payload);
+  const routeSnapshotByKey = parsedEnvelope.snapshot.performance.requestRouting.routeTimings.reduce<
+    Record<string, RequestObservabilityRouteSnapshot>
+  >((snapshot, routeTiming) => {
+    snapshot[buildRequestObservabilityRouteKey(routeTiming)] = {
+      requestCount: routeTiming.requestCount,
+      lastDurationMs: routeTiming.lastDurationMs,
+      lastQueueDelayMs: routeTiming.lastQueueDelayMs,
+    };
+    return snapshot;
+  }, {});
+
+  return {
+    totalErrorCount: parsedEnvelope.snapshot.performance.requestRouting.totalErrorCount,
+    routeSnapshotByKey,
+  };
+}
+
+function readRequestObservabilityBudgetViolations(
+  input: RequestObservabilityBudgetAssertionInput,
+): string[] {
+  const ignoredRouteKeys = new Set(input.ignoredRouteKeys ?? []);
+  const routeKeys = new Set<string>([
+    ...Object.keys(input.baselineSnapshot.routeSnapshotByKey),
+    ...Object.keys(input.currentSnapshot.routeSnapshotByKey),
+  ]);
+
+  const violations: string[] = [];
+  for (const routeKey of routeKeys) {
+    if (ignoredRouteKeys.has(routeKey)) {
+      continue;
+    }
+
+    const baselineRouteSnapshot = input.baselineSnapshot.routeSnapshotByKey[routeKey];
+    const currentRouteSnapshot = input.currentSnapshot.routeSnapshotByKey[routeKey];
+    if (currentRouteSnapshot === undefined) {
+      continue;
+    }
+
+    const baselineRequestCount = baselineRouteSnapshot?.requestCount ?? 0;
+    if (currentRouteSnapshot.requestCount <= baselineRequestCount) {
+      continue;
+    }
+
+    if (currentRouteSnapshot.lastDurationMs > input.maximumLastDurationMs) {
+      violations.push(
+        `${routeKey}: lastDurationMs=${String(currentRouteSnapshot.lastDurationMs)} budget=${String(input.maximumLastDurationMs)}`,
+      );
+    }
+    if (currentRouteSnapshot.lastQueueDelayMs > input.maximumLastQueueDelayMs) {
+      violations.push(
+        `${routeKey}: lastQueueDelayMs=${String(currentRouteSnapshot.lastQueueDelayMs)} budget=${String(input.maximumLastQueueDelayMs)}`,
+      );
+    }
+  }
+
+  return violations;
+}
+
 export function expectRuntimeRequestErrorOperationSpikeBudget(
   input: RuntimeRequestErrorOperationSpikeAssertionInput,
 ): void {
@@ -240,5 +333,22 @@ export function expectRuntimeRequestErrorOperationSpikeBudget(
   expect(
     operationIncreaseDetails,
     `runtime-request-error operation increases exceeded budget ${String(input.maximumIncreasePerOperation)}:\n${operationIncreaseDetails.join("\n")}`,
+  ).toEqual([]);
+}
+
+export function expectRequestObservabilityBudgets(
+  input: RequestObservabilityBudgetAssertionInput,
+): void {
+  const requestErrorIncrease =
+    input.currentSnapshot.totalErrorCount - input.baselineSnapshot.totalErrorCount;
+  expect(
+    requestErrorIncrease,
+    `requestRouting.totalErrorCount increased beyond budget ${String(input.maximumRequestErrorIncrease)}`,
+  ).toBeLessThanOrEqual(input.maximumRequestErrorIncrease);
+
+  const violations = readRequestObservabilityBudgetViolations(input);
+  expect(
+    violations,
+    `request observability route budgets were exceeded:\n${violations.join("\n")}`,
   ).toEqual([]);
 }

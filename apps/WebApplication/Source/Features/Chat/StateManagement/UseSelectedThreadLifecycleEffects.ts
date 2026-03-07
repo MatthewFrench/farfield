@@ -19,9 +19,6 @@ import type { LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 
 export interface UseSelectedThreadLifecycleEffectsInput {
   selectedThreadId: string | null;
-  readNextSelectedThreadIdentifierAfterLoadFailure: (
-    failedThreadIdentifier: string,
-  ) => string | null;
   selectedThreadIdRef: MutableRefObject<string | null>;
   selectedThreadLoadTokenRef: MutableRefObject<number>;
   loadSelectedThreadRef: MutableRefObject<
@@ -33,7 +30,6 @@ export interface UseSelectedThreadLifecycleEffectsInput {
   setReadThreadState: Dispatch<SetStateAction<ChatReadThreadResponse | null>>;
   setStreamEvents: Dispatch<SetStateAction<ChatStreamEventsResponse["events"]>>;
   setIsSelectedThreadLoading: Dispatch<SetStateAction<boolean>>;
-  setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
   unsubscribeThread: (threadId: string) => Promise<void>;
   handleRuntimeRequestError: <ErrorType>(error: ErrorType) => void;
 }
@@ -43,9 +39,6 @@ export function useSelectedThreadLifecycleEffects(
 ): void {
   const unsubscribeThreadRef = useRef(input.unsubscribeThread);
   const handleRuntimeRequestErrorRef = useRef(input.handleRuntimeRequestError);
-  const readNextSelectedThreadIdentifierAfterLoadFailureRef = useRef(
-    input.readNextSelectedThreadIdentifierAfterLoadFailure,
-  );
   const previousSelectedThreadIdentifierRef = useRef<string | null>(input.selectedThreadId);
   const unsubscribeInFlightThreadIdentifiersRef = useRef<Set<string>>(new Set());
 
@@ -90,11 +83,6 @@ export function useSelectedThreadLifecycleEffects(
   useEffect(() => {
     handleRuntimeRequestErrorRef.current = input.handleRuntimeRequestError;
   }, [input.handleRuntimeRequestError]);
-
-  useEffect(() => {
-    readNextSelectedThreadIdentifierAfterLoadFailureRef.current =
-      input.readNextSelectedThreadIdentifierAfterLoadFailure;
-  }, [input.readNextSelectedThreadIdentifierAfterLoadFailure]);
 
   useEffect(() => {
     return () => {
@@ -164,10 +152,9 @@ export function useSelectedThreadLifecycleEffects(
         }
         const message = toErrorMessage(error);
         if (isThreadNotLoadedReadError(message)) {
-          const nextSelectedThreadIdentifier =
-            readNextSelectedThreadIdentifierAfterLoadFailureRef.current(selectedThreadIdentifier);
-          input.setSelectedThreadId(nextSelectedThreadIdentifier);
-          selectedThreadIdRef.current = nextSelectedThreadIdentifier;
+          // Preserve explicit user selection when the read path fails. Redirecting to another
+          // thread lets one thread's load failure override the requested view.
+          input.handleRuntimeRequestError(error);
           return;
         }
         input.handleRuntimeRequestError(error);
@@ -189,7 +176,6 @@ export function useSelectedThreadLifecycleEffects(
     input.setIsSelectedThreadLoading,
     input.setLiveState,
     input.setReadThreadState,
-    input.setSelectedThreadId,
     input.setStreamEvents,
   ]);
 }

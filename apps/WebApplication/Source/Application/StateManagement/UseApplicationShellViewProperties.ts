@@ -67,6 +67,7 @@ export interface UseApplicationShellViewPropertiesInput {
   sendPushTestNotificationFromSettings: (
     input: SendPushTestNotificationFromSettingsInput,
   ) => void | Promise<void>;
+  prepareActiveThreadQueryForExplicitRefresh: () => Promise<void>;
   refreshCoreDataAndSelectedThread: () => void | Promise<void>;
   setActiveTab: (nextTab: ApplicationHeaderBarProps["activeTab"]) => void;
   toggleTheme: () => void;
@@ -754,7 +755,10 @@ function buildSettingsWorkspacePaneProperties(
     theme: input.theme,
     isBusy: input.isBusy,
     onRefreshData: () => {
-      invokeAsyncOwnerAction(input.refreshCoreDataAndSelectedThread);
+      invokeAsyncOwnerAction(async () => {
+        await input.prepareActiveThreadQueryForExplicitRefresh();
+        await input.refreshCoreDataAndSelectedThread();
+      });
     },
     onToggleTheme: input.toggleTheme,
     debugWorkspacePaneProperties: buildDebugWorkspacePaneProperties(input),
