@@ -8,6 +8,7 @@ import {
   STARTUP_DEFERRED_AGENTS_OPERATION,
   STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
   STARTUP_DEFERRED_HEALTH_OPERATION,
+  STARTUP_DEFERRED_MODES_OPERATION,
   STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
 } from "../Source/Application/StateManagement/CoreDataStartupRequestProfile";
 import {
@@ -499,19 +500,25 @@ describe("useCoreDataLoaders", () => {
     expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
   });
 
-  it("does not report deferred startup transport cancellations caused by startup churn", async () => {
+  it("retries deferred startup transport churn before reporting an error", async () => {
     const harness = createHarness("chat");
     vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
       ACTIVE_THREAD_STATE,
     );
-    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockRejectedValue(
-      new Error("Request failed for /api/health: Failed to fetch status=n/a"),
-    );
-    vi.spyOn(harness.capabilityServerClient, "listAgents").mockRejectedValue(
-      new Error(
-        "Invalid JSON response from /api/agents: empty response status=200 OK requestId req_123",
-      ),
-    );
+    const readHealthStatusSpy = vi
+      .spyOn(harness.capabilityServerClient, "readHealthStatus")
+      .mockRejectedValueOnce(
+        new Error("Request failed for /api/health: Failed to fetch status=n/a"),
+      )
+      .mockResolvedValueOnce(HEALTH_RESPONSE);
+    const listAgentsSpy = vi
+      .spyOn(harness.capabilityServerClient, "listAgents")
+      .mockRejectedValueOnce(
+        new Error(
+          "Invalid JSON response from /api/agents: empty response status=200 OK requestId req_123",
+        ),
+      )
+      .mockResolvedValueOnce(AGENTS_RESPONSE);
     vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
       COLLABORATION_MODES_RESPONSE,
     );
@@ -526,10 +533,106 @@ describe("useCoreDataLoaders", () => {
       await loaders.loadCoreData();
     });
     await act(async () => {
-      await vi.runOnlyPendingTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
     });
 
     expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+    expect(readHealthStatusSpy).toHaveBeenCalledTimes(2);
+    expect(listAgentsSpy).toHaveBeenCalledTimes(2);
+    expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries deferred startup 503 capability reads before reporting an error", async () => {
+    const harness = createHarness("chat");
+    const setModesMock =
+      vi.fn<(value: SetStateAction<CapabilityCollaborationModesResponse["data"]>) => void>();
+    harness.input.setModes = setModesMock;
+    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
+      ACTIVE_THREAD_STATE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockResolvedValue(HEALTH_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    const listModesSpy = vi
+      .spyOn(harness.capabilityServerClient, "listCollaborationModes")
+      .mockRejectedValueOnce(
+        new Error("Request failed for /api/collaboration-modes status=503 actionId=action-modes"),
+      )
+      .mockResolvedValueOnce(COLLABORATION_MODES_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+    expect(listModesSpy).toHaveBeenCalledTimes(2);
+    expect(setModesMock).toHaveBeenCalled();
+  });
+
+  it("reports deferred startup 503 capability failures after the retry budget is exhausted", async () => {
+    const harness = createHarness("chat");
+    vi.spyOn(harness.threadListStateController, "loadActiveThreadState").mockResolvedValue(
+      ACTIVE_THREAD_STATE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "readHealthStatus").mockResolvedValue(HEALTH_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    const listModesSpy = vi
+      .spyOn(harness.capabilityServerClient, "listCollaborationModes")
+      .mockRejectedValue(
+        new Error("Request failed for /api/collaboration-modes status=503 actionId=action-modes"),
+      );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreData();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(listModesSpy).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(harness.input.handleRuntimeRequestError)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(harness.input.handleRuntimeRequestError).mock.calls[0]?.[0]).toBeInstanceOf(
+      Error,
+    );
+    const reportedError = vi.mocked(harness.input.handleRuntimeRequestError).mock.calls[0]?.[0];
+    if (!(reportedError instanceof Error)) {
+      throw new Error("Expected deferred startup failure to report an Error");
+    }
+    expect(reportedError.message).toContain(STARTUP_DEFERRED_MODES_OPERATION);
   });
 
   it("refreshes only the active thread list for tracked thread-list refreshes", async () => {

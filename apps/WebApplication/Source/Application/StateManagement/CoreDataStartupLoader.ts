@@ -47,9 +47,14 @@ const STARTUP_DEFERRED_FAILED_TO_FETCH_PATTERN =
   /^Request failed for \/.+: Failed to fetch status=n\/a$/i;
 const STARTUP_DEFERRED_EMPTY_JSON_RESPONSE_PATTERN =
   /^Invalid JSON response from \/.+: empty response status=200 OK requestId .+$/i;
+const STARTUP_DEFERRED_RESTART_STATUS_PATTERN = /^Request failed for \/.+ status=(502|503|504)\b/i;
+const STARTUP_DEFERRED_INVALID_JSON_RESTART_STATUS_PATTERN =
+  /^Invalid JSON response from \/.+ status=(502|503|504)\b/i;
 const THREAD_LIST_UPDATED_AT_SORT_KEY = "updated_at" as const;
 // Yield one event-loop turn so critical startup reads can commit before non-critical hydration starts.
 const DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS = 0;
+const DEFERRED_STARTUP_RETRY_DELAY_MILLISECONDS = 500;
+const DEFERRED_STARTUP_MAXIMUM_RETRY_ATTEMPTS = 2;
 const STARTUP_CRITICAL_THREAD_READ_FROM_CACHE = true;
 const CONFIG_DEFAULTS_AGENT_ID: AgentId = "codex";
 
@@ -87,6 +92,7 @@ interface DeferredStartupResultApplicationInput<ResultValue> {
   result: PromiseSettledResult<ResultValue>;
   operation: string;
   onFulfilled: (value: ResultValue) => void;
+  retryAttemptCount: number;
   reportDeferredStartupFailure: DeferredStartupFailureReporter;
 }
 
@@ -184,6 +190,12 @@ function applyDeferredStartupResult<ResultValue>(
   if (shouldIgnoreDeferredStartupFailure(input.result.reason)) {
     return;
   }
+  if (
+    shouldRetryDeferredStartupFailure(input.result.reason) &&
+    input.retryAttemptCount < DEFERRED_STARTUP_MAXIMUM_RETRY_ATTEMPTS
+  ) {
+    return;
+  }
   input.reportDeferredStartupFailure(input.operation, input.result.reason);
 }
 
@@ -191,10 +203,16 @@ function shouldIgnoreDeferredStartupFailure<ErrorType>(error: ErrorType): boolea
   if (error instanceof Error && isRequestCanceledError(error)) {
     return true;
   }
+  return false;
+}
+
+function shouldRetryDeferredStartupFailure<ErrorType>(error: ErrorType): boolean {
   const message = toErrorMessage(error);
   return (
     STARTUP_DEFERRED_FAILED_TO_FETCH_PATTERN.test(message) ||
-    STARTUP_DEFERRED_EMPTY_JSON_RESPONSE_PATTERN.test(message)
+    STARTUP_DEFERRED_EMPTY_JSON_RESPONSE_PATTERN.test(message) ||
+    STARTUP_DEFERRED_RESTART_STATUS_PATTERN.test(message) ||
+    STARTUP_DEFERRED_INVALID_JSON_RESTART_STATUS_PATTERN.test(message)
   );
 }
 
@@ -225,12 +243,14 @@ function applyDeferredStartupSnapshotResult<ResultValue>(input: {
   result: PromiseSettledResult<ResultValue>;
   operation: string;
   toSnapshotPartial: (value: ResultValue) => CoreDataSnapshotPartial | null;
+  retryAttemptCount: number;
   applySnapshotState: SnapshotStateApplier;
   reportDeferredStartupFailure: DeferredStartupFailureReporter;
 }): void {
   applyDeferredStartupResult({
     result: input.result,
     operation: input.operation,
+    retryAttemptCount: input.retryAttemptCount,
     onFulfilled: (resultValue) => {
       const nextSnapshotPartial = input.toSnapshotPartial(resultValue);
       if (nextSnapshotPartial) {
@@ -328,6 +348,7 @@ export class CoreDataStartupLoader {
     // Keep startup sequencing deterministic: apply critical thread state first, then defer non-critical reads.
     this.scheduleDeferredStartupReads({
       deferredStartupSequence,
+      retryAttemptCount: 0,
       applySnapshotState,
       reportDeferredStartupFailure,
     });
@@ -339,16 +360,22 @@ export class CoreDataStartupLoader {
 
   private scheduleDeferredStartupReads(input: {
     deferredStartupSequence: number;
+    retryAttemptCount: number;
     applySnapshotState: SnapshotStateApplier;
     reportDeferredStartupFailure: DeferredStartupFailureReporter;
   }): void {
+    const delayMilliseconds =
+      input.retryAttemptCount > 0
+        ? DEFERRED_STARTUP_RETRY_DELAY_MILLISECONDS
+        : DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS;
     window.setTimeout(() => {
       void this.runDeferredStartupReads(input);
-    }, DEFERRED_STARTUP_NEXT_TURN_DELAY_MILLISECONDS);
+    }, delayMilliseconds);
   }
 
   private async runDeferredStartupReads(input: {
     deferredStartupSequence: number;
+    retryAttemptCount: number;
     applySnapshotState: SnapshotStateApplier;
     reportDeferredStartupFailure: DeferredStartupFailureReporter;
   }): Promise<void> {
@@ -446,6 +473,7 @@ export class CoreDataStartupLoader {
       result: nextHealthResult,
       operation: STARTUP_DEFERRED_HEALTH_OPERATION,
       toSnapshotPartial: (nextHealth) => ({ nextHealth }),
+      retryAttemptCount: input.retryAttemptCount,
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
@@ -453,6 +481,7 @@ export class CoreDataStartupLoader {
       result: nextAgentsResult,
       operation: STARTUP_DEFERRED_AGENTS_OPERATION,
       toSnapshotPartial: (nextAgents) => ({ nextAgents }),
+      retryAttemptCount: input.retryAttemptCount,
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
@@ -460,6 +489,7 @@ export class CoreDataStartupLoader {
       result: nextCapabilitiesResult,
       operation: STARTUP_DEFERRED_MODES_OPERATION,
       toSnapshotPartial: (nextCapabilities) => ({ nextCapabilities }),
+      retryAttemptCount: input.retryAttemptCount,
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
@@ -467,6 +497,7 @@ export class CoreDataStartupLoader {
       result: nextTraceStatusResult,
       operation: STARTUP_DEFERRED_TRACE_STATUS_OPERATION,
       toSnapshotPartial: (nextTraceStatus) => (nextTraceStatus ? { nextTraceStatus } : null),
+      retryAttemptCount: input.retryAttemptCount,
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
@@ -475,8 +506,30 @@ export class CoreDataStartupLoader {
       operation: STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION,
       toSnapshotPartial: (debugWorkspaceData) =>
         debugWorkspaceData ? { debugWorkspaceData } : null,
+      retryAttemptCount: input.retryAttemptCount,
       applySnapshotState: input.applySnapshotState,
       reportDeferredStartupFailure: input.reportDeferredStartupFailure,
     });
+
+    if (
+      input.retryAttemptCount < DEFERRED_STARTUP_MAXIMUM_RETRY_ATTEMPTS &&
+      [
+        nextHealthResult,
+        nextAgentsResult,
+        nextCapabilitiesResult,
+        nextTraceStatusResult,
+        nextDebugWorkspaceDataResult,
+      ].some(
+        (result) =>
+          result.status === "rejected" && shouldRetryDeferredStartupFailure(result.reason),
+      )
+    ) {
+      this.scheduleDeferredStartupReads({
+        deferredStartupSequence: input.deferredStartupSequence,
+        retryAttemptCount: input.retryAttemptCount + 1,
+        applySnapshotState: input.applySnapshotState,
+        reportDeferredStartupFailure: input.reportDeferredStartupFailure,
+      });
+    }
   }
 }

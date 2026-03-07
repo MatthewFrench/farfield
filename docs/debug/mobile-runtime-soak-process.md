@@ -586,6 +586,27 @@ Verification evidence:
 6. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
 7. real browser run on `https://farfield.matthewfrench.io/threads/019cc17a-1b65-7ef3-9c15-e7cfc6494273` redirected to `/`, showed `No thread selected`, emitted no fresh `runtime-request-error`, and reduced the thread-read request sequence to one `GET /api/threads/:threadId?includeTurns=true => 404`
 
+### March 7, 2026: Deferred Startup Retries Restart-Window Capability Churn
+
+Changed owner modules:
+
+1. [CoreDataStartupLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataStartupLoader.ts)
+
+Implementation summary:
+
+1. deferred startup reads now treat restart-window `502/503/504`, failed-fetch, and transient invalid-JSON responses as retryable for a bounded number of attempts instead of surfacing them immediately as runtime banners
+2. successful deferred startup reads still apply on the first pass, and only the still-failing deferred surfaces are retried under the same startup sequence guard
+
+User-visible impact:
+
+1. remote dev-server rebuilds are less likely to leave the app stuck with a `startup-deferred.*` error banner after the server comes back
+2. non-critical startup capability data can recover on its own after brief restart churn instead of requiring a manual reload to clear the banner
+
+Verification evidence:
+
+1. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+2. real browser run on `https://farfield.matthewfrench.io/` after the restart-window banner repro settled with no visible deferred-startup error banner, all deferred startup routes returning `200`, and no fresh client-error entries after `2026-03-07T08:20:09Z`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
