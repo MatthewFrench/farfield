@@ -82,6 +82,11 @@ describe("CodexAgentAdapter", () => {
       ),
     ).toBe(true);
     expect(
+      adapter.isThreadNotLoadedError(
+        new AppServerRpcError(-32603, "no rollout found for thread id thread-123"),
+      ),
+    ).toBe(true);
+    expect(
       adapter.isThreadNotLoadedError(new AppServerRpcError(-32600, "conversation not found")),
     ).toBe(false);
     expect(adapter.isThreadNotLoadedError(new AppServerRpcError(-32601, "thread not loaded"))).toBe(

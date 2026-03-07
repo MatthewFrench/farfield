@@ -12,6 +12,7 @@ export const APP_SERVER_INVALID_REQUEST_MESSAGE_FRAGMENT = {
 } as const;
 export const APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT = {
   threadRolloutMissing: "failed to locate rollout for thread",
+  threadRolloutMissingCurrent: "no rollout found for thread id",
 } as const;
 
 export interface CodexAgentRuntimeState {

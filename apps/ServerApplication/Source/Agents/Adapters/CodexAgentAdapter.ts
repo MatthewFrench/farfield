@@ -241,6 +241,10 @@ export class CodexAgentAdapter implements AgentAdapter {
       isAppServerErrorMatchingMessageFragment(
         error,
         APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT.threadRolloutMissing,
+      ) ||
+      isAppServerErrorMatchingMessageFragment(
+        error,
+        APP_SERVER_RUNTIME_ERROR_MESSAGE_FRAGMENT.threadRolloutMissingCurrent,
       )
     );
   }

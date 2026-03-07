@@ -467,11 +467,13 @@ Changed owner modules:
 1. [CodexThreadManagementOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadManagementOwner.ts)
 2. [CodexAgentAdapterOwnerFactory.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterOwnerFactory.ts)
 3. [CodexAgentAdapter.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapter.ts)
-4. [CodexThreadManagementOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts)
+4. [CodexAgentAdapterContracts.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexAgentAdapterContracts.ts)
+5. [CodexThreadManagementOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts)
+6. [CodexAgentAdapter.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexAgentAdapter.test.ts)
 
 Implementation summary:
 
-1. the Codex thread-management read owner now resumes a thread with extended history and retries once when `readThread` fails with `conversation not found` or `thread not loaded`
+1. the Codex thread-management read owner now resumes a thread with extended history and retries once when `readThread` fails with `conversation not found`, `thread not loaded`, or the rollout-missing runtime error text currently emitted by app-server
 2. the read path keeps returning the original error for unrelated failures, so the recovery scope stays limited to the missing-thread race
 
 User-visible impact:
@@ -482,8 +484,9 @@ User-visible impact:
 Verification evidence:
 
 1. [CodexThreadManagementOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadManagementOwner.test.ts)
-2. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
-3. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
+2. [CodexAgentAdapter.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexAgentAdapter.test.ts)
+3. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+4. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
 
 ### March 7, 2026: Thread Read And Unsubscribe Routes Keep Missing-Thread Errors Explicit
 
