@@ -532,6 +532,39 @@ describe("useCoreDataLoaders", () => {
     expect(vi.mocked(harness.input.handleRuntimeRequestError)).not.toHaveBeenCalled();
   });
 
+  it("refreshes only the active thread list for tracked thread-list refreshes", async () => {
+    const harness = createHarness("chat");
+    const loadActiveThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadActiveThreadState")
+      .mockResolvedValue(ACTIVE_THREAD_STATE);
+    const readHealthStatusSpy = vi.spyOn(harness.capabilityServerClient, "readHealthStatus");
+    const listAgentsSpy = vi.spyOn(harness.capabilityServerClient, "listAgents");
+    const listModesSpy = vi.spyOn(harness.capabilityServerClient, "listCollaborationModes");
+    const listModelsSpy = vi.spyOn(harness.capabilityServerClient, "listModels");
+    const readDefaultsSpy = vi.spyOn(harness.capabilityServerClient, "readConfigDefaults");
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.refreshActiveThreadListTracked();
+    });
+
+    expect(loadActiveThreadStateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        readFromCache: false,
+        actionName: "runtime-refresh.threads.active",
+      }),
+    );
+    expect(
+      harness.actionLog.filter((actionName) => actionName === "runtime-refresh.threads.active"),
+    ).toEqual(["runtime-refresh.threads.active"]);
+    expect(readHealthStatusSpy).not.toHaveBeenCalled();
+    expect(listAgentsSpy).not.toHaveBeenCalled();
+    expect(listModesSpy).not.toHaveBeenCalled();
+    expect(listModelsSpy).not.toHaveBeenCalled();
+    expect(readDefaultsSpy).not.toHaveBeenCalled();
+  });
+
   it("skips archived-thread refresh during tracked core refresh before archived surface is loaded", async () => {
     const harness = createHarness("chat");
     const loadActiveThreadStateSpy = vi

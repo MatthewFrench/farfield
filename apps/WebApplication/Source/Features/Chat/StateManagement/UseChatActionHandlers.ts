@@ -102,7 +102,7 @@ export interface UseChatActionHandlersInput {
   threadMutationClient: ChatRequestActionThreadMutationClient;
   pendingUserInputAnswerBuilder: PendingUserInputAnswerBuilder;
   onInvalidateActiveThreadQuery: () => void;
-  loadCoreDataTracked: () => Promise<void>;
+  refreshActiveThreadListTracked: () => Promise<void>;
   onReloadSelectedThread: (threadId: string) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatActionErrorReportInput) => Promise<void>;
 }
@@ -260,10 +260,10 @@ function createSubmitToolCallRequestResponseHandler(
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
   const refreshThreadData = useCallback(
     async (threadId: string): Promise<void> => {
-      await input.loadCoreDataTracked();
+      await input.refreshActiveThreadListTracked();
       await input.onReloadSelectedThread(threadId);
     },
-    [input.loadCoreDataTracked, input.onReloadSelectedThread],
+    [input.onReloadSelectedThread, input.refreshActiveThreadListTracked],
   );
 
   const handleThreadSelected = (threadId: string): void => {

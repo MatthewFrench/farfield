@@ -372,6 +372,49 @@ Verification evidence:
 1. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
 2. [mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-sentinel/mobile-soak-spec-ts-mobile-managed-thread-soak-behavior.ndjson)
 
+### March 7, 2026: Chat Mutation Refresh Uses Active-Thread-Only Reload Path
+
+Changed owner modules:
+
+1. [ActiveThreadLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/ActiveThreadLoader.ts)
+2. [UseCoreDataLoaders.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseCoreDataLoaders.ts)
+3. [UseChatActionHandlers.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/UseChatActionHandlers.ts)
+
+Implementation summary:
+
+1. added a tracked active-thread-list refresh owner path that reloads sidebar thread data without invoking the broader deferred core-data capability bundle
+2. switched chat mutation refresh flows to use that active-thread-only refresh before reloading the selected thread
+
+User-visible impact:
+
+1. sending a message or handling chat follow-up actions does less unrelated refresh work before the selected thread settles again
+2. sidebar thread ordering and preview refresh can still converge after chat mutations without dragging health, agents, models, modes, and defaults behind every action
+
+Verification evidence:
+
+1. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+2. [UseChatActionHandlers.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseChatActionHandlers.test.tsx)
+
+### March 7, 2026: Soak Logs Iteration Substep Timings
+
+Changed owner modules:
+
+1. [mobile-soak.spec.ts](/Users/matthewfrench/GitHub/farfield/end-to-end/real/scenarios/mobile-soak.spec.ts)
+
+Implementation summary:
+
+1. each soak iteration now logs separate browse, open, send, and reload timings in addition to total readiness time
+2. the soak can now localize slow-path behavior without requiring manual trace inspection first
+
+User-visible impact:
+
+1. no direct product behavior changed for users
+2. runtime investigations can now tell whether slowness is mostly in thread browsing, thread opening, agent reply wait, or reload restore
+
+Verification evidence:
+
+1. [browser-mobile-soak.json](/Users/matthewfrench/GitHub/farfield/.runtime/end-to-end-performance/browser-mobile-soak.json)
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
@@ -386,6 +429,7 @@ As of Saturday, March 7, 2026:
 6. the soak now watches request-error growth plus route last-duration and queue-delay budgets through `/api/debug/observability`
 7. for thread/sidebar/chat/reload/mobile-runtime changes, this can now be treated as an expected verification path unless a task explicitly cannot use the real stack
 8. the latest multi-agent Chromium rerun removed the setup-time managed-thread read `500` burst, but steady-state managed-thread reread volume and occasional warm-iteration outliers still need reduction
+9. the latest Chromium rerun with substep timing showed the dominant iteration cost is currently the send-and-wait path, not sidebar open or reload restore
 
 ### March 7, 2026: Soak Enforces Server Observability Budgets
 

@@ -12,6 +12,7 @@ import { DebugWorkspaceDataReader } from "@/Features/Debugging/StateManagement/D
 import { DebugWorkspaceStateStore } from "@/Features/Debugging/StateManagement/DebugWorkspaceStateStore";
 import { ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { ActiveThreadLoader, type ActiveThreadLoaderDependencies } from "./ActiveThreadLoader";
 import {
   ArchivedThreadLoader,
   type ArchivedThreadLoaderDependencies,
@@ -41,6 +42,8 @@ export interface SelectedThreadLoaderOptions {
   includeTurns?: boolean;
   includeReadThread?: boolean;
 }
+
+const TRACKED_ACTIVE_THREAD_LIST_REFRESH_OPERATION = "runtime-refresh.threads.active";
 
 type Health = CoreDataHealthResponse;
 type ConfigDefaults = CoreDataConfigDefaultsResponse;
@@ -116,6 +119,21 @@ function createArchivedThreadLoaderDependencies(
   };
 }
 
+function createActiveThreadLoaderDependencies(
+  input: UseCoreDataLoadersInput,
+): ActiveThreadLoaderDependencies {
+  return {
+    threadListStateController: input.threadListStateController,
+    threadListLimit: input.threadListLimit,
+    threadListMaxPages: input.threadListMaxPages,
+    selectedThreadIdRef: input.selectedThreadIdRef,
+    unreadThreadIdsRef: input.unreadThreadIdsRef,
+    setThreads: input.setThreads,
+    setUnreadThreadIds: input.setUnreadThreadIds,
+    handleRuntimeRequestError: input.handleRuntimeRequestError,
+  };
+}
+
 export interface UseCoreDataLoadersInput {
   debugHistoryLimit: number;
   debugErrorListLimit: number;
@@ -169,6 +187,7 @@ export interface CoreDataLoaders {
   loadCoreData: () => Promise<void>;
   loadArchivedThreads: () => Promise<void>;
   loadCoreDataTracked: () => Promise<void>;
+  refreshActiveThreadListTracked: () => Promise<void>;
 }
 
 function shouldRefreshArchivedThreadsDuringTrackedCoreRefresh(
@@ -204,6 +223,18 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
   }
   const archivedThreadLoader = archivedThreadLoaderReference.current;
 
+  const activeThreadLoaderReference = useRef<ActiveThreadLoader | null>(null);
+  if (activeThreadLoaderReference.current === null) {
+    activeThreadLoaderReference.current = new ActiveThreadLoader(
+      createActiveThreadLoaderDependencies(input),
+    );
+  } else {
+    activeThreadLoaderReference.current.updateDependencies(
+      createActiveThreadLoaderDependencies(input),
+    );
+  }
+  const activeThreadLoader = activeThreadLoaderReference.current;
+
   const loadCoreData = useCallback(async () => {
     await startupLoader.loadCoreData();
   }, [startupLoader]);
@@ -236,9 +267,29 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     loadCoreData,
   ]);
 
+  const refreshActiveThreadListTracked = useCallback(async () => {
+    await input.coreDataRefreshConcurrencyCoordinator.run(async () => {
+      const { actionId, requestOptions } = input.buildActionRequestOptions(
+        TRACKED_ACTIVE_THREAD_LIST_REFRESH_OPERATION,
+      );
+      await activeThreadLoader.loadActiveThreads({
+        readFromCache: false,
+        actionId,
+        ...(requestOptions.actionName !== undefined
+          ? { actionName: requestOptions.actionName }
+          : {}),
+      });
+    });
+  }, [
+    activeThreadLoader,
+    input.buildActionRequestOptions,
+    input.coreDataRefreshConcurrencyCoordinator,
+  ]);
+
   return {
     loadCoreData,
     loadArchivedThreads,
     loadCoreDataTracked,
+    refreshActiveThreadListTracked,
   };
 }

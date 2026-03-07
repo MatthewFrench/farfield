@@ -215,7 +215,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
   const selectedThreadIdRef: MutableRefObject<string | null> = {
     current: selectedThreadId,
   };
-  const loadCoreDataTracked = vi.fn(async () => {});
+  const refreshActiveThreadListTracked = vi.fn(async () => {});
   const onReloadSelectedThread = vi.fn(async (_threadId: string) => {});
   const onInvalidateActiveThreadQuery = vi.fn();
   const reportTrackedUserInterfaceError = vi.fn(
@@ -253,7 +253,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     threadMutationClient: createThreadMutationClient(),
     pendingUserInputAnswerBuilder,
     onInvalidateActiveThreadQuery,
-    loadCoreDataTracked,
+    refreshActiveThreadListTracked,
     onReloadSelectedThread,
     reportTrackedUserInterfaceError,
   };
@@ -264,6 +264,8 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     collaborationModeActionCoordinator,
     pendingThreadMaterializationCoordinator,
     pendingUserInputAnswerBuilder,
+    refreshActiveThreadListTracked,
+    onReloadSelectedThread,
     setSelectedThreadId,
     selectedThreadIdRef,
   };
@@ -375,6 +377,49 @@ describe("UseChatActionHandlers", () => {
         modes: DEFAULT_MODES,
         onSetModeSyncing: input.setIsModeSyncing,
       }),
+    );
+  });
+
+  it("refreshes the active thread list before reloading the selected thread after chat refresh", async () => {
+    const {
+      input,
+      chatRequestActionCoordinator,
+      refreshActiveThreadListTracked,
+      onReloadSelectedThread,
+    } = createTestInput();
+    const sendMessageSpy = vi
+      .spyOn(chatRequestActionCoordinator, "sendMessage")
+      .mockImplementation(async (nextInput) => {
+        await nextInput.onRefreshThreadData(DEFAULT_THREAD_IDENTIFIER);
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null) {
+      throw new Error("expected handlers to be ready");
+    }
+    await handlers.submitMessage("hello world");
+
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_IDENTIFIER);
+    expect(refreshActiveThreadListTracked.mock.invocationCallOrder[0]).toBeLessThan(
+      onReloadSelectedThread.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
 

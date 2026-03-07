@@ -357,7 +357,7 @@ export function buildApplicationChatFeatureCompositionInput(
       threadMutationClient: applicationOwnerDependencies.threadMutationServerClient,
       pendingUserInputAnswerBuilder: applicationOwnerDependencies.pendingUserInputAnswerBuilder,
       onInvalidateActiveThreadQuery: dependencies.invalidateActiveThreadQuery,
-      loadCoreDataTracked: coreDataLoaders.loadCoreDataTracked,
+      refreshActiveThreadListTracked: coreDataLoaders.refreshActiveThreadListTracked,
       onReloadSelectedThread: input.loadSelectedThreadTracked,
       reportTrackedUserInterfaceError: runtimeRequestHandlers.reportTrackedUserInterfaceError,
     },

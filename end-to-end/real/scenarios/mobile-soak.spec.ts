@@ -137,6 +137,13 @@ interface MobileSoakStateGuard {
   waitForManagedThreadTurnCompletion: (threadId: string) => Promise<void>;
 }
 
+interface MobileSoakIterationStepDurations {
+  browseMilliseconds: number;
+  openMilliseconds: number;
+  sendMilliseconds: number;
+  reloadMilliseconds: number;
+}
+
 async function closeMobileSidebarIfVisible(page: Page): Promise<void> {
   const sidebarMobile = page.getByTestId("sidebar-mobile");
   const sidebarCount = await sidebarMobile.count();
@@ -305,26 +312,54 @@ async function runMobileSoakIteration(input: {
   stateGuard: MobileSoakStateGuard;
   managedThreadId: string;
   iterationIndex: number;
-}): Promise<void> {
-  await browseExistingThreads(input.page, input.sentinel, input.managedThreadId);
-  await openManagedThread(input.page, input.sentinel, input.managedThreadId);
+}): Promise<MobileSoakIterationStepDurations> {
+  const browseMilliseconds = await measureElapsedMilliseconds(async () => {
+    await browseExistingThreads(input.page, input.sentinel, input.managedThreadId);
+  });
+  const openMilliseconds = await measureElapsedMilliseconds(async () => {
+    await openManagedThread(input.page, input.sentinel, input.managedThreadId);
+  });
 
   const messageText = buildManagedThreadMessage(input.iterationIndex);
   const expectedAgentResponseText = buildManagedThreadResponse(input.iterationIndex);
-  await sendMessageToManagedThread(
-    input.page,
-    input.sentinel,
-    input.stateGuard,
-    input.managedThreadId,
-    messageText,
-    expectedAgentResponseText,
-  );
-  await verifyManagedThreadAfterReload(
-    input.page,
-    input.sentinel,
-    input.managedThreadId,
-    messageText,
-    expectedAgentResponseText,
+  const sendMilliseconds = await measureElapsedMilliseconds(async () => {
+    await sendMessageToManagedThread(
+      input.page,
+      input.sentinel,
+      input.stateGuard,
+      input.managedThreadId,
+      messageText,
+      expectedAgentResponseText,
+    );
+  });
+  const reloadMilliseconds = await measureElapsedMilliseconds(async () => {
+    await verifyManagedThreadAfterReload(
+      input.page,
+      input.sentinel,
+      input.managedThreadId,
+      messageText,
+      expectedAgentResponseText,
+    );
+  });
+
+  return {
+    browseMilliseconds,
+    openMilliseconds,
+    sendMilliseconds,
+    reloadMilliseconds,
+  };
+}
+
+function logIterationStepDurations(
+  iterationIndex: number,
+  stepDurations: MobileSoakIterationStepDurations,
+): void {
+  process.stdout.write(
+    `[end-to-end-performance] ${buildIterationLabel(iterationIndex)} steps browseMs=${String(
+      stepDurations.browseMilliseconds,
+    )} openMs=${String(stepDurations.openMilliseconds)} sendMs=${String(
+      stepDurations.sendMilliseconds,
+    )} reloadMs=${String(stepDurations.reloadMilliseconds)}\n`,
   );
 }
 
@@ -367,8 +402,9 @@ test("mobile managed-thread soak behavior", async ({ page, sentinel, stateGuard 
 
   const iterationDurationsMilliseconds: number[] = [];
   for (let iterationIndex = 0; iterationIndex < MOBILE_SOAK_ITERATION_COUNT; iterationIndex += 1) {
+    let stepDurations: MobileSoakIterationStepDurations | null = null;
     const iterationElapsedMilliseconds = await measureElapsedMilliseconds(async () => {
-      await runMobileSoakIteration({
+      stepDurations = await runMobileSoakIteration({
         page,
         sentinel,
         stateGuard,
@@ -383,6 +419,9 @@ test("mobile managed-thread soak behavior", async ({ page, sentinel, stateGuard 
         iterationElapsedMilliseconds,
       )}\n`,
     );
+    if (stepDurations !== null) {
+      logIterationStepDurations(iterationIndex, stepDurations);
+    }
   }
 
   const performanceSnapshot = await readPerformanceProbeSnapshot(page);
