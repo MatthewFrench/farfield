@@ -263,6 +263,11 @@ interface ContextBoundUnsubscribeAdapter extends AgentAdapter {
   unsubscribeThread(input: AgentUnsubscribeThreadInput): Promise<AgentUnsubscribeThreadStatus>;
 }
 
+interface ContextBoundSetThreadNameAdapter extends AgentAdapter {
+  observedThreadNames: Array<{ threadId: string; name: string }>;
+  setThreadName(input: AgentSetThreadNameInput): Promise<void>;
+}
+
 interface ContextBoundArchiveAdapter extends AgentAdapter {
   observedThreadIds: string[];
   archiveThread(input: { threadId: string }): Promise<void>;
@@ -653,6 +658,59 @@ describe("ThreadMemberMutationRouteOwner", () => {
         name: "Better title",
       },
     ]);
+  });
+
+  it("invokes thread-name mutation methods with adapter instance context", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const adapter: ContextBoundSetThreadNameAdapter = {
+      ...createAgentAdapter({
+        sendMessage: async () => {},
+      }),
+      observedThreadNames: [],
+      async setThreadName(inputValue: AgentSetThreadNameInput) {
+        this.observedThreadNames.push({
+          threadId: inputValue.threadId,
+          name: inputValue.name,
+        });
+      },
+    };
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "name"],
+        readJsonBody: async () => ({
+          name: "Renamed thread",
+        }),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(adapter.observedThreadNames).toEqual([
+      {
+        threadId: "thread-1",
+        name: "Renamed thread",
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-1",
+    });
   });
 
   it("handles thread-rollback mutations and forwards turn-count payload", async () => {

@@ -69,7 +69,7 @@ export class ThreadMemberNameMutationRouteOwner {
 
     try {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
-        await setThreadName({
+        await setThreadName.call(adapter, {
           threadId,
           name: body.name,
         });
