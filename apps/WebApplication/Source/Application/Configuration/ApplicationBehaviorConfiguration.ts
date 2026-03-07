@@ -33,16 +33,14 @@ export const EVENT_REFRESH_SCHEDULE_DELAY_MS = 200;
 export const PUSH_DIAGNOSTICS_REFRESH_TIME_TO_LIVE_MS = 30_000;
 
 const EventStreamRefreshDecisionExecutionModeSchema = z.enum(["worker", "in-thread"]);
-const defaultEventStreamRefreshDecisionExecutionMode =
-  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+const defaultEventStreamRefreshDecisionExecutionMode = "in-thread";
 export const EVENT_STREAM_REFRESH_DECISION_EXECUTION_MODE =
   EventStreamRefreshDecisionExecutionModeSchema.parse(
     defaultEventStreamRefreshDecisionExecutionMode,
   );
 
 const DerivedComputationExecutionModeSchema = z.enum(["worker", "in-thread"]);
-const defaultDerivedComputationExecutionMode =
-  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+const defaultDerivedComputationExecutionMode = "in-thread";
 
 export const THREAD_LIST_PRESENTATION_EXECUTION_MODE = DerivedComputationExecutionModeSchema.parse(
   defaultDerivedComputationExecutionMode,

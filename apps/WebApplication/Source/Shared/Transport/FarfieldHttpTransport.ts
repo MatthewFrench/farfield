@@ -29,8 +29,7 @@ import {
 
 const RequestPathSchema = z.string().trim().min(1, "Request path must not be blank.");
 const HttpResponseDecodeExecutionModeSchema = z.enum(["worker", "in-thread"]);
-const defaultHttpResponseDecodeExecutionMode =
-  import.meta.env.MODE === "test" ? "in-thread" : "worker";
+const defaultHttpResponseDecodeExecutionMode = "in-thread";
 const HTTP_RESPONSE_DECODE_EXECUTION_MODE = HttpResponseDecodeExecutionModeSchema.parse(
   defaultHttpResponseDecodeExecutionMode,
 );

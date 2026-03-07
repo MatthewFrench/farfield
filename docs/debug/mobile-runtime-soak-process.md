@@ -918,6 +918,36 @@ Verification evidence:
 2. `bun run --cwd apps/WebApplication typecheck`
 3. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1842`, `7947`, `6709`, zero new sentinel API/banner/page errors, and freeze summary `count=1 totalFreezeMs=150`
 
+### March 7, 2026: Non-PWA Web Worker Defaults Removed
+
+Changed owner modules:
+
+1. [ApplicationBehaviorConfiguration.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/Configuration/ApplicationBehaviorConfiguration.ts)
+2. [FarfieldHttpTransport.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Shared/Transport/FarfieldHttpTransport.ts)
+
+Implementation summary:
+
+1. event-stream refresh decisions now default to in-thread execution instead of a dedicated worker
+2. derived web computation defaults now run in-thread instead of worker mode:
+   thread-list presentation, debug issue derivation, and conversation item flattening
+3. HTTP response decode now defaults to in-thread execution instead of a dedicated decode worker
+4. service worker behavior remains unchanged for push/PWA/update handling
+
+User-visible impact:
+
+1. removes worker roundtrip overhead and worker-lifecycle complexity from normal web runtime paths
+2. keeps the same features while simplifying the execution model behind sidebar, chat, and debug derived-state flows
+3. reduces the number of moving concurrency surfaces that can contribute to mobile roughness while preserving the service worker path that is actually needed
+
+Verification evidence:
+
+1. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+2. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+3. [ThreadListPane.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadListPane.test.tsx)
+4. [UseApplicationShellViewProperties.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts)
+5. `bun run --cwd apps/WebApplication typecheck`
+6. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2710`, `7304`, `6108`, zero new sentinel API/banner/page errors, and freeze summary `count=1 totalFreezeMs=167`
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
