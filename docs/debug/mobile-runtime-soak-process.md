@@ -654,6 +654,29 @@ Verification evidence:
 3. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
 4. real browser mobile-width thread-open run on `https://farfield.matthewfrench.io/threads/019cc4e3-c181-7341-bc1e-8fc70b578415` reduced the non-debug selected-thread read sequence to one `GET /api/threads/:threadId?includeTurns=true`, one `GET /live-state`, and one `GET /stream-events?limit=80`, with no follow-up `stream-events?sinceSequence=0` reread
 
+### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
+
+Changed owner modules:
+
+1. [CodexMessageDispatchOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexMessageDispatchOwner.ts)
+
+Implementation summary:
+
+1. server-side send now uses the projected turn-start template when it already exists in stream-owned state
+2. if projected state does not expose a template, the send path starts the turn immediately without doing a blocking `thread/read` first
+
+User-visible impact:
+
+1. `POST /api/threads/:threadId/messages` no longer spends route-critical time rereading the full thread just to recover a turn-start template
+2. raw send HTTP should return faster in template-missing cases, even though total user-visible turn completion time still depends on Codex turn execution
+
+Verification evidence:
+
+1. [CodexMessageDispatchOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexMessageDispatchOwner.test.ts)
+2. [ThreadMemberMutationRouteOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadMemberMutationRouteOwner.test.ts)
+3. `bun run --cwd apps/ServerApplication typecheck`
+4. unchanged real soak stayed green on Saturday, March 7, 2026, with no new sentinel errors
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.

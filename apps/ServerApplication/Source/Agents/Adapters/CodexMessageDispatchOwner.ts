@@ -10,9 +10,7 @@ import type { AgentSendMessageInput, AgentThreadConversationState } from "../Typ
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const RESUME_WITH_EXTENDED_HISTORY = true;
-const APP_SERVER_OWNER_CLIENT_IDENTIFIER = "app-server";
 const IPC_SEND_MESSAGE_FAILURE_LOG_EVENT = "codex-ipc-send-message-failed";
-const TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT = "codex-turn-start-template-unavailable";
 const TURN_IN_PROGRESS_STATUS = "inProgress";
 const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
 const STEER_TURN_IDENTIFIER_UNAVAILABLE_ERROR =
@@ -51,7 +49,7 @@ export class CodexMessageDispatchOwner {
       );
 
       if (ownerClientId !== null) {
-        const turnStartTemplate = await this.readTurnStartTemplate(input.threadId, ownerClientId);
+        const turnStartTemplate = this.readTurnStartTemplate(input.threadId);
         try {
           await this.service.sendMessage({
             threadId: input.threadId,
@@ -59,7 +57,7 @@ export class CodexMessageDispatchOwner {
             text: input.text,
             ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
             ...(typeof input.isSteering === "boolean" ? { isSteering: input.isSteering } : {}),
-            turnStartTemplate,
+            ...(turnStartTemplate !== null ? { turnStartTemplate } : {}),
           });
           return;
         } catch (error) {
@@ -105,10 +103,7 @@ export class CodexMessageDispatchOwner {
       return;
     }
 
-    const turnStartTemplate = await this.readTurnStartTemplate(
-      input.threadId,
-      APP_SERVER_OWNER_CLIENT_IDENTIFIER,
-    );
+    const turnStartTemplate = this.readTurnStartTemplate(input.threadId);
     await this.runAppServerCall(() =>
       this.appClient.startTurn({
         threadId: input.threadId,
@@ -141,42 +136,21 @@ export class CodexMessageDispatchOwner {
     throw new Error(STEER_TURN_IDENTIFIER_UNAVAILABLE_ERROR);
   }
 
-  private async readTurnStartTemplate(
-    threadId: string,
-    ownerClientId: string,
-  ): Promise<TurnStartParams | null> {
-    let turnStartTemplate: TurnStartParams | null = null;
+  // Keep the hot send path proportional to stream-owned state. Missing projected params are
+  // acceptable; blocking on a full thread reread here would delay POST /messages completion.
+  private readTurnStartTemplate(threadId: string): TurnStartParams | null {
     const projectedConversationState =
       this.threadStreamStateOwner.getProjectedConversationState(threadId);
 
     try {
       if (projectedConversationState) {
-        turnStartTemplate = findLatestTurnParamsTemplate(projectedConversationState);
+        return findLatestTurnParamsTemplate(projectedConversationState);
       }
     } catch {
-      turnStartTemplate = null;
-    }
-
-    if (turnStartTemplate) {
-      return turnStartTemplate;
-    }
-
-    try {
-      const readResult = await this.runAppServerCall(() =>
-        this.appClient.readThread(threadId, true),
-      );
-      return findLatestTurnParamsTemplate(readResult.thread);
-    } catch (error) {
-      logger.debug(
-        {
-          threadId,
-          ownerClientId,
-          error: toErrorMessage(error),
-        },
-        TURN_START_TEMPLATE_UNAVAILABLE_LOG_EVENT,
-      );
       return null;
     }
+
+    return null;
   }
 }
 

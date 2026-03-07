@@ -108,6 +108,7 @@ function createThreadStreamStateOwner(
   options?: {
     turnStatus?: "completed" | "inProgress" | "in_progress";
     turnId?: string;
+    includeInitialTurnParams?: boolean;
   },
 ): CodexThreadStreamStateOwner {
   const threadStreamStateOwner = new CodexThreadStreamStateOwner();
@@ -128,11 +129,15 @@ function createThreadStreamStateOwner(
             turns: [
               {
                 ...(options?.turnId !== undefined ? { turnId: options.turnId } : {}),
-                params: {
-                  threadId,
-                  input: [{ type: "text", text: "existing input" }],
-                  attachments: [],
-                },
+                ...(options?.includeInitialTurnParams === false
+                  ? {}
+                  : {
+                      params: {
+                        threadId,
+                        input: [{ type: "text", text: "existing input" }],
+                        attachments: [],
+                      },
+                    }),
                 status: options?.turnStatus ?? "completed",
                 items: [],
               },
@@ -153,6 +158,7 @@ function createOwnerTestContext(
     isConversationNotFoundError?: <ErrorType>(error: ErrorType) => boolean;
     initialTurnStatus?: "completed" | "inProgress" | "in_progress";
     initialTurnId?: string;
+    includeInitialTurnParams?: boolean;
   },
 ): OwnerTestContext {
   const appServerTransport = new TestAppServerTransport();
@@ -161,6 +167,7 @@ function createOwnerTestContext(
   const threadStreamStateOwner = createThreadStreamStateOwner(threadId, ownerClientId, {
     turnStatus: options?.initialTurnStatus,
     turnId: options?.initialTurnId,
+    includeInitialTurnParams: options?.includeInitialTurnParams,
   });
   let runAppServerCallCount = 0;
 
@@ -240,6 +247,33 @@ describe("CodexMessageDispatchOwner", () => {
     expect(context.appServerTransport.requestCalls).toHaveLength(0);
   });
 
+  it("does not reread the thread before IPC sends when no projected turn template exists", async () => {
+    const threadId = "thread-ipc-no-template";
+    const ownerClientId = "owner-client-ipc-no-template";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      includeInitialTurnParams: false,
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "hello without template",
+      },
+      true,
+    );
+
+    expect(context.service.sendMessageCalls).toHaveLength(1);
+    const sendCall = context.service.sendMessageCalls[0];
+    expect(sendCall).toBeDefined();
+    if (!sendCall) {
+      throw new Error("Expected sendMessage call.");
+    }
+    expect(sendCall.turnStartTemplate).toBeUndefined();
+    expect("turnStartTemplate" in sendCall).toBe(false);
+    expect(context.readRunAppServerCallCount()).toBe(0);
+    expect(context.appServerTransport.requestCalls).toHaveLength(0);
+  });
+
   it("uses turn/start for app-server sends when IPC is unavailable", async () => {
     const threadId = "thread-3";
     const ownerClientId = "owner-client-3";
@@ -269,6 +303,45 @@ describe("CodexMessageDispatchOwner", () => {
             {
               type: "text",
               text: "hello from app-server",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
+  });
+
+  it("does not reread the thread before app-server sends when no projected turn template exists", async () => {
+    const threadId = "thread-app-server-no-template";
+    const ownerClientId = "owner-client-app-server-no-template";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      includeInitialTurnParams: false,
+    });
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-without-template",
+      },
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "hello without template",
+      },
+      false,
+    );
+
+    expect(context.readRunAppServerCallCount()).toBe(1);
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "hello without template",
             },
           ],
           attachments: [],
