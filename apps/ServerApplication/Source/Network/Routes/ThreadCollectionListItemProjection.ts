@@ -1,25 +1,9 @@
-import type { FarfieldThreadListItem } from "@farfield/protocol";
+import type { FarfieldThreadListItem, ThreadConversationState } from "@farfield/protocol";
 import type { AgentId } from "../../Agents/Types.js";
 
 const USER_MESSAGE_ITEM_TYPE = "userMessage";
 const USER_MESSAGE_TEXT_CONTENT_TYPE = "text";
 const REMOVED_PROJECT_STATE = "removed";
-
-interface ThreadCollectionProjectionSourceTextContentItem {
-  type: string;
-  text?: string;
-}
-
-type ThreadCollectionProjectionSourceContentItem = ThreadCollectionProjectionSourceTextContentItem;
-
-interface ThreadCollectionProjectionSourceTurnItem {
-  type: string;
-  content?: ThreadCollectionProjectionSourceContentItem[] | undefined;
-}
-
-interface ThreadCollectionProjectionSourceTurn {
-  items: ThreadCollectionProjectionSourceTurnItem[];
-}
 
 export interface ThreadCollectionListItemProjectionSource {
   id: string;
@@ -31,7 +15,7 @@ export interface ThreadCollectionListItemProjectionSource {
   threadName?: string | null | undefined;
   title?: string | null | undefined;
   name?: string | null | undefined;
-  turns?: ThreadCollectionProjectionSourceTurn[] | undefined;
+  turns?: ThreadConversationState["turns"] | undefined;
   removed?: boolean | undefined;
   projectRemoved?: boolean | undefined;
   projectState?: "active" | "removed" | undefined;
@@ -71,7 +55,7 @@ function readThreadPreview(thread: ThreadCollectionListItemProjectionSource): st
 }
 
 function readLatestTurnItemType(
-  turns: ThreadCollectionProjectionSourceTurn[] | undefined,
+  turns: ThreadConversationState["turns"] | undefined,
 ): string | undefined {
   if (turns === undefined || turns.length === 0) {
     return undefined;
@@ -95,7 +79,7 @@ function readLatestTurnItemType(
 }
 
 function readLastUserMessage(
-  turns: ThreadCollectionProjectionSourceTurn[] | undefined,
+  turns: ThreadConversationState["turns"] | undefined,
 ): string | undefined {
   if (turns === undefined || turns.length === 0) {
     return undefined;

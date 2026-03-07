@@ -52,7 +52,8 @@ export class ThreadMemberArchiveMutationRouteOwner {
       return false;
     }
 
-    if (!adapter.archiveThread) {
+    const archiveThread = adapter.archiveThread;
+    if (archiveThread === undefined) {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support thread archive`,
@@ -68,7 +69,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
 
     try {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
-        await adapter.archiveThread({
+        await archiveThread.call(adapter, {
           threadId,
         });
       });
@@ -125,7 +126,8 @@ export class ThreadMemberArchiveMutationRouteOwner {
       return false;
     }
 
-    if (!adapter.unarchiveThread) {
+    const unarchiveThread = adapter.unarchiveThread;
+    if (unarchiveThread === undefined) {
       jsonResponse(this.dependencies.res, 400, {
         ok: false,
         error: `Agent ${agentId} does not support thread unarchive`,
@@ -141,7 +143,7 @@ export class ThreadMemberArchiveMutationRouteOwner {
 
     try {
       await threadConcurrencyCoordinator.runExclusive(threadId, async () => {
-        await adapter.unarchiveThread({
+        await unarchiveThread.call(adapter, {
           threadId,
         });
       });

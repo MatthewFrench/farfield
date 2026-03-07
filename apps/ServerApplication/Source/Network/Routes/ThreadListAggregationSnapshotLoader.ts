@@ -11,7 +11,10 @@ import type {
   ThreadListItemWithAgentId,
   ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
-import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
+import {
+  projectThreadListItemFromAgentThreadListItem,
+  type ThreadCollectionListItemProjectionSource,
+} from "./ThreadCollectionListItemProjection.js";
 
 const ThreadCollectionRouteLogEventByName = {
   agentListThreadsFailed: "agent-list-threads-failed",
@@ -113,6 +116,27 @@ async function readLoadedThreadResultIfMissingFromList(input: {
     );
     return null;
   }
+}
+
+function buildBackfilledThreadListProjectionSource(
+  readThreadResult: AgentReadThreadResult,
+): ThreadCollectionListItemProjectionSource | null {
+  const createdAt = readThreadResult.thread.createdAt;
+  const updatedAt = readThreadResult.thread.updatedAt;
+  if (createdAt === undefined || updatedAt === undefined) {
+    return null;
+  }
+
+  return {
+    id: readThreadResult.thread.id,
+    createdAt,
+    updatedAt,
+    cwd: readThreadResult.thread.cwd,
+    path: null,
+    turns: readThreadResult.thread.turns,
+    hasUnreadTurn: undefined,
+    isLoadedInMemory: true,
+  };
 }
 
 export function buildAggregationAdapterListThreadsInput(input: {
@@ -227,17 +251,13 @@ export async function loadThreadListAggregationSnapshot(input: {
       }
 
       input.registerThreadAdapterOwnership(loadedThreadIdentifier, adapterResult.adapter.id);
+      const backfilledThreadProjectionSource =
+        buildBackfilledThreadListProjectionSource(readThreadResult);
+      if (backfilledThreadProjectionSource === null) {
+        continue;
+      }
       const projectedThreadListItem = projectThreadListItemFromAgentThreadListItem({
-        thread: {
-          id: readThreadResult.thread.id,
-          createdAt: readThreadResult.thread.createdAt,
-          updatedAt: readThreadResult.thread.updatedAt,
-          cwd: readThreadResult.thread.cwd,
-          path: null,
-          turns: readThreadResult.thread.turns,
-          hasUnreadTurn: undefined,
-          isLoadedInMemory: true,
-        },
+        thread: backfilledThreadProjectionSource,
         agentId: adapterResult.adapter.id,
         isLoadedInMemory: true,
       });
