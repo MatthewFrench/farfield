@@ -178,6 +178,19 @@ describe("ThreadListPane", () => {
     );
   });
 
+  it("shows a subtle refresh indicator while thread list data is refreshing", () => {
+    cleanup();
+    render(
+      <ThreadListPane
+        {...createThreadListPaneProperties({
+          isCoreLoading: true,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("thread-list-refresh-indicator").textContent).toContain("Refreshing");
+  });
+
   it("renders runtime status badges for thread rows", () => {
     cleanup();
     render(

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/Components/UserInterface/Button";
 import {
@@ -85,7 +85,18 @@ export function ThreadListActiveSection({
   return (
     <div className="space-y-1">
       <div className="px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground/60 flex items-center justify-between">
-        <span>Threads</span>
+        <span className="flex items-center gap-1.5">
+          <span>Threads</span>
+          {properties.isCoreLoading && (
+            <span
+              data-testid="thread-list-refresh-indicator"
+              className="flex items-center gap-1 text-[9px] normal-case tracking-normal text-muted-foreground/70"
+            >
+              <Loader2 size={10} className="animate-spin" />
+              Refreshing
+            </span>
+          )}
+        </span>
         <span>{String(properties.threads.length)}</span>
       </div>
       {properties.activeProjectGroups.length > 0 && (

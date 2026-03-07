@@ -248,9 +248,23 @@ export class ThreadListStateController {
     );
   }
 
+  public async prepareThreadQueriesForExplicitRefresh(): Promise<void> {
+    await Promise.all([
+      this.prepareActiveThreadQueryForExplicitRefresh(),
+      this.prepareArchivedThreadQueryForExplicitRefresh(),
+    ]);
+  }
+
   public invalidateArchivedThreadQuery(): void {
     // Keep the last snapshot as a sync baseline; invalidation should only revoke freshness.
     this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);
+  }
+
+  public async prepareArchivedThreadQueryForExplicitRefresh(): Promise<void> {
+    this.threadQueryCache.invalidate(ThreadListCacheKeyByName.archivedThreads);
+    await this.threadListSnapshotPersistenceStore.clearThreadListSnapshot(
+      ThreadListCacheKeyByName.archivedThreads,
+    );
   }
 
   public invalidateThreadQueries(): void {

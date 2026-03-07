@@ -245,8 +245,8 @@ function buildApplicationShellViewPropertiesInput(
     refreshPushSettingsDiagnostics: input.pushFeatureComposition.refreshPushSettingsDiagnostics,
     sendPushTestNotificationFromSettings:
       input.pushFeatureComposition.sendPushTestNotificationFromSettings,
-    prepareActiveThreadQueryForExplicitRefresh:
-      input.threadListStateController.prepareActiveThreadQueryForExplicitRefresh.bind(
+    prepareThreadQueriesForExplicitRefresh:
+      input.threadListStateController.prepareThreadQueriesForExplicitRefresh.bind(
         input.threadListStateController,
       ),
     refreshCoreDataAndSelectedThread: input.refreshCoreDataAndSelectedThread,

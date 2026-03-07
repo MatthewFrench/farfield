@@ -117,7 +117,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const enablePushNotificationsFromToolbarSpy = vi.fn(async (): Promise<void> => {});
   const refreshPushSettingsDiagnosticsSpy = vi.fn(async (): Promise<void> => {});
   const sendPushTestNotificationFromSettingsSpy = vi.fn(async (): Promise<void> => {});
-  const prepareActiveThreadQueryForExplicitRefreshSpy = vi.fn(async (): Promise<void> => {});
+  const prepareThreadQueriesForExplicitRefreshSpy = vi.fn(async (): Promise<void> => {});
   const refreshCoreDataAndSelectedThreadSpy = vi.fn(async (): Promise<void> => {});
   const setActiveTabSpy = vi.fn((): void => {});
   const toggleThemeSpy = vi.fn((): void => {});
@@ -268,7 +268,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     enablePushNotificationsFromToolbar: enablePushNotificationsFromToolbarSpy,
     refreshPushSettingsDiagnostics: refreshPushSettingsDiagnosticsSpy,
     sendPushTestNotificationFromSettings: sendPushTestNotificationFromSettingsSpy,
-    prepareActiveThreadQueryForExplicitRefresh: prepareActiveThreadQueryForExplicitRefreshSpy,
+    prepareThreadQueriesForExplicitRefresh: prepareThreadQueriesForExplicitRefreshSpy,
     refreshCoreDataAndSelectedThread: refreshCoreDataAndSelectedThreadSpy,
     setActiveTab: setActiveTabSpy,
     toggleTheme: toggleThemeSpy,
@@ -444,7 +444,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     enablePushNotificationsFromToolbarSpy,
     refreshPushSettingsDiagnosticsSpy,
     sendPushTestNotificationFromSettingsSpy,
-    prepareActiveThreadQueryForExplicitRefreshSpy,
+    prepareThreadQueriesForExplicitRefreshSpy,
     refreshCoreDataAndSelectedThreadSpy,
     setActiveTabSpy,
     toggleThemeSpy,
@@ -572,7 +572,7 @@ describe("useApplicationShellViewProperties", () => {
     expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
 
     void settingsProperties.onRefreshData();
-    expect(fixture.prepareActiveThreadQueryForExplicitRefreshSpy).toHaveBeenCalledTimes(1);
+    expect(fixture.prepareThreadQueriesForExplicitRefreshSpy).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
     });

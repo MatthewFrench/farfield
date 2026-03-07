@@ -862,6 +862,37 @@ Verification evidence:
 2. `bun run --cwd apps/WebApplication typecheck`
 3. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=1765`, `6442`, `6197`, zero new sentinel API/banner/page errors, and no visible runtime banner regressions
 
+### March 7, 2026: Manual Sidebar Refresh Now Refreshes Both Lists And Shows Activity
+
+Changed owner modules:
+
+1. [ThreadListStateController.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/StateManagement/ThreadListStateController.ts)
+2. [UseApplicationShellViewProperties.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationShellViewProperties.ts)
+3. [UseApplicationShellComposition.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationShellComposition.ts)
+4. [ThreadListActiveSection.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Threads/UserInterface/ThreadListActiveSection.tsx)
+5. [UseApplicationShellViewProperties.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts)
+6. [ThreadListPane.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadListPane.test.tsx)
+
+Implementation summary:
+
+1. the settings-panel refresh action now clears both active and archived thread-query baselines before running the tracked core refresh
+2. this prevents manual refresh from only forcing the active list while leaving archived sidebar data on stale cached snapshots
+3. the active thread-list header now shows a subtle `Refreshing` indicator while sidebar/core thread data is reloading
+
+User-visible impact:
+
+1. manual refresh from settings now targets the whole sidebar instead of only the active-thread slice
+2. sidebar refresh work is visibly indicated without needing the user to infer that anything is happening
+3. thread list changes are less likely to appear “stuck” until a full page reload after a manual refresh
+
+Verification evidence:
+
+1. [UseApplicationShellViewProperties.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationShellViewProperties.test.ts)
+2. [ThreadListPane.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ThreadListPane.test.tsx)
+3. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+4. `bun run --cwd apps/WebApplication typecheck`
+5. unchanged real soak passed on Saturday, March 7, 2026, with step timings `sendMs=2158`, `6741`, `11752`, zero new sentinel API/banner/page errors, and no refresh-path banner regressions
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
