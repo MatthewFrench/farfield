@@ -72,7 +72,10 @@ function readInitialRefreshFlags(input: {
 }): EventRefreshFlags {
   const { snapshot, hasConnectedBefore } = input;
   return {
-    refreshCore: true,
+    // Initial startup already runs the core refresh path through application refresh effects.
+    // Reserve EventSource-open core refresh for reconnect recovery so first open does not
+    // immediately invalidate and reread the active sidebar query a second time.
+    refreshCore: hasConnectedBefore,
     refreshHistory: snapshot.activeTab === DEBUG_ACTIVE_TAB,
     refreshSelectedThread: hasConnectedBefore
       ? Boolean(snapshot.selectedThreadId)

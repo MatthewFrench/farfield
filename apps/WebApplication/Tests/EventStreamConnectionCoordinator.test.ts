@@ -164,7 +164,7 @@ describe("EventStreamConnectionCoordinator", () => {
 
     expect(executedRefreshes).toEqual([
       {
-        refreshCore: true,
+        refreshCore: false,
         refreshHistory: true,
         refreshSelectedThread: true,
         refreshNotificationProjections: true,
@@ -205,7 +205,7 @@ describe("EventStreamConnectionCoordinator", () => {
 
     expect(executedRefreshes).toEqual([
       {
-        refreshCore: true,
+        refreshCore: false,
         refreshHistory: false,
         refreshSelectedThread: false,
         refreshNotificationProjections: true,
@@ -263,7 +263,7 @@ describe("EventStreamConnectionCoordinator", () => {
 
     expect(executedRefreshes).toEqual([
       {
-        refreshCore: true,
+        refreshCore: false,
         refreshHistory: false,
         refreshSelectedThread: false,
         refreshNotificationProjections: true,

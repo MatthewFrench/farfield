@@ -679,6 +679,32 @@ Verification evidence:
 4. `bun run --cwd apps/WebApplication typecheck`
 5. unchanged Chromium real soak on Sunday, March 8, 2026, stayed green with `freeze count=1 totalFreezeMs=167`, `sendMs=1952`, `13422`, `14745`; treat this as a selected-thread work-reduction fix, not a send-latency fix
 
+### March 8, 2026: EventSource First Open Stops Forcing A Second Core Sidebar Refresh
+
+Changed owner modules:
+
+1. [EventStreamConnectionCoordinator.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/EventStreamConnectionCoordinator.ts)
+2. [EventStreamConnectionCoordinator.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/EventStreamConnectionCoordinator.test.ts)
+
+Implementation summary:
+
+1. first EventSource open now reserves `refreshCore` for reconnect recovery instead of always forcing a core refresh on startup
+2. startup still refreshes selected thread, debug history, and notification projections through the existing owned paths, but it no longer immediately invalidates and rereads the active sidebar query a second time just because the event stream connected
+
+User-visible impact:
+
+1. startup should perform less duplicate active-sidebar reread work before the page settles
+2. reconnect recovery still refreshes core data, so disconnect healing behavior is preserved while initial startup does less redundant sidebar churn
+
+Verification evidence:
+
+1. [EventStreamConnectionCoordinator.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/EventStreamConnectionCoordinator.test.ts)
+2. [UseEventStreamEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseEventStreamEffects.test.tsx)
+3. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+4. `bun run --cwd apps/WebApplication test -- Tests/EventStreamConnectionCoordinator.test.ts Tests/UseEventStreamEffects.test.tsx Tests/ApplicationRuntimeComposition.test.tsx`
+5. `bun run --cwd apps/WebApplication typecheck`
+6. unchanged Chromium real soak rerun on Sunday, March 8, 2026, was interrupted by `dev:remote` watch restarts triggered by the soak command's required protocol build, so use the focused tests plus the startup revalidation audit as the trustworthy signal for this change
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:
