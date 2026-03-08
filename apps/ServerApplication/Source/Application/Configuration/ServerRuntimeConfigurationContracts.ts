@@ -10,6 +10,8 @@ export interface ServerRuntimeConfiguration {
   historyPayloadSummaryMaximumBytes: number;
   historyDetailRetentionMaximumBytes: number;
   historyReplayRetentionMaximumBytes: number;
+  createdThreadListProjectionTimeToLiveMilliseconds: number;
+  createdThreadListProjectionMaximumEntries: number;
   userAgent: string;
   runtimeStateSnapshotCacheTimeToLiveMs: number;
   ipcReconnectDelayMs: number;

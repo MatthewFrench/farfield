@@ -25,6 +25,7 @@ import { PushDispatchConcurrencyCoordinator } from "../Network/PushDispatchConcu
 import { PushMutationConcurrencyCoordinator } from "../Network/PushMutationConcurrencyCoordinator.js";
 import { PushTestPayloadOwner } from "../Network/PushTestPayloadOwner.js";
 import { RequestObservabilityOwner } from "../Network/RequestObservabilityOwner.js";
+import { CreatedThreadListProjectionOwner } from "../Network/Routes/CreatedThreadListProjectionOwner.js";
 import { ServerErrorEventRecorder } from "../Network/ServerErrorEventRecorder.js";
 import { ServerObservabilitySnapshotOwner } from "../Network/ServerObservabilitySnapshotOwner.js";
 import { ServerRequestHandler } from "../Network/ServerRequestHandler.js";
@@ -186,6 +187,10 @@ const threadListAggregationCache = new ThreadListAggregationCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
   runtimeConfiguration.threadListAggregationCacheMaximumEntries,
 );
+const createdThreadListProjectionOwner = new CreatedThreadListProjectionOwner({
+  timeToLiveMilliseconds: runtimeConfiguration.createdThreadListProjectionTimeToLiveMilliseconds,
+  maximumEntries: runtimeConfiguration.createdThreadListProjectionMaximumEntries,
+});
 const sidebarThreadSyncSnapshotCache = new SidebarThreadSyncSnapshotCache(
   runtimeConfiguration.threadListAggregationCacheTimeToLiveMs,
   runtimeConfiguration.threadListAggregationCacheMaximumEntries,
@@ -402,6 +407,7 @@ const serverRequestHandler = new ServerRequestHandler({
   replayAdapter: readCodexAdapter(),
   threadListAggregationCache,
   sidebarThreadSyncSnapshotCache,
+  createdThreadListProjectionOwner,
   threadUnreadableStateOwner,
   threadConcurrencyCoordinator,
   threadSendProgressObservabilityOwner,

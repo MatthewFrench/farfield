@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { JsonValue } from "@farfield/protocol";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type { ThreadListAggregationCache } from "../ThreadListAggregationCache.js";
+import type { CreatedThreadListProjectionOwner } from "./CreatedThreadListProjectionOwner.js";
 
 export type ThreadCollectionRouteMethod = "GET" | "POST";
 
@@ -35,6 +36,7 @@ export interface ThreadCollectionRouteDependencies {
   url: URL;
   defaultWorkspace: string;
   threadListAggregationCache: ThreadListAggregationCache;
+  createdThreadListProjectionOwner: CreatedThreadListProjectionOwner;
   listEnabledAdapters: () => AgentAdapter[];
   registerThreadAdapterOwnership: (threadId: string, agentId: AgentId) => void;
   shouldIncludeThreadInList: (threadId: string) => boolean;

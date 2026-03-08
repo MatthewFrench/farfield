@@ -102,6 +102,16 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     ServerRuntimeEnvironmentVariableNames.historyReplayRetentionMaximumBytes,
     ServerRuntimeDefaultValues.historyReplayRetentionMaximumBytes,
   );
+  const createdThreadListProjectionTimeToLiveMilliseconds = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.createdThreadListProjectionTimeToLiveMilliseconds,
+    ServerRuntimeDefaultValues.createdThreadListProjectionTimeToLiveMilliseconds,
+  );
+  const createdThreadListProjectionMaximumEntries = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.createdThreadListProjectionMaximumEntries,
+    ServerRuntimeDefaultValues.createdThreadListProjectionMaximumEntries,
+  );
   const userAgent = ServerRuntimeStaticConfiguration.userAgent;
   const runtimeStateSnapshotCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
     env,
@@ -288,6 +298,8 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     historyPayloadSummaryMaximumBytes,
     historyDetailRetentionMaximumBytes,
     historyReplayRetentionMaximumBytes,
+    createdThreadListProjectionTimeToLiveMilliseconds,
+    createdThreadListProjectionMaximumEntries,
     userAgent,
     runtimeStateSnapshotCacheTimeToLiveMs,
     ipcReconnectDelayMs,

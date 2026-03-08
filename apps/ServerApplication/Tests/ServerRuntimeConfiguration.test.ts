@@ -50,6 +50,8 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.historyPayloadSummaryMaximumBytes).toBe(131_072);
     expect(configuration.historyDetailRetentionMaximumBytes).toBe(4_194_304);
     expect(configuration.historyReplayRetentionMaximumBytes).toBe(1_048_576);
+    expect(configuration.createdThreadListProjectionTimeToLiveMilliseconds).toBe(60_000);
+    expect(configuration.createdThreadListProjectionMaximumEntries).toBe(128);
     expect(configuration.capabilityListTimeoutMs).toBe(8_000);
     expect(configuration.threadListAdapterTimeoutMs).toBe(7_500);
     expect(configuration.pushTestSendTimeoutMs).toBe(7_500);
@@ -176,6 +178,18 @@ describe("readServerRuntimeConfiguration", () => {
 
     expect(configuration.historyDetailRetentionMaximumBytes).toBe(8_192);
     expect(configuration.historyReplayRetentionMaximumBytes).toBe(2_048);
+  });
+
+  it("accepts created-thread projection retention overrides from environment", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      CREATED_THREAD_LIST_PROJECTION_TTL_MS: "15000",
+      CREATED_THREAD_LIST_PROJECTION_MAX_ENTRIES: "32",
+    });
+
+    expect(configuration.createdThreadListProjectionTimeToLiveMilliseconds).toBe(15_000);
+    expect(configuration.createdThreadListProjectionMaximumEntries).toBe(32);
   });
 
   it("parses strict boolean tokens for secure cookie configuration", () => {

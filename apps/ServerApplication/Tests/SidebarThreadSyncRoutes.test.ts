@@ -13,6 +13,7 @@ import type {
   AgentReadThreadResult,
   AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
+import { CreatedThreadListProjectionOwner } from "../Source/Network/Routes/CreatedThreadListProjectionOwner.js";
 import type { SidebarThreadSyncRouteDependencies } from "../Source/Network/Routes/SidebarThreadSyncRouteContracts.js";
 import { handleSidebarThreadSyncRoutes } from "../Source/Network/Routes/SidebarThreadSyncRoutes.js";
 import { SidebarThreadSyncSnapshotCache } from "../Source/Network/SidebarThreadSyncSnapshotCache.js";
@@ -103,6 +104,7 @@ function createSidebarThreadSyncDependencies(input: {
   onJsonResponse: (statusCode: number, body: object) => void;
   threadListAggregationCache?: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache?: SidebarThreadSyncSnapshotCache;
+  createdThreadListProjectionOwner?: CreatedThreadListProjectionOwner;
 }): SidebarThreadSyncRouteDependencies {
   const { request, response } = createMockRequestResponsePair();
   request.method = "POST";
@@ -116,6 +118,12 @@ function createSidebarThreadSyncDependencies(input: {
       input.threadListAggregationCache ?? new ThreadListAggregationCache(1_000, 8),
     sidebarThreadSyncSnapshotCache:
       input.sidebarThreadSyncSnapshotCache ?? new SidebarThreadSyncSnapshotCache(1_000, 8),
+    createdThreadListProjectionOwner:
+      input.createdThreadListProjectionOwner ??
+      new CreatedThreadListProjectionOwner({
+        timeToLiveMilliseconds: 60_000,
+        maximumEntries: 16,
+      }),
     listEnabledAdapters: input.listEnabledAdapters,
     registerThreadAdapterOwnership: () => {},
     shouldIncludeThreadInList: input.shouldIncludeThreadInList ?? (() => true),
@@ -255,6 +263,72 @@ describe("handleSidebarThreadSyncRoutes", () => {
     expect(capturedBody).toMatchObject({
       ok: false,
       error: "Invalid sidebar thread sync request",
+    });
+  });
+
+  it("returns newly created thread in sidebar sync before adapter list catches up", async () => {
+    let capturedBody: object | null = null;
+    const createdThreadListProjectionOwner = new CreatedThreadListProjectionOwner({
+      timeToLiveMilliseconds: 60_000,
+      maximumEntries: 16,
+    });
+    createdThreadListProjectionOwner.rememberThread({
+      id: "thread_created_overlay",
+      preview: "",
+      displayName: undefined,
+      lastUserMessage: undefined,
+      latestActivityIsUserMessage: false,
+      createdAt: 1_735_600_000_000,
+      updatedAt: 1_735_600_000_001,
+      cwd: "/tmp/workspace",
+      path: null,
+      agentId: "codex",
+      hasUnreadTurn: null,
+      isLoadedInMemory: true,
+      isProjectRemoved: false,
+    });
+    const adapter = createMockAgentAdapter(
+      "codex",
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+        pages: 1,
+        truncated: false,
+      }),
+    );
+
+    const handled = await handleSidebarThreadSyncRoutes(
+      createSidebarThreadSyncDependencies({
+        requestBody: {
+          archived: false,
+          limit: 20,
+          maxPages: 2,
+          sortKey: "updated_at",
+          cwd: "/tmp/workspace",
+          knownSnapshotVersion: null,
+        },
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (_statusCode, body) => {
+          capturedBody = body;
+        },
+        createdThreadListProjectionOwner,
+      }),
+    );
+
+    expect(handled).toBe(true);
+    expect(FarfieldSidebarThreadSyncResponseSchema.parse(capturedBody)).toMatchObject({
+      ok: true,
+      syncStatus: "snapshot",
+      threadList: {
+        data: [
+          {
+            id: "thread_created_overlay",
+            agentId: "codex",
+            cwd: "/tmp/workspace",
+            isLoadedInMemory: true,
+          },
+        ],
+      },
     });
   });
 

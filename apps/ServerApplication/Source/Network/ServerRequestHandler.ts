@@ -22,6 +22,7 @@ import {
   RequestUrlPathnameParseStatusByName,
   readPathnameForRequestMetricsFromRequestUrl,
 } from "./RequestPathContracts.js";
+import type { CreatedThreadListProjectionOwner } from "./Routes/CreatedThreadListProjectionOwner.js";
 import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
 import { type RuntimeStateSnapshotReader } from "./Routes/RuntimeRoutes.js";
 import type { ThreadRouteDependencies } from "./Routes/ThreadRoutes.js";
@@ -83,6 +84,7 @@ export interface ServerRequestHandlerDependencies {
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
+  createdThreadListProjectionOwner: CreatedThreadListProjectionOwner;
   threadUnreadableStateOwner: ThreadUnreadableStateOwner;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
@@ -187,6 +189,7 @@ export class ServerRequestHandler {
       replayAdapter: this.deps.replayAdapter,
       threadListAggregationCache: this.deps.threadListAggregationCache,
       sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
+      createdThreadListProjectionOwner: this.deps.createdThreadListProjectionOwner,
       threadUnreadableStateOwner: this.deps.threadUnreadableStateOwner,
       threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
       threadSendProgressObservabilityOwner: this.deps.threadSendProgressObservabilityOwner,

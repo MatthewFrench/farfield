@@ -15,6 +15,7 @@ import type {
   AgentReadThreadResult,
   AgentSendMessageInput,
 } from "../Source/Agents/Types.js";
+import { CreatedThreadListProjectionOwner } from "../Source/Network/Routes/CreatedThreadListProjectionOwner.js";
 import {
   type ThreadCollectionRouteMethod,
   ThreadCollectionRouteMethodByName,
@@ -145,6 +146,7 @@ function createCollectionRouteDependencies(input: {
     timeoutMs: number,
     label: string,
   ) => Promise<ValueType>;
+  createdThreadListProjectionOwner?: CreatedThreadListProjectionOwner;
 }): ThreadCollectionRouteDependencies {
   const { request, response } = createMockRequestResponsePair();
   request.method = input.method ?? ThreadCollectionRouteMethodByName.get;
@@ -156,6 +158,12 @@ function createCollectionRouteDependencies(input: {
     url: input.url,
     defaultWorkspace: input.defaultWorkspace ?? "/tmp/workspace",
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
+    createdThreadListProjectionOwner:
+      input.createdThreadListProjectionOwner ??
+      new CreatedThreadListProjectionOwner({
+        timeToLiveMilliseconds: 60_000,
+        maximumEntries: 16,
+      }),
     listEnabledAdapters: input.listEnabledAdapters,
     registerThreadAdapterOwnership: () => {},
     shouldIncludeThreadInList: input.shouldIncludeThreadInList ?? (() => true),
@@ -375,6 +383,77 @@ describe("handleThreadCollectionRoutes", () => {
     expect(capturedBody).toMatchObject({
       ok: false,
       error: "Invalid thread list query parameters",
+    });
+  });
+
+  it("returns newly created thread in the active list before adapter list catches up", async () => {
+    let createResponseBody: object | null = null;
+    let listResponseBody: object | null = null;
+    const createdThreadListProjectionOwner = new CreatedThreadListProjectionOwner({
+      timeToLiveMilliseconds: 60_000,
+      maximumEntries: 16,
+    });
+    const createThread = vi.fn(
+      async (input: AgentCreateThreadInput): Promise<AgentCreateThreadResult> => ({
+        threadId: "thread_created_overlay",
+        thread: {
+          id: "thread_created_overlay",
+          preview: "",
+          createdAt: 1_736_100_000_000,
+          updatedAt: 1_736_100_000_001,
+          cwd: input.cwd,
+        },
+        cwd: input.cwd,
+      }),
+    );
+    const listThreads = vi.fn(
+      async (): Promise<AgentListThreadsResult> => ({
+        data: [],
+        nextCursor: null,
+        pages: 1,
+        truncated: false,
+      }),
+    );
+    const adapter = createMockAgentAdapter("codex", listThreads, createThread);
+
+    await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        method: ThreadCollectionRouteMethodByName.post,
+        url: buildThreadCollectionRouteUrl(),
+        listEnabledAdapters: () => [adapter],
+        resolveCreateThreadAdapter: () => adapter,
+        onJsonResponse: (_statusCode, body) => {
+          createResponseBody = body;
+        },
+        createdThreadListProjectionOwner,
+      }),
+    );
+
+    await handleThreadCollectionRoutes(
+      createCollectionRouteDependencies({
+        method: ThreadCollectionRouteMethodByName.get,
+        url: buildThreadCollectionRouteUrl(),
+        listEnabledAdapters: () => [adapter],
+        onJsonResponse: (_statusCode, body) => {
+          listResponseBody = body;
+        },
+        createdThreadListProjectionOwner,
+      }),
+    );
+
+    expect(createResponseBody).toMatchObject({
+      ok: true,
+      threadId: "thread_created_overlay",
+    });
+    expect(listResponseBody).toMatchObject({
+      ok: true,
+      data: [
+        {
+          id: "thread_created_overlay",
+          agentId: "codex",
+          isLoadedInMemory: true,
+        },
+      ],
     });
   });
 

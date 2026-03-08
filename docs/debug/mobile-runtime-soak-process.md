@@ -775,6 +775,34 @@ Verification evidence:
 9. `bun run --cwd packages/CodexProtocol test -- Tests/ProtocolAppServerSchemas.test.ts`
 10. stable development rebuild after this change returned to `ready` with no immediate crash summary, but multi-minute OOM absence still needs longer observation
 
+### March 8, 2026: Create Route Seeds Short-Lived Active List Projections
+
+Changed owner modules:
+
+1. [CreatedThreadListProjectionOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/CreatedThreadListProjectionOwner.ts)
+2. [ThreadCollectionRoutes.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadCollectionRoutes.ts)
+3. [ThreadListAggregationSnapshotLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/ThreadListAggregationSnapshotLoader.ts)
+4. [SidebarThreadSyncRoutes.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Network/Routes/SidebarThreadSyncRoutes.ts)
+
+Implementation summary:
+
+1. the create-thread route now remembers a bounded short-lived active-thread projection for the just-created thread
+2. active `/api/threads` aggregation and `/api/sidebar/threads/sync` now merge that remembered projection when adapter list reads have not caught up yet
+3. the projection is forgotten once the adapter list includes the thread, so it is explicitly a temporary create-freshness bridge rather than a second long-lived cache
+
+User-visible impact:
+
+1. newly created active threads should appear in the active thread list and sidebar sync sooner instead of waiting for adapter list eventual consistency
+2. this specifically targets the stable soak failure where a managed thread existed and was directly readable but had not yet appeared in the active list
+
+Verification evidence:
+
+1. [ThreadCollectionRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ThreadCollectionRoutes.test.ts)
+2. [SidebarThreadSyncRoutes.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/SidebarThreadSyncRoutes.test.ts)
+3. [ServerRequestHandler.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerRequestHandler.test.ts)
+4. `bun run --cwd apps/ServerApplication test -- Tests/ThreadCollectionRoutes.test.ts Tests/SidebarThreadSyncRoutes.test.ts Tests/ServerRequestHandler.test.ts`
+5. `bun run --cwd apps/ServerApplication typecheck`
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:

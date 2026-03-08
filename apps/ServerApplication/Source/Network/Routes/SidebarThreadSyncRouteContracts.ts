@@ -3,6 +3,7 @@ import type { JsonValue } from "@farfield/protocol";
 import type { AgentAdapter, AgentId } from "../../Agents/Types.js";
 import type { SidebarThreadSyncSnapshotCache } from "../SidebarThreadSyncSnapshotCache.js";
 import type { ThreadListAggregationCache } from "../ThreadListAggregationCache.js";
+import type { CreatedThreadListProjectionOwner } from "./CreatedThreadListProjectionOwner.js";
 
 export type SidebarThreadSyncRouteMethod = "POST";
 
@@ -23,6 +24,7 @@ export interface SidebarThreadSyncRouteDependencies {
   url: URL;
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
+  createdThreadListProjectionOwner: CreatedThreadListProjectionOwner;
   listEnabledAdapters: () => AgentAdapter[];
   registerThreadAdapterOwnership: (threadId: string, agentId: AgentId) => void;
   shouldIncludeThreadInList: (threadId: string) => boolean;

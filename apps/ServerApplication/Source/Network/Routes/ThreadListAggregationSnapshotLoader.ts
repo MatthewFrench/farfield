@@ -9,6 +9,7 @@ import type {
   ThreadListItemWithAgentId,
   ThreadListSortKey,
 } from "../ThreadListAggregationCache.js";
+import type { CreatedThreadListProjectionOwner } from "./CreatedThreadListProjectionOwner.js";
 import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
 
 const ThreadCollectionRouteLogEventByName = {
@@ -101,12 +102,14 @@ export async function loadThreadListAggregationSnapshot(input: {
   withTimeout: ThreadCollectionRouteWithTimeout;
   registerThreadAdapterOwnership: ThreadCollectionRouteThreadOwnershipRegistrar;
   shouldIncludeThreadInList: (threadId: string) => boolean;
+  createdThreadListProjectionOwner: CreatedThreadListProjectionOwner;
   sortItems: (left: ThreadListItemWithAgentId, right: ThreadListItemWithAgentId) => number;
 }): Promise<{
   mergedData: ThreadListItemWithAgentId[];
   combinedTruncated: boolean;
 }> {
   const mergedData: ThreadListItemWithAgentId[] = [];
+  const mergedThreadIdentifierSet = new Set<string>();
   let combinedTruncated = false;
 
   const adapterResults = await Promise.all(
@@ -172,7 +175,25 @@ export async function loadThreadListAggregationSnapshot(input: {
           isLoadedInMemory,
         });
       mergedData.push(projectedThreadListItem);
+      mergedThreadIdentifierSet.add(projectedThreadListItem.id);
+      input.createdThreadListProjectionOwner.forgetThread(projectedThreadListItem.id);
     }
+  }
+
+  const projectedCreatedThreads = input.createdThreadListProjectionOwner.readMatchingThreads({
+    enabledAgentIds: input.enabledAdapterList.map((adapter) => adapter.id),
+    archived: input.adapterListThreadsInput.archived,
+    cwd: input.adapterListThreadsInput.cwd,
+  });
+  for (const projectedCreatedThread of projectedCreatedThreads) {
+    if (mergedThreadIdentifierSet.has(projectedCreatedThread.id)) {
+      continue;
+    }
+    if (!input.shouldIncludeThreadInList(projectedCreatedThread.id)) {
+      continue;
+    }
+    mergedData.push(projectedCreatedThread);
+    mergedThreadIdentifierSet.add(projectedCreatedThread.id);
   }
 
   mergedData.sort(input.sortItems);

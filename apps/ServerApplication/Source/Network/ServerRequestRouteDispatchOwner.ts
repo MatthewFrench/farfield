@@ -17,6 +17,7 @@ import type { EventStreamClientRegistry } from "./EventStreamClientRegistry.js";
 import type { PushMutationConcurrencyCoordinator } from "./PushMutationConcurrencyCoordinator.js";
 import { handleAgentRoutes } from "./Routes/AgentRoutes.js";
 import { handleCapabilityRoutes } from "./Routes/CapabilityRoutes.js";
+import type { CreatedThreadListProjectionOwner } from "./Routes/CreatedThreadListProjectionOwner.js";
 import type { DebugRouteDependencies } from "./Routes/DebugRoutes.js";
 import { handleDebugRoutes } from "./Routes/DebugRoutes.js";
 import { handleLocalImageRoutes } from "./Routes/LocalImageRoutes.js";
@@ -53,6 +54,7 @@ export interface ServerRequestRouteDispatchOwnerDependencies {
   replayAdapter: DebugRouteDependencies["replayAdapter"];
   threadListAggregationCache: ThreadListAggregationCache;
   sidebarThreadSyncSnapshotCache: SidebarThreadSyncSnapshotCache;
+  createdThreadListProjectionOwner: CreatedThreadListProjectionOwner;
   threadUnreadableStateOwner: ThreadUnreadableStateOwner;
   threadConcurrencyCoordinator: ThreadConcurrencyCoordinator;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
@@ -180,6 +182,7 @@ export class ServerRequestRouteDispatchOwner {
         url: input.url,
         threadListAggregationCache: this.deps.threadListAggregationCache,
         sidebarThreadSyncSnapshotCache: this.deps.sidebarThreadSyncSnapshotCache,
+        createdThreadListProjectionOwner: this.deps.createdThreadListProjectionOwner,
         listEnabledAdapters: () => this.deps.registry.listEnabled(),
         registerThreadAdapterOwnership: (threadId, agentId) => {
           this.deps.threadAdapterResolver.registerThreadOwner(threadId, agentId);
@@ -205,6 +208,7 @@ export class ServerRequestRouteDispatchOwner {
         url: input.url,
         defaultWorkspace: this.deps.defaultWorkspace,
         threadListAggregationCache: this.deps.threadListAggregationCache,
+        createdThreadListProjectionOwner: this.deps.createdThreadListProjectionOwner,
         threadConcurrencyCoordinator: this.deps.threadConcurrencyCoordinator,
         listEnabledAdapters: () => this.deps.registry.listEnabled(),
         registerThreadAdapterOwnership: (threadId, agentId) => {

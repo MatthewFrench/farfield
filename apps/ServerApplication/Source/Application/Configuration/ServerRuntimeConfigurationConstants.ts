@@ -10,6 +10,8 @@ export const ServerRuntimeEnvironmentVariableNames = Object.freeze({
   codexIpcSocketPath: "CODEX_IPC_SOCKET",
   debugClientErrorLogPath: "DEBUG_CLIENT_ERROR_LOG_PATH",
   debugClientErrorMaximumEntries: "DEBUG_CLIENT_ERROR_MAX_ENTRIES",
+  createdThreadListProjectionMaximumEntries: "CREATED_THREAD_LIST_PROJECTION_MAX_ENTRIES",
+  createdThreadListProjectionTimeToLiveMilliseconds: "CREATED_THREAD_LIST_PROJECTION_TTL_MS",
   historyDetailRetentionMaximumBytes: "HISTORY_DETAIL_RETENTION_MAX_BYTES",
   runtimeProfile: "FARFIELD_RUNTIME_PROFILE",
   historyPayloadSummaryMaximumBytes: "HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES",
@@ -47,6 +49,8 @@ export const ServerRuntimeDefaultValues = Object.freeze({
   apiSessionSigningSecret: "farfield_session_secret",
   apiSessionTimeToLiveMilliseconds: 28_800_000,
   capabilityListTimeoutMilliseconds: 8_000,
+  createdThreadListProjectionMaximumEntries: 128,
+  createdThreadListProjectionTimeToLiveMilliseconds: 60_000,
   clientErrorMaximumEntries: 2_000,
   historyLimit: 2_000,
   // Keep payload summaries bounded at 128 KiB to cap log/memory overhead in debug flows.

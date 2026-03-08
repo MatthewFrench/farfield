@@ -2,6 +2,7 @@ import type { AgentCreateThreadInput, AgentId } from "../../Agents/Types.js";
 import { logger } from "../../Shared/Logging/Logger.js";
 import { parseStartThreadBody, type StartThreadBody } from "../RequestSchemas/HttpSchemas.js";
 import type { ThreadListSortKey } from "../ThreadListAggregationCache.js";
+import { projectThreadListItemFromAgentThreadListItem } from "./ThreadCollectionListItemProjection.js";
 import { ThreadCollectionListQueryOwner } from "./ThreadCollectionListQueryOwner.js";
 import {
   type ThreadCollectionRouteDependencies,
@@ -129,6 +130,13 @@ async function handleThreadCollectionCreateRoute(
     const createThreadInput = buildCreateThreadInput(body, adapter.id, defaultWorkspace);
     const result = await adapter.createThread(createThreadInput);
     registerThreadAdapterOwnership(result.threadId, adapter.id);
+    deps.createdThreadListProjectionOwner.rememberThread(
+      projectThreadListItemFromAgentThreadListItem({
+        thread: result.thread,
+        agentId: adapter.id,
+        isLoadedInMemory: true,
+      }),
+    );
 
     invalidateThreadListAggregationCache(
       ThreadCollectionRouteCacheInvalidationReasonByName.threadCreated,
@@ -284,6 +292,7 @@ async function handleThreadCollectionListRoute(
         withTimeout,
         registerThreadAdapterOwnership,
         shouldIncludeThreadInList: deps.shouldIncludeThreadInList,
+        createdThreadListProjectionOwner: deps.createdThreadListProjectionOwner,
         sortItems: (left, right) =>
           threadCollectionListQueryOwner.compareThreadListItems(left, right, sortKey),
       }),
