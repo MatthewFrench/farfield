@@ -4,6 +4,7 @@ import {
   FarfieldPushTestBodySchema,
   type JsonValue,
 } from "@farfield/protocol";
+import { buildCodexIpcFrameHistoryPayload } from "../Agents/Adapters/CodexIpcFrameHistoryPayloadBuilder.js";
 import { AgentRuntimeOwner } from "../Agents/AgentRuntimeOwner.js";
 import { formatServerHelpText, parseServerCliOptions } from "../Agents/CliOptions.js";
 import { ThreadAdapterResolver } from "../Agents/ThreadAdapterResolver.js";
@@ -320,7 +321,7 @@ agentRuntimeOwner = new AgentRuntimeOwner({
     activityHistoryService.pushHistory(
       BootstrapHistoryEventContract.ipcTransport,
       event.direction,
-      event.frame as JsonValue,
+      buildCodexIpcFrameHistoryPayload(event),
       {
         method: event.method,
         threadId: event.threadId,

@@ -169,6 +169,31 @@ Current status:
 2. archived name invalidation and proven-missing archived pruning were fixed
 3. archived freshness policy should still be reviewed when more sidebar/runtime work is done
 
+### 9. Inbound Codex IPC frames were entering activity history as raw payloads
+
+Files:
+
+1. [ServerBootstrap.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/ServerBootstrap.ts)
+2. [ActivityHistoryService.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Activity/ActivityHistoryService.ts)
+3. [ActivityHistoryPayloadProjection.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Modules/Activity/ActivityHistoryPayloadProjection.ts)
+
+Why it was bad:
+
+1. non-batched inbound Codex IPC frames were being pushed into activity history as full raw frame payloads
+2. history projection then did a full `JSON.stringify` plus `Buffer.byteLength` on those payloads before deciding whether to summarize them
+3. the history store also retained the original raw payload by entry id, so very large inbound frames could be stringified and then kept alive in memory
+
+User-visible impact:
+
+1. long-lived stable API sessions could grow toward heap OOM and crash the stable API child
+2. this was especially bad in stable mode because the validated API child stays alive for long windows while inbound Codex/app-server traffic continues
+
+Current status:
+
+1. mitigated
+2. inbound Codex IPC frames now enter history as compact summaries instead of raw payloads
+3. outbound preview frames still keep raw payloads so debug replay remains intact
+
 ## Confirmed Mitigations Already Landed
 
 ### Sidebar freshness and stale selection

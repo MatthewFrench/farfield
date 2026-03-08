@@ -741,6 +741,34 @@ Verification evidence:
 4. `bun run --cwd apps/WebApplication typecheck`
 5. unchanged Chromium real soak rerun on Sunday, March 8, 2026, still hit `dev:remote` watch restarts from the required protocol build and surfaced unrelated `runtime-request-error` banners, so use the focused tests plus the prior commit-fan-out probe output as the trustworthy signal for this change
 
+### March 8, 2026: Inbound Codex IPC History Stops Retaining Raw Frame Payloads
+
+Changed owner modules:
+
+1. [CodexIpcFrameHistoryPayloadBuilder.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexIpcFrameHistoryPayloadBuilder.ts)
+2. [ServerBootstrap.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Application/ServerBootstrap.ts)
+3. [CodexIpcFrameHistoryPayloadBuilder.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts)
+
+Implementation summary:
+
+1. inbound Codex IPC frames now enter activity history as compact metadata summaries instead of full raw frame payloads
+2. outbound preview frames still keep their raw payloads so debug replay continues to have request bodies when the operator explicitly replays a request or broadcast
+3. this removes the previous path where activity-history projection had to run full-frame `JSON.stringify` and raw-payload retention on arbitrary inbound Codex frames
+
+User-visible impact:
+
+1. long-lived stable API sessions should be less likely to hit heap growth from large inbound IPC frame history retention
+2. debug history still shows inbound IPC activity, but as bounded summaries instead of giant raw frame bodies
+
+Verification evidence:
+
+1. [CodexIpcFrameHistoryPayloadBuilder.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts)
+2. [ActivityHistoryService.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ActivityHistoryService.test.ts)
+3. [ServerBootstrap.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerBootstrap.test.ts)
+4. `bun run --cwd apps/ServerApplication test -- Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts Tests/ActivityHistoryService.test.ts Tests/ServerBootstrap.test.ts`
+5. `bun run --cwd apps/ServerApplication typecheck`
+6. stable development rebuild after this change returned to `ready` with no immediate crash summary, but multi-minute OOM absence still needs longer observation
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:
