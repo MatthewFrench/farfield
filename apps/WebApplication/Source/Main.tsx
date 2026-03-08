@@ -161,9 +161,7 @@ function installBootstrapWindowOwners(): void {
       ).threadId,
     readUrl: () => window.location.pathname + window.location.search,
   });
-  if (import.meta.env.DEV) {
-    installGlobalClientPerformanceFreezeProbe();
-  }
+  installGlobalClientPerformanceFreezeProbe();
 }
 
 installBootstrapWindowOwners();

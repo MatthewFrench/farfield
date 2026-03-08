@@ -151,6 +151,7 @@ Stable verification path:
 - `bun run dev:stable` serves the validated stable web shell on `http://127.0.0.1:4412`
 - `bun run end-to-end:real:mobile-soak:stable` targets that stable web shell and writes isolated artifacts with `E2E_REAL_OUTPUT_PROFILE=stable-dev`
 - verified on Sunday, March 8, 2026: the stable Chromium soak wrote to `.runtime/end-to-end-performance/stable-dev/`, `.runtime/end-to-end-sentinel/stable-dev/`, `test-results/stable-dev/real-app/`, and `playwright-report/stable-dev/real-app/`, and the run passed with `freezeCount=0`
+- stable builds now install the client freeze probe too; direct browser evaluation on Sunday, March 8, 2026, confirmed `window.__farfieldClientPerformanceFreezeProbeOwner` exists on the stable shell and returns populated instant events, completed operations, long tasks, and freeze windows
 
 ## Triage Order For AI
 

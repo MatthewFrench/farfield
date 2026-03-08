@@ -85,6 +85,9 @@ const mainModuleMocks = vi.hoisted(() => {
       remove: (): void => {},
     }),
   );
+  const installGlobalClientPerformanceFreezeProbe = vi.fn((): { remove: () => void } => ({
+    remove: (): void => {},
+  }));
   const reloadApplicationWindow = vi.fn((): void => {});
   const parseFromLocation = vi.fn(
     (
@@ -127,6 +130,7 @@ const mainModuleMocks = vi.hoisted(() => {
     reconcilePushSubscription,
     getWebShellHealth,
     installGlobalClientCrashReporter,
+    installGlobalClientPerformanceFreezeProbe,
     reloadApplicationWindow,
     parseFromLocation,
     serviceWorkerControllerChangeReloadOwnerConstructorArguments,
@@ -153,6 +157,11 @@ vi.mock("../Source/Application/DataAccess/WebShellApi", () => ({
 
 vi.mock("../Source/Application/Boot/InstallClientErrorReporter", () => ({
   installGlobalClientCrashReporter: mainModuleMocks.installGlobalClientCrashReporter,
+}));
+
+vi.mock("../Source/Application/Boot/InstallClientPerformanceFreezeProbe", () => ({
+  installGlobalClientPerformanceFreezeProbe:
+    mainModuleMocks.installGlobalClientPerformanceFreezeProbe,
 }));
 
 vi.mock("../Source/Application/Boot/ApplicationWindowReloadOwner", () => ({
@@ -328,6 +337,7 @@ describe("Main bootstrap", () => {
       "?view=chat",
     );
     expect(crashReporterOptions.readUrl?.()).toBe("/threads/thread-123?view=chat");
+    expect(mainModuleMocks.installGlobalClientPerformanceFreezeProbe).toHaveBeenCalledTimes(1);
 
     runNextAnimationFrame();
     runNextAnimationFrame();
