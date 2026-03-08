@@ -1,5 +1,5 @@
 import type { IpcFrame } from "@farfield/protocol";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatStreamEventsResponse } from "@/Features/Chat/DataAccess/ChatServerClient";
 import { resolveNextStreamEventsState } from "@/Features/Chat/DomainModel/SelectedThreadStreamEventStateResolver";
 
@@ -28,6 +28,10 @@ function buildStreamSnapshot(input: {
 }
 
 describe("SelectedThreadStreamEventStateResolver", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("keeps previous events when reset payload tail matches current state", () => {
     const previousEvents = [buildEvent("event-1")];
     const nextEvents = [buildEvent("event-1")];
@@ -114,5 +118,25 @@ describe("SelectedThreadStreamEventStateResolver", () => {
     });
 
     expect(resolvedEvents).toEqual([buildEvent("event-2"), buildEvent("event-tail")]);
+  });
+
+  it("does not rely on JSON.stringify for event equality", () => {
+    const stringifySpy = vi.spyOn(JSON, "stringify");
+    const previousEvents = [buildEvent("event-1")];
+    const nextEvents = [buildEvent("event-1")];
+
+    const resolvedEvents = resolveNextStreamEventsState({
+      previousStreamEvents: previousEvents,
+      streamEventsSnapshot: buildStreamSnapshot({
+        events: nextEvents,
+        nextSequence: 2,
+        resetRequired: true,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      expectedSinceSequence: null,
+    });
+
+    expect(resolvedEvents).toBe(previousEvents);
+    expect(stringifySpy).not.toHaveBeenCalled();
   });
 });
