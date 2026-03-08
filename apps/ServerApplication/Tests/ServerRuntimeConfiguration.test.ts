@@ -223,6 +223,40 @@ describe("readServerRuntimeConfiguration", () => {
     );
   });
 
+  it("namespaces runtime-owned paths under FARFIELD_RUNTIME_PROFILE when configured", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const environment = buildBaseEnvironment(temporaryDirectoryPath);
+    delete environment.DEBUG_CLIENT_ERROR_LOG_PATH;
+    const configuration = readServerRuntimeConfiguration({
+      ...environment,
+      FARFIELD_RUNTIME_PROFILE: "stable-dev",
+    });
+
+    expect(configuration.clientErrorLogPath).toBe(
+      path.join(
+        process.cwd(),
+        ".runtime",
+        "stable-dev",
+        "logs",
+        "errors",
+        `${configuration.clientErrorSessionId}.ndjson`,
+      ),
+    );
+    expect(configuration.invalidThreadStreamEventsLogPath).toBe(
+      path.resolve(
+        process.cwd(),
+        ".runtime",
+        "stable-dev",
+        "logs",
+        "threads",
+        "invalid-thread-stream-events.ndjson",
+      ),
+    );
+    expect(configuration.traceDirectoryPath).toBe(
+      path.resolve(process.cwd(), ".runtime", "stable-dev", "traces"),
+    );
+  });
+
   it("fails for empty optional path environment values with a clear variable error", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     expect(() => {
@@ -231,6 +265,16 @@ describe("readServerRuntimeConfiguration", () => {
         DEBUG_CLIENT_ERROR_LOG_PATH: "   ",
       });
     }).toThrow("DEBUG_CLIENT_ERROR_LOG_PATH must be a non-empty path when set");
+  });
+
+  it("fails for invalid FARFIELD_RUNTIME_PROFILE values", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    expect(() => {
+      readServerRuntimeConfiguration({
+        ...buildBaseEnvironment(temporaryDirectoryPath),
+        FARFIELD_RUNTIME_PROFILE: "stable/dev",
+      });
+    }).toThrow("FARFIELD_RUNTIME_PROFILE must match");
   });
 
   it("validates logger level and optional invalid stream log path", () => {

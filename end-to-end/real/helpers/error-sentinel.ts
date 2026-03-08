@@ -11,6 +11,7 @@ import type {
 } from "@playwright/test";
 import { z } from "zod";
 import { buildSignalFailureMessage } from "./diagnostics";
+import { resolveRealEndToEndRuntimeOutputDirectory } from "./output-profile";
 import {
   findMatchingSignalAllowlistEntry,
   type SignalMatchInput,
@@ -457,7 +458,7 @@ export class ErrorSentinel {
   public async writeSummary(): Promise<string> {
     await this.refresh();
 
-    const outputDirectory = path.join(process.cwd(), ".runtime", "end-to-end-sentinel");
+    const outputDirectory = resolveRealEndToEndRuntimeOutputDirectory("end-to-end-sentinel");
     await fs.mkdir(outputDirectory, { recursive: true });
 
     const scenarioFileName = `${sanitizeScenarioId(this.scenarioId)}.ndjson`;

@@ -10,6 +10,7 @@ export const ServerRuntimeEnvironmentVariableNames = Object.freeze({
   codexIpcSocketPath: "CODEX_IPC_SOCKET",
   debugClientErrorLogPath: "DEBUG_CLIENT_ERROR_LOG_PATH",
   debugClientErrorMaximumEntries: "DEBUG_CLIENT_ERROR_MAX_ENTRIES",
+  runtimeProfile: "FARFIELD_RUNTIME_PROFILE",
   historyPayloadSummaryMaximumBytes: "HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES",
   host: "HOST",
   invalidThreadStreamEventsLogPath: "FARFIELD_INVALID_STREAM_LOG_PATH",

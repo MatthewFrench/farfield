@@ -28,6 +28,34 @@ import {
   readTrimmedEnvironmentValue,
 } from "./ServerRuntimeEnvironmentValueReaders.js";
 
+const RuntimeProfilePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+function readRuntimeRootPath(input: {
+  env: NodeJS.ProcessEnv;
+  defaultWorkspacePath: string;
+}): string {
+  const rawRuntimeProfile = readTrimmedEnvironmentValue(
+    input.env,
+    ServerRuntimeEnvironmentVariableNames.runtimeProfile,
+  );
+  if (rawRuntimeProfile.length === 0) {
+    return path.resolve(
+      input.defaultWorkspacePath,
+      ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+    );
+  }
+  if (!RuntimeProfilePattern.test(rawRuntimeProfile)) {
+    throw new Error(
+      `${ServerRuntimeEnvironmentVariableNames.runtimeProfile} must match ${RuntimeProfilePattern.source}`,
+    );
+  }
+  return path.resolve(
+    input.defaultWorkspacePath,
+    ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+    rawRuntimeProfile,
+  );
+}
+
 // Owner note: this module composes configuration owners to produce the single
 // startup runtime configuration contract for the server process.
 export type { ServerRuntimeConfiguration } from "./ServerRuntimeConfigurationContracts.js";
@@ -38,6 +66,10 @@ export function readServerRuntimeConfigurationFromCurrentProcessEnvironment(): S
 
 export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRuntimeConfiguration {
   const defaultWorkspacePath = path.resolve(process.cwd());
+  const runtimeRootPath = readRuntimeRootPath({
+    env,
+    defaultWorkspacePath,
+  });
   const logLevel = LoggerLevelSchema.parse(
     (
       readEnvironmentValue(env, ServerRuntimeEnvironmentVariableNames.logLevel) ??
@@ -82,7 +114,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   );
 
   const traceDirectoryPath = path.resolve(
-    defaultWorkspacePath,
+    runtimeRootPath,
     ServerRuntimeStaticConfiguration.traceDirectoryName,
   );
 
@@ -215,8 +247,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
       ServerRuntimeEnvironmentVariableNames.debugClientErrorLogPath,
     ) ??
     path.join(
-      defaultWorkspacePath,
-      ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+      runtimeRootPath,
       ServerRuntimeStaticConfiguration.logsDirectoryName,
       ServerRuntimeStaticConfiguration.errorsLogDirectoryName,
       `${clientErrorSessionId}.ndjson`,
@@ -232,8 +263,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
       ServerRuntimeEnvironmentVariableNames.invalidThreadStreamEventsLogPath,
     ) ??
     path.resolve(
-      defaultWorkspacePath,
-      ServerRuntimeStaticConfiguration.runtimeDirectoryName,
+      runtimeRootPath,
       ServerRuntimeStaticConfiguration.logsDirectoryName,
       ServerRuntimeStaticConfiguration.threadLogsDirectoryName,
       ServerRuntimeStaticConfiguration.invalidThreadStreamEventsLogFileName,

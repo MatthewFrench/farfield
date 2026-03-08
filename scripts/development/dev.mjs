@@ -3,6 +3,7 @@
 import { spawn, spawnSync } from "node:child_process";
 
 const bunBinary = process.platform === "win32" ? "bun.exe" : "bun";
+const DEFAULT_DEVELOPMENT_RUNTIME_PROFILE = "dev";
 
 function printHelp() {
   process.stdout.write(
@@ -12,8 +13,8 @@ function printHelp() {
       "Flags:",
       "  --remote                      Bind server and web to 0.0.0.0",
       "  --agents=<ids>                Comma-separated list: codex, opencode, all",
-      "  --help                        Show this help message"
-    ].join("\n")
+      "  --help                        Show this help message",
+    ].join("\n"),
   );
   process.stdout.write("\n");
 }
@@ -21,7 +22,7 @@ function printHelp() {
 function parseArgs(argv) {
   const result = {
     remote: false,
-    agents: ""
+    agents: "",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -60,14 +61,10 @@ function parseArgs(argv) {
 }
 
 function runBuild(filter) {
-  const result = spawnSync(
-    bunBinary,
-    ["run", "--filter", filter, "build"],
-    {
-      stdio: "inherit",
-      env: process.env
-    }
-  );
+  const result = spawnSync(bunBinary, ["run", "--filter", filter, "build"], {
+    stdio: "inherit",
+    env: process.env,
+  });
 
   if (typeof result.status === "number") {
     return result.status;
@@ -90,14 +87,10 @@ for (const filter of buildFilters) {
 }
 
 const sharedPackageWatchers = buildFilters.map((filter) =>
-  spawn(
-    bunBinary,
-    ["run", "--filter", filter, "build", "--watch"],
-    {
-      stdio: "inherit",
-      env: process.env
-    }
-  )
+  spawn(bunBinary, ["run", "--filter", filter, "build", "--watch"], {
+    stdio: "inherit",
+    env: process.env,
+  }),
 );
 
 const devScript = args.remote ? "dev:remote" : "dev";
@@ -113,23 +106,23 @@ if (serverArgs.length > 0) {
 
 const serverProcess = spawn(bunBinary, serverCommand, {
   stdio: "inherit",
-  env: process.env
+  env: {
+    ...process.env,
+    FARFIELD_RUNTIME_PROFILE:
+      (process.env["FARFIELD_RUNTIME_PROFILE"] ?? "").trim() || DEFAULT_DEVELOPMENT_RUNTIME_PROFILE,
+  },
 });
 
-const webProcess = spawn(
-  bunBinary,
-  ["run", "--filter", "@farfield/web", devScript],
-  {
-    stdio: "inherit",
-    env: process.env
-  }
-);
+const webProcess = spawn(bunBinary, ["run", "--filter", "@farfield/web", devScript], {
+  stdio: "inherit",
+  env: process.env,
+});
 
 const childProcesses = [...sharedPackageWatchers, serverProcess, webProcess];
 let terminating = false;
 let firstExit = {
   code: null,
-  signal: null
+  signal: null,
 };
 
 const stopChildren = (signal) => {

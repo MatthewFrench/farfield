@@ -3,6 +3,7 @@ import http from "node:http";
 import readline from "node:readline";
 
 const bunBinary = process.platform === "win32" ? "bun.exe" : "bun";
+const STABLE_DEVELOPMENT_RUNTIME_PROFILE = "stable-dev";
 const StableApiHealthTimeoutMilliseconds = 15_000;
 const StableApiHealthProbeTimeoutMilliseconds = 1_000;
 const StableApiHealthProbeRetryDelayMilliseconds = 250;
@@ -96,6 +97,7 @@ export class StableDevelopmentApiServerOwner {
       ...this.baseChildEnvironment,
       HOST: this.configuration.host,
       PORT: String(this.configuration.apiPort),
+      FARFIELD_RUNTIME_PROFILE: STABLE_DEVELOPMENT_RUNTIME_PROFILE,
       WEB_BUILD_ID: buildVersion,
       VITE_APP_BUILD_ID: buildVersion,
     };

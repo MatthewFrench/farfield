@@ -131,17 +131,25 @@ Sentinel:
 
 - `.runtime/end-to-end-sentinel/latest.ndjson`
 - `.runtime/end-to-end-sentinel/<scenario>.ndjson`
+- when `E2E_REAL_OUTPUT_PROFILE` is set, the same files are written under `.runtime/end-to-end-sentinel/<profile>/`
 
 Freeze and performance:
 
 - `.runtime/end-to-end-performance/latest.json`
 - `.runtime/end-to-end-performance/<label>.json`
+- when `E2E_REAL_OUTPUT_PROFILE` is set, the same files are written under `.runtime/end-to-end-performance/<profile>/`
 
 Playwright failure context:
 
 - `test-results/real-app/<scenario>/error-context.md`
 - `test-results/real-app/<scenario>/trace.zip`
 - `test-results/real-app/<scenario>/video.webm`
+- when `E2E_REAL_OUTPUT_PROFILE` is set, Playwright outputs move under `test-results/<profile>/real-app/` and `playwright-report/<profile>/real-app/`
+
+Stable verification path:
+
+- `bun run dev:stable` serves the validated stable web shell on `http://127.0.0.1:4412`
+- `bun run end-to-end:real:mobile-soak:stable` targets that stable web shell and writes isolated artifacts with `E2E_REAL_OUTPUT_PROFILE=stable-dev`
 
 ## Triage Order For AI
 

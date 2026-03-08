@@ -8,6 +8,7 @@ import {
 } from "@farfield/protocol";
 import type { Page, TestInfo } from "@playwright/test";
 import { z } from "zod";
+import { resolveRealEndToEndRuntimeOutputDirectory } from "./output-profile";
 
 const PerformanceBudgetModeSchema = z.enum(["fail", "warn"]);
 
@@ -609,7 +610,7 @@ export async function writeFreezeProfileArtifact(input: {
   snapshot: FarfieldClientPerformanceProbeSnapshot;
   report: FreezeProfileReport;
 }): Promise<string> {
-  const outputDirectory = path.join(process.cwd(), ".runtime", "end-to-end-performance");
+  const outputDirectory = resolveRealEndToEndRuntimeOutputDirectory("end-to-end-performance");
   await fs.mkdir(outputDirectory, { recursive: true });
 
   const artifactFileName = `${sanitizeLabel(input.label)}.json`;

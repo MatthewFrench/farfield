@@ -67,6 +67,7 @@ Each scenario writes a signal summary to:
 
 - `.runtime/end-to-end-sentinel/<scenario>.ndjson`
 - `.runtime/end-to-end-sentinel/latest.ndjson`
+- when `E2E_REAL_OUTPUT_PROFILE` is set, the same files are written under `.runtime/end-to-end-sentinel/<profile>/`
 
 Use this for fast triage while iterating:
 
@@ -78,6 +79,14 @@ Freeze-profile artifacts are written to:
 
 - `.runtime/end-to-end-performance/<label>.json`
 - `.runtime/end-to-end-performance/latest.json`
+- when `E2E_REAL_OUTPUT_PROFILE` is set, the same files are written under `.runtime/end-to-end-performance/<profile>/`
+
+Stable-mode convenience:
+
+```bash
+bun run dev:stable
+bun run end-to-end:real:mobile-soak:stable
+```
 
 Use the dedicated mobile freeze run for repeated sidebar open/close profiling:
 

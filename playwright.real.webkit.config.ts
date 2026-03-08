@@ -1,6 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolveRealEndToEndPlaywrightOutputDirectory } from "./end-to-end/real/helpers/output-profile";
 
 const baseURL = (process.env["E2E_REAL_BASE_URL"] ?? "http://127.0.0.1:4312").trim();
+const outputDirectory = resolveRealEndToEndPlaywrightOutputDirectory(
+  "test-results",
+  "real-app-webkit",
+);
+const reportDirectory = resolveRealEndToEndPlaywrightOutputDirectory(
+  "playwright-report",
+  "real-app-webkit",
+);
 
 export default defineConfig({
   testDir: "./end-to-end/real/scenarios",
@@ -11,11 +20,8 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   fullyParallel: false,
-  outputDir: "test-results/real-app-webkit",
-  reporter: [
-    ["list"],
-    ["html", { outputFolder: "playwright-report/real-app-webkit", open: "never" }],
-  ],
+  outputDir: outputDirectory,
+  reporter: [["list"], ["html", { outputFolder: reportDirectory, open: "never" }]],
   use: {
     ...devices["iPhone 13"],
     browserName: "webkit",
