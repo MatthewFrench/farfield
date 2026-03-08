@@ -8,6 +8,8 @@ export interface ServerRuntimeConfiguration {
   port: number;
   historyLimit: number;
   historyPayloadSummaryMaximumBytes: number;
+  historyDetailRetentionMaximumBytes: number;
+  historyReplayRetentionMaximumBytes: number;
   userAgent: string;
   runtimeStateSnapshotCacheTimeToLiveMs: number;
   ipcReconnectDelayMs: number;

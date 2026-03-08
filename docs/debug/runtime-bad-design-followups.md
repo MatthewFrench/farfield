@@ -192,7 +192,8 @@ Current status:
 
 1. mitigated
 2. inbound Codex IPC frames now enter history as compact summaries instead of raw payloads
-3. outbound preview frames still keep raw payloads so debug replay remains intact
+3. debug-history detail retention and replay retention are now separate bounded stores with explicit byte budgets and eviction counters
+4. outbound preview frames still keep raw payloads so debug replay remains intact
 
 ## Confirmed Mitigations Already Landed
 

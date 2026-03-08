@@ -544,6 +544,22 @@ export const FarfieldThreadSendProgressObservabilityStatisticsSchema = z
   })
   .strict();
 
+export const FarfieldActivityHistoryRetentionStatisticsSchema = z
+  .object({
+    historyEntryCount: z.number().int().nonnegative(),
+    detailPayloadEntryCount: z.number().int().nonnegative(),
+    replayPayloadEntryCount: z.number().int().nonnegative(),
+    totalDetailPayloadBytes: z.number().int().nonnegative(),
+    totalReplayPayloadBytes: z.number().int().nonnegative(),
+    historyLimit: z.number().int().positive(),
+    detailRetentionMaximumBytes: z.number().int().positive(),
+    replayRetentionMaximumBytes: z.number().int().positive(),
+    historyEntryEvictionCount: z.number().int().nonnegative(),
+    detailPayloadEvictionCount: z.number().int().nonnegative(),
+    replayPayloadEvictionCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const FarfieldDebugObservabilitySnapshotSchema = z
   .object({
     recordedAt: z.string().datetime(),
@@ -575,6 +591,7 @@ export const FarfieldDebugObservabilitySnapshotSchema = z
         requestRouting: FarfieldRequestObservabilitySnapshotSchema,
         eventLoop: FarfieldEventLoopLagStatisticsSchema,
         threadSendProgression: FarfieldThreadSendProgressObservabilityStatisticsSchema,
+        activityHistory: FarfieldActivityHistoryRetentionStatisticsSchema,
       })
       .strict(),
   })

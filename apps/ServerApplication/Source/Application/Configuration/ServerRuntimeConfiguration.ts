@@ -92,6 +92,16 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     ServerRuntimeEnvironmentVariableNames.historyPayloadSummaryMaximumBytes,
     ServerRuntimeDefaultValues.historyPayloadSummaryMaximumBytes,
   );
+  const historyDetailRetentionMaximumBytes = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.historyDetailRetentionMaximumBytes,
+    ServerRuntimeDefaultValues.historyDetailRetentionMaximumBytes,
+  );
+  const historyReplayRetentionMaximumBytes = readPositiveIntegerEnvironmentValue(
+    env,
+    ServerRuntimeEnvironmentVariableNames.historyReplayRetentionMaximumBytes,
+    ServerRuntimeDefaultValues.historyReplayRetentionMaximumBytes,
+  );
   const userAgent = ServerRuntimeStaticConfiguration.userAgent;
   const runtimeStateSnapshotCacheTimeToLiveMs = readPositiveIntegerEnvironmentValue(
     env,
@@ -276,6 +286,8 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
     port,
     historyLimit,
     historyPayloadSummaryMaximumBytes,
+    historyDetailRetentionMaximumBytes,
+    historyReplayRetentionMaximumBytes,
     userAgent,
     runtimeStateSnapshotCacheTimeToLiveMs,
     ipcReconnectDelayMs,

@@ -10,10 +10,24 @@ import { ActivityHistoryStoreOwner } from "./ActivityHistoryStoreOwner.js";
 import { ActivityTraceLifecycleOwner } from "./ActivityTraceLifecycleOwner.js";
 
 const DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES = 131_072;
+const DEFAULT_HISTORY_DETAIL_RETENTION_MAXIMUM_BYTES = 4_194_304;
+const DEFAULT_HISTORY_REPLAY_RETENTION_MAXIMUM_BYTES = 1_048_576;
 const RECENT_TRACE_LIMIT = 20;
 const TRACE_HISTORY_EVENT_TYPE = "history";
 const ACTION_ERROR_LOG_EVENT = "action-error";
 const ACTIVITY_HISTORY_APPENDED_EVENT_TYPE = "activity-history-appended";
+
+export interface ActivityHistoryWriteOptions {
+  retainReplayPayload?: boolean;
+}
+
+export interface ActivityHistoryServiceOptions {
+  historyLimit: number;
+  eventStreamClientRegistry: EventStreamClientRegistry;
+  historyPayloadSummaryMaximumBytes?: number;
+  historyDetailRetentionMaximumBytes?: number;
+  historyReplayRetentionMaximumBytes?: number;
+}
 
 /**
  * Owns activity-history snapshots and delegates storage/trace/payload-projection
@@ -25,11 +39,14 @@ export class ActivityHistoryService {
   private readonly historyStoreOwner: ActivityHistoryStoreOwner;
   private readonly traceLifecycleOwner: ActivityTraceLifecycleOwner;
 
-  public constructor(
-    historyLimit: number,
-    eventStreamClientRegistry: EventStreamClientRegistry,
-    historyPayloadSummaryMaximumBytes = DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES,
-  ) {
+  public constructor(options: ActivityHistoryServiceOptions) {
+    const historyLimit = options.historyLimit;
+    const historyPayloadSummaryMaximumBytes =
+      options.historyPayloadSummaryMaximumBytes ?? DEFAULT_HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES;
+    const historyDetailRetentionMaximumBytes =
+      options.historyDetailRetentionMaximumBytes ?? DEFAULT_HISTORY_DETAIL_RETENTION_MAXIMUM_BYTES;
+    const historyReplayRetentionMaximumBytes =
+      options.historyReplayRetentionMaximumBytes ?? DEFAULT_HISTORY_REPLAY_RETENTION_MAXIMUM_BYTES;
     if (!Number.isInteger(historyLimit) || historyLimit <= 0) {
       throw new Error("ActivityHistoryService requires positive integer historyLimit");
     }
@@ -41,10 +58,30 @@ export class ActivityHistoryService {
         "ActivityHistoryService requires positive integer historyPayloadSummaryMaximumBytes",
       );
     }
+    if (
+      !Number.isInteger(historyDetailRetentionMaximumBytes) ||
+      historyDetailRetentionMaximumBytes <= 0
+    ) {
+      throw new Error(
+        "ActivityHistoryService requires positive integer historyDetailRetentionMaximumBytes",
+      );
+    }
+    if (
+      !Number.isInteger(historyReplayRetentionMaximumBytes) ||
+      historyReplayRetentionMaximumBytes <= 0
+    ) {
+      throw new Error(
+        "ActivityHistoryService requires positive integer historyReplayRetentionMaximumBytes",
+      );
+    }
 
     this.historyPayloadSummaryMaximumBytes = historyPayloadSummaryMaximumBytes;
-    this.eventStreamClientRegistry = eventStreamClientRegistry;
-    this.historyStoreOwner = new ActivityHistoryStoreOwner(historyLimit);
+    this.eventStreamClientRegistry = options.eventStreamClientRegistry;
+    this.historyStoreOwner = new ActivityHistoryStoreOwner({
+      historyLimit,
+      detailRetentionMaximumBytes: historyDetailRetentionMaximumBytes,
+      replayRetentionMaximumBytes: historyReplayRetentionMaximumBytes,
+    });
     this.traceLifecycleOwner = new ActivityTraceLifecycleOwner(RECENT_TRACE_LIMIT);
   }
 
@@ -52,8 +89,16 @@ export class ActivityHistoryService {
     return this.historyStoreOwner.readHistoryEntries();
   }
 
-  public readHistoryById(): Map<string, HistoryEntry["payload"]> {
-    return this.historyStoreOwner.readHistoryById();
+  public readHistoryDetailPayload(entryId: string): HistoryEntry["payload"] | null {
+    return this.historyStoreOwner.readHistoryDetailPayload(entryId);
+  }
+
+  public readReplayPayload(entryId: string): HistoryEntry["payload"] | null {
+    return this.historyStoreOwner.readReplayPayload(entryId);
+  }
+
+  public readRetentionStatistics() {
+    return this.historyStoreOwner.readRetentionStatistics();
   }
 
   public readRecentTraces(): TraceSummary[] {
@@ -102,6 +147,7 @@ export class ActivityHistoryService {
     direction: HistoryEntry["direction"],
     payload: HistoryEntry["payload"],
     meta: HistoryEntry["meta"] = {},
+    options: ActivityHistoryWriteOptions = {},
   ): HistoryEntry {
     const historyPayload = summarizePayloadForHistory(
       payload,
@@ -116,7 +162,11 @@ export class ActivityHistoryService {
       payload: historyPayload,
       meta: historyMeta,
     };
-    this.historyStoreOwner.appendHistoryEntry(entry, payload);
+    this.historyStoreOwner.appendHistoryEntry({
+      entry,
+      detailPayload: historyPayload,
+      replayPayload: options.retainReplayPayload === true ? payload : null,
+    });
     this.traceLifecycleOwner.appendTraceRecordIfActive({
       type: TRACE_HISTORY_EVENT_TYPE,
       ...entry,

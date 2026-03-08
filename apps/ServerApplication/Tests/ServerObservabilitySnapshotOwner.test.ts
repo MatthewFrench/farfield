@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { AgentRegistry } from "../Source/Agents/Registry.js";
 import { ThreadAdapterResolver } from "../Source/Agents/ThreadAdapterResolver.js";
 import { ThreadIndex } from "../Source/Agents/ThreadIndex.js";
+import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
 import { EventLoopLagObservabilityOwner } from "../Source/Network/EventLoopLagObservabilityOwner.js";
 import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
 import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
@@ -33,6 +34,7 @@ interface ServerObservabilitySnapshotOwnerFixture {
   requestObservabilityOwner: RequestObservabilityOwner;
   threadAdapterResolver: ThreadAdapterResolver;
   eventStreamClientRegistry: EventStreamClientRegistry;
+  activityHistoryService: ActivityHistoryService;
   eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
 }
@@ -58,6 +60,10 @@ function createFixture(
   const eventStreamClientRegistry = new EventStreamClientRegistry(
     EVENT_STREAM_KEEPALIVE_INTERVAL_MILLISECONDS,
   );
+  const activityHistoryService = new ActivityHistoryService({
+    historyLimit: 20,
+    eventStreamClientRegistry,
+  });
   const eventLoopLagObservabilityOwner = new EventLoopLagObservabilityOwner(
     EVENT_LOOP_SAMPLE_INTERVAL_MILLISECONDS,
     EVENT_LOOP_MAXIMUM_SAMPLE_COUNT,
@@ -82,6 +88,7 @@ function createFixture(
     requestObservabilityOwner,
     eventLoopLagObservabilityOwner,
     threadSendProgressObservabilityOwner,
+    activityHistoryService,
     readNowIsoString,
   });
 
@@ -94,6 +101,7 @@ function createFixture(
     requestObservabilityOwner,
     threadAdapterResolver,
     eventStreamClientRegistry,
+    activityHistoryService,
     eventLoopLagObservabilityOwner,
     threadSendProgressObservabilityOwner,
   };
@@ -239,6 +247,9 @@ describe("ServerObservabilitySnapshotOwner", () => {
       expect(
         snapshot.performance.threadSendProgression.lastAcceptedToFirstPublishedThreadDeltaMs,
       ).toBe(140);
+      expect(snapshot.performance.activityHistory.historyEntryCount).toBe(0);
+      expect(snapshot.performance.activityHistory.detailPayloadEntryCount).toBe(0);
+      expect(snapshot.performance.activityHistory.replayPayloadEntryCount).toBe(0);
     } finally {
       disposeFixture(fixture);
     }

@@ -137,7 +137,10 @@ function createHandlerTestHarness(options: HandlerHarnessOptions = {}): HandlerT
     threadStreamDeltaEventPublisher,
     eventStreamClientRegistry,
     runtimeStateOwner: createRuntimeStateOwner(),
-    activityHistoryService: new ActivityHistoryService(32, eventStreamClientRegistry),
+    activityHistoryService: new ActivityHistoryService({
+      historyLimit: 32,
+      eventStreamClientRegistry,
+    }),
     clientErrorStore: new ClientErrorStore(
       path.join(tempDirectoryPath, "client-errors.ndjson"),
       "session_test",

@@ -83,8 +83,8 @@ export class DebugReplayRouteOwner {
       return true;
     }
 
-    const replayPayload = activityHistoryService.readHistoryById().get(entry.id);
-    if (replayPayload === undefined) {
+    const replayPayload = activityHistoryService.readReplayPayload(entry.id);
+    if (replayPayload === null) {
       jsonResponse(res, DebugReplayRouteStatusCodeByName.clientErrorConflict, {
         ok: false,
         error: DebugReplayRouteErrorMessageByName.historyPayloadNotFound,

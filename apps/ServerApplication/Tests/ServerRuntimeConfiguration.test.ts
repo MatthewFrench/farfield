@@ -48,6 +48,8 @@ describe("readServerRuntimeConfiguration", () => {
     expect(configuration.pushEnabled).toBe(false);
     expect(configuration.runtimeStateSnapshotCacheTimeToLiveMs).toBe(250);
     expect(configuration.historyPayloadSummaryMaximumBytes).toBe(131_072);
+    expect(configuration.historyDetailRetentionMaximumBytes).toBe(4_194_304);
+    expect(configuration.historyReplayRetentionMaximumBytes).toBe(1_048_576);
     expect(configuration.capabilityListTimeoutMs).toBe(8_000);
     expect(configuration.threadListAdapterTimeoutMs).toBe(7_500);
     expect(configuration.pushTestSendTimeoutMs).toBe(7_500);
@@ -162,6 +164,18 @@ describe("readServerRuntimeConfiguration", () => {
 
     expect(configuration.threadListAdapterTimeoutMs).toBe(12_000);
     expect(configuration.pushTestSendTimeoutMs).toBe(3_000);
+  });
+
+  it("accepts history retention byte-budget overrides from environment", () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const configuration = readServerRuntimeConfiguration({
+      ...buildBaseEnvironment(temporaryDirectoryPath),
+      HISTORY_DETAIL_RETENTION_MAX_BYTES: "8192",
+      HISTORY_REPLAY_RETENTION_MAX_BYTES: "2048",
+    });
+
+    expect(configuration.historyDetailRetentionMaximumBytes).toBe(8_192);
+    expect(configuration.historyReplayRetentionMaximumBytes).toBe(2_048);
   });
 
   it("parses strict boolean tokens for secure cookie configuration", () => {

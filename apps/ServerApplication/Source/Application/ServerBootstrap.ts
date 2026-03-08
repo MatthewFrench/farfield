@@ -147,11 +147,13 @@ process.on("exit", () => {
 });
 const requestObservabilityOwner = new RequestObservabilityOwner();
 const threadSendProgressObservabilityOwner = new ThreadSendProgressObservabilityOwner();
-const activityHistoryService = new ActivityHistoryService(
-  runtimeConfiguration.historyLimit,
+const activityHistoryService = new ActivityHistoryService({
+  historyLimit: runtimeConfiguration.historyLimit,
   eventStreamClientRegistry,
-  runtimeConfiguration.historyPayloadSummaryMaximumBytes,
-);
+  historyPayloadSummaryMaximumBytes: runtimeConfiguration.historyPayloadSummaryMaximumBytes,
+  historyDetailRetentionMaximumBytes: runtimeConfiguration.historyDetailRetentionMaximumBytes,
+  historyReplayRetentionMaximumBytes: runtimeConfiguration.historyReplayRetentionMaximumBytes,
+});
 
 function emitThreadStreamStateChangedHistorySummary(
   summary: ThreadStreamStateChangedBatchSummary,
@@ -326,6 +328,9 @@ agentRuntimeOwner = new AgentRuntimeOwner({
         method: event.method,
         threadId: event.threadId,
       },
+      {
+        retainReplayPayload: event.direction === "out",
+      },
     );
   },
   onThreadStreamStateChanged: (threadId) => {
@@ -353,6 +358,7 @@ const serverObservabilitySnapshotOwner = new ServerObservabilitySnapshotOwner({
   requestObservabilityOwner,
   eventLoopLagObservabilityOwner,
   threadSendProgressObservabilityOwner,
+  activityHistoryService,
 });
 
 function broadcastRuntimeState(): void {

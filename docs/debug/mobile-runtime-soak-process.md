@@ -753,21 +753,27 @@ Implementation summary:
 
 1. inbound Codex IPC frames now enter activity history as compact metadata summaries instead of full raw frame payloads
 2. outbound preview frames still keep their raw payloads so debug replay continues to have request bodies when the operator explicitly replays a request or broadcast
-3. this removes the previous path where activity-history projection had to run full-frame `JSON.stringify` and raw-payload retention on arbitrary inbound Codex frames
+3. activity history now retains bounded detail payloads separately from replay payloads, with explicit byte budgets and oldest-first eviction
+4. server observability now exposes activity-history entry counts, byte counts, and eviction counters so retention growth is visible in `/api/debug/observability`
 
 User-visible impact:
 
 1. long-lived stable API sessions should be less likely to hit heap growth from large inbound IPC frame history retention
 2. debug history still shows inbound IPC activity, but as bounded summaries instead of giant raw frame bodies
+3. debug replay keeps working for outbound preview frames, while older replay payloads can now age out independently when the replay budget is exceeded
 
 Verification evidence:
 
 1. [CodexIpcFrameHistoryPayloadBuilder.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts)
 2. [ActivityHistoryService.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ActivityHistoryService.test.ts)
 3. [ServerBootstrap.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerBootstrap.test.ts)
-4. `bun run --cwd apps/ServerApplication test -- Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts Tests/ActivityHistoryService.test.ts Tests/ServerBootstrap.test.ts`
-5. `bun run --cwd apps/ServerApplication typecheck`
-6. stable development rebuild after this change returned to `ready` with no immediate crash summary, but multi-minute OOM absence still needs longer observation
+4. [ServerObservabilitySnapshotOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerObservabilitySnapshotOwner.test.ts)
+5. [ServerRuntimeConfiguration.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/ServerRuntimeConfiguration.test.ts)
+6. [ProtocolAppServerSchemas.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexProtocol/Tests/ProtocolAppServerSchemas.test.ts)
+7. `bun run --cwd apps/ServerApplication test -- Tests/ActivityHistoryService.test.ts Tests/CodexIpcFrameHistoryPayloadBuilder.test.ts Tests/ServerBootstrap.test.ts Tests/ServerObservabilitySnapshotOwner.test.ts Tests/ServerRuntimeConfiguration.test.ts`
+8. `bun run --cwd apps/ServerApplication typecheck`
+9. `bun run --cwd packages/CodexProtocol test -- Tests/ProtocolAppServerSchemas.test.ts`
+10. stable development rebuild after this change returned to `ready` with no immediate crash summary, but multi-minute OOM absence still needs longer observation
 
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 

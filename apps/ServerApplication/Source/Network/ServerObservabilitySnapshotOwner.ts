@@ -3,6 +3,8 @@ import type {
   ThreadAdapterResolver,
   ThreadAdapterResolverStatistics,
 } from "../Agents/ThreadAdapterResolver.js";
+import type { ActivityHistoryService } from "../Modules/Activity/ActivityHistoryService.js";
+import type { ActivityHistoryRetentionStatistics } from "../Modules/Activity/ActivityHistoryStoreOwner.js";
 import type {
   EventLoopLagObservabilityOwner,
   EventLoopLagStatistics,
@@ -79,6 +81,7 @@ export interface ServerObservabilitySnapshot {
     requestRouting: RequestObservabilitySnapshot;
     eventLoop: EventLoopLagStatistics;
     threadSendProgression: ThreadSendProgressObservabilityStatistics;
+    activityHistory: ActivityHistoryRetentionStatistics;
   };
 }
 
@@ -93,6 +96,7 @@ export interface ServerObservabilitySnapshotOwnerDependencies {
   requestObservabilityOwner: RequestObservabilityOwner;
   eventLoopLagObservabilityOwner: EventLoopLagObservabilityOwner;
   threadSendProgressObservabilityOwner: ThreadSendProgressObservabilityOwner;
+  activityHistoryService: ActivityHistoryService;
   readNowIsoString?: () => string;
 }
 
@@ -157,6 +161,7 @@ export class ServerObservabilitySnapshotOwner {
         eventLoop: this.dependencies.eventLoopLagObservabilityOwner.readStatistics(),
         threadSendProgression:
           this.dependencies.threadSendProgressObservabilityOwner.readStatistics(),
+        activityHistory: this.dependencies.activityHistoryService.readRetentionStatistics(),
       },
     };
 

@@ -114,7 +114,10 @@ describe("ServerLifecycleCoordinator", () => {
     const registry = new AgentRegistry([createAdapter("codex", adapterCounters)]);
 
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
-    const activityHistoryService = new ActivityHistoryService(50, eventStreamClientRegistry);
+    const activityHistoryService = new ActivityHistoryService({
+      historyLimit: 50,
+      eventStreamClientRegistry,
+    });
     const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinator(
       50,
       () => false,

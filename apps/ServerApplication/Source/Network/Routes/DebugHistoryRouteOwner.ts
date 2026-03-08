@@ -87,7 +87,7 @@ export class DebugHistoryRouteOwner {
     jsonResponse(res, DebugHistoryRouteStatusCodeByName.successOk, {
       ok: true,
       entry: historyEntry,
-      fullPayload: activityHistoryService.readHistoryById().get(historyEntryIdentifier) ?? null,
+      fullPayload: activityHistoryService.readHistoryDetailPayload(historyEntryIdentifier),
     });
     return true;
   }

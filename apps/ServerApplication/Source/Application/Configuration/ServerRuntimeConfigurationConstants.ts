@@ -10,8 +10,10 @@ export const ServerRuntimeEnvironmentVariableNames = Object.freeze({
   codexIpcSocketPath: "CODEX_IPC_SOCKET",
   debugClientErrorLogPath: "DEBUG_CLIENT_ERROR_LOG_PATH",
   debugClientErrorMaximumEntries: "DEBUG_CLIENT_ERROR_MAX_ENTRIES",
+  historyDetailRetentionMaximumBytes: "HISTORY_DETAIL_RETENTION_MAX_BYTES",
   runtimeProfile: "FARFIELD_RUNTIME_PROFILE",
   historyPayloadSummaryMaximumBytes: "HISTORY_PAYLOAD_SUMMARY_MAXIMUM_BYTES",
+  historyReplayRetentionMaximumBytes: "HISTORY_REPLAY_RETENTION_MAX_BYTES",
   host: "HOST",
   invalidThreadStreamEventsLogPath: "FARFIELD_INVALID_STREAM_LOG_PATH",
   logLevel: "LOG_LEVEL",
@@ -49,6 +51,10 @@ export const ServerRuntimeDefaultValues = Object.freeze({
   historyLimit: 2_000,
   // Keep payload summaries bounded at 128 KiB to cap log/memory overhead in debug flows.
   historyPayloadSummaryMaximumBytes: 131_072,
+  // Keep retained history-detail payload storage bounded independently from the visible entry count.
+  historyDetailRetentionMaximumBytes: 4_194_304,
+  // Replay payload retention is a separate, much smaller budget because only replayable entries need raw bodies.
+  historyReplayRetentionMaximumBytes: 1_048_576,
   host: "127.0.0.1",
   ipcReconnectDelayMilliseconds: 1_000,
   logLevel: "info",
