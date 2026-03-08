@@ -24,6 +24,9 @@ interface SnapshotOwnerHarness {
   readStreamEvents: () => ChatStreamEventsResponse["events"];
   readPersistedThreadDisplayName: () => string | null;
   readPersistedSnapshots: () => SelectedThreadSnapshotCacheRecord[];
+  readSetLiveStateCount: () => number;
+  readSetReadThreadStateCount: () => number;
+  readSetStreamEventsCount: () => number;
 }
 
 const originalLocalStorage = window.localStorage;
@@ -155,6 +158,9 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
   let readThreadState: ChatReadThreadResponse | null = null;
   let streamEvents: ChatStreamEventsResponse["events"] = [];
   const persistedSnapshots: SelectedThreadSnapshotCacheRecord[] = [];
+  let setLiveStateCount = 0;
+  let setReadThreadStateCount = 0;
+  let setStreamEventsCount = 0;
 
   const threadDisplayNamePreferenceStore = new ThreadDisplayNamePreferenceStore(
     `test.selected-thread-snapshot.display-name.${initialSelectedThreadId}`,
@@ -175,18 +181,21 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
     setLiveState: createStateSetter(
       () => liveState,
       (nextState) => {
+        setLiveStateCount += 1;
         liveState = nextState;
       },
     ),
     setReadThreadState: createStateSetter(
       () => readThreadState,
       (nextState) => {
+        setReadThreadStateCount += 1;
         readThreadState = nextState;
       },
     ),
     setStreamEvents: createStateSetter(
       () => streamEvents,
       (nextState) => {
+        setStreamEventsCount += 1;
         streamEvents = nextState;
       },
     ),
@@ -202,6 +211,9 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
     readPersistedThreadDisplayName: () =>
       threadDisplayNamePreferenceStore.readThreadDisplayName(initialSelectedThreadId),
     readPersistedSnapshots: () => persistedSnapshots,
+    readSetLiveStateCount: () => setLiveStateCount,
+    readSetReadThreadStateCount: () => setReadThreadStateCount,
+    readSetStreamEventsCount: () => setStreamEventsCount,
   };
 }
 
@@ -356,5 +368,61 @@ describe("SelectedThreadSnapshotStateOwner", () => {
     expect(latestPersistedSnapshot?.streamEventsSnapshot.events).toEqual([
       buildBroadcastEvent("event-2"),
     ]);
+  });
+
+  it("skips redundant selected-thread snapshot applies when effective state is unchanged", () => {
+    const harness = createHarness("thread-1");
+    const snapshotInput: ApplySnapshotsToStateInput = {
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Stable title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("event-1")],
+        nextSequence: 2,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: {
+        ok: true,
+        agentId: "codex",
+        thread: {
+          ...buildConversationState("thread-1"),
+          title: "Stable title",
+          turns: [],
+        },
+      },
+      includeTurnsUsedForRead: true,
+    };
+
+    harness.owner.applySnapshots(snapshotInput);
+    const persistedSnapshotCount = harness.readPersistedSnapshots().length;
+    const setLiveStateCount = harness.readSetLiveStateCount();
+    const setReadThreadStateCount = harness.readSetReadThreadStateCount();
+    const setStreamEventsCount = harness.readSetStreamEventsCount();
+
+    harness.owner.applySnapshots({
+      ...snapshotInput,
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Stable title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [buildBroadcastEvent("event-1")],
+        nextSequence: 2,
+        resetRequired: false,
+      }),
+      readThreadSnapshot: {
+        ok: true,
+        agentId: "codex",
+        thread: {
+          ...buildConversationState("thread-1"),
+          title: "Stable title",
+          turns: [],
+        },
+      },
+    });
+
+    expect(harness.readPersistedSnapshots()).toHaveLength(persistedSnapshotCount);
+    expect(harness.readSetLiveStateCount()).toBe(setLiveStateCount);
+    expect(harness.readSetReadThreadStateCount()).toBe(setReadThreadStateCount);
+    expect(harness.readSetStreamEventsCount()).toBe(setStreamEventsCount);
   });
 });

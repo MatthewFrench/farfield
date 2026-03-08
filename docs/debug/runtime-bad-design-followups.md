@@ -69,7 +69,9 @@ Why it is bad:
 
 Current status:
 
-1. open
+1. partially mitigated
+2. redundant selected-thread snapshot persistence and state-setter work now short-circuit when live state, read-thread state, stream events, and stream cursor are effectively unchanged
+3. broad slice ownership still exists, so this owner remains a follow-up target for narrower patch application
 
 ### 4. Conversation flattening still recomputes from the full turn list
 

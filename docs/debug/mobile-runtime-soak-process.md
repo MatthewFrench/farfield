@@ -654,6 +654,31 @@ Verification evidence:
 3. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
 4. real browser mobile-width thread-open run on `https://farfield.matthewfrench.io/threads/019cc4e3-c181-7341-bc1e-8fc70b578415` reduced the non-debug selected-thread read sequence to one `GET /api/threads/:threadId?includeTurns=true`, one `GET /live-state`, and one `GET /stream-events?limit=80`, with no follow-up `stream-events?sinceSequence=0` reread
 
+### March 8, 2026: Selected-Thread Snapshot Owner Skips No-Op Reapplies
+
+Changed owner modules:
+
+1. [SelectedThreadSnapshotStateOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/StateManagement/SelectedThreadSnapshotStateOwner.ts)
+2. [SelectedThreadSnapshotStateOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/SelectedThreadSnapshotStateOwner.test.ts)
+
+Implementation summary:
+
+1. selected-thread snapshot application now compares the effective live-state signature, read-thread signature, stream-event snapshot, and stored cursor before persisting or setting state
+2. when the incoming snapshot is equivalent to the already applied selected-thread snapshot, the owner now skips persistence and avoids re-running `setLiveState`, `setReadThreadState`, and `setStreamEvents`
+
+User-visible impact:
+
+1. repeated selected-thread reads that return equivalent data now do less post-request apply work on the client
+2. this should reduce unnecessary selected-thread state churn during reconnects and rereads, even though it does not address the larger send-latency outliers by itself
+
+Verification evidence:
+
+1. [SelectedThreadSnapshotStateOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/SelectedThreadSnapshotStateOwner.test.ts)
+2. [SelectedThreadStreamEventStateResolver.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/SelectedThreadStreamEventStateResolver.test.ts)
+3. `bun run --cwd apps/WebApplication test -- Tests/SelectedThreadSnapshotStateOwner.test.ts Tests/SelectedThreadStreamEventStateResolver.test.ts`
+4. `bun run --cwd apps/WebApplication typecheck`
+5. unchanged Chromium real soak on Sunday, March 8, 2026, stayed green with `freeze count=1 totalFreezeMs=167`, `sendMs=1952`, `13422`, `14745`; treat this as a selected-thread work-reduction fix, not a send-latency fix
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:

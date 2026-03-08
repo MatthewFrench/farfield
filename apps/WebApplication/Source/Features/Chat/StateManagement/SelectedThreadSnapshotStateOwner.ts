@@ -1,3 +1,4 @@
+import type { IpcFrame, JsonValue } from "@farfield/protocol";
 import { type Dispatch, type MutableRefObject, type SetStateAction, startTransition } from "react";
 import { type SelectedThreadSnapshotCacheRecord } from "@/Features/Chat/DataAccess/SelectedThreadSnapshotIndexedDatabaseStore";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
@@ -82,6 +83,142 @@ function hasTurnsInSelectedThreadSnapshots(
   );
 }
 
+function areJsonValuesEqual(
+  leftValue: JsonValue | undefined,
+  rightValue: JsonValue | undefined,
+): boolean {
+  if (leftValue === rightValue) {
+    return true;
+  }
+  if (leftValue === undefined || rightValue === undefined) {
+    return false;
+  }
+  if (leftValue === null || rightValue === null) {
+    return leftValue === rightValue;
+  }
+  if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+    if (!Array.isArray(leftValue) || !Array.isArray(rightValue)) {
+      return false;
+    }
+    if (leftValue.length !== rightValue.length) {
+      return false;
+    }
+    for (let index = 0; index < leftValue.length; index += 1) {
+      if (!areJsonValuesEqual(leftValue[index], rightValue[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (typeof leftValue === "object" || typeof rightValue === "object") {
+    if (typeof leftValue !== "object" || typeof rightValue !== "object") {
+      return false;
+    }
+    const leftKeys = Object.keys(leftValue);
+    const rightKeys = Object.keys(rightValue);
+    if (leftKeys.length !== rightKeys.length) {
+      return false;
+    }
+    for (const leftKey of leftKeys) {
+      if (!(leftKey in rightValue)) {
+        return false;
+      }
+      if (!areJsonValuesEqual(leftValue[leftKey], rightValue[leftKey])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function areIpcFramesEqual(previousEvent: IpcFrame, nextEvent: IpcFrame): boolean {
+  if (previousEvent === nextEvent) {
+    return true;
+  }
+  if (previousEvent.type !== nextEvent.type) {
+    return false;
+  }
+
+  switch (previousEvent.type) {
+    case "request":
+      return (
+        nextEvent.type === "request" &&
+        previousEvent.requestId === nextEvent.requestId &&
+        previousEvent.method === nextEvent.method &&
+        previousEvent.targetClientId === nextEvent.targetClientId &&
+        previousEvent.sourceClientId === nextEvent.sourceClientId &&
+        previousEvent.version === nextEvent.version &&
+        areJsonValuesEqual(previousEvent.params, nextEvent.params)
+      );
+    case "response":
+      return (
+        nextEvent.type === "response" &&
+        previousEvent.requestId === nextEvent.requestId &&
+        previousEvent.method === nextEvent.method &&
+        previousEvent.handledByClientId === nextEvent.handledByClientId &&
+        previousEvent.resultType === nextEvent.resultType &&
+        areJsonValuesEqual(previousEvent.result, nextEvent.result) &&
+        areJsonValuesEqual(previousEvent.error, nextEvent.error)
+      );
+    case "broadcast":
+      return (
+        nextEvent.type === "broadcast" &&
+        previousEvent.method === nextEvent.method &&
+        previousEvent.sourceClientId === nextEvent.sourceClientId &&
+        previousEvent.targetClientId === nextEvent.targetClientId &&
+        previousEvent.version === nextEvent.version &&
+        areJsonValuesEqual(previousEvent.params, nextEvent.params)
+      );
+    case "client-discovery-request":
+      return (
+        nextEvent.type === "client-discovery-request" &&
+        previousEvent.requestId === nextEvent.requestId &&
+        areIpcFramesEqual(previousEvent.request, nextEvent.request)
+      );
+    case "client-discovery-response":
+      return (
+        nextEvent.type === "client-discovery-response" &&
+        previousEvent.requestId === nextEvent.requestId &&
+        previousEvent.response.canHandle === nextEvent.response.canHandle
+      );
+  }
+}
+
+function areStreamEventCollectionsEqual(
+  previousEvents: IpcFrame[],
+  nextEvents: IpcFrame[],
+): boolean {
+  if (previousEvents.length !== nextEvents.length) {
+    return false;
+  }
+  for (let index = 0; index < previousEvents.length; index += 1) {
+    const previousEvent = previousEvents[index];
+    const nextEvent = nextEvents[index];
+    if (previousEvent === undefined || nextEvent === undefined) {
+      return false;
+    }
+    if (!areIpcFramesEqual(previousEvent, nextEvent)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areStreamEventSnapshotsEqual(
+  previousSnapshot: StreamEventsResponse,
+  nextSnapshot: StreamEventsResponse,
+): boolean {
+  return (
+    previousSnapshot.threadId === nextSnapshot.threadId &&
+    previousSnapshot.ownerClientId === nextSnapshot.ownerClientId &&
+    previousSnapshot.nextSequence === nextSnapshot.nextSequence &&
+    previousSnapshot.firstAvailableSequence === nextSnapshot.firstAvailableSequence &&
+    previousSnapshot.resetRequired === nextSnapshot.resetRequired &&
+    areStreamEventCollectionsEqual(previousSnapshot.events, nextSnapshot.events)
+  );
+}
+
 /**
  * Owns selected-thread snapshot state application and stream cursor tracking.
  * Hook composition delegates mutation logic to this owner to keep state transitions explicit.
@@ -138,6 +275,9 @@ export class SelectedThreadSnapshotStateOwner {
       streamEventsSinceSequenceUsed: snapshotInput.streamEventsSinceSequenceUsed,
     });
     const persistedSnapshot = this.buildPersistedSnapshot(snapshotInput);
+    if (!this.shouldApplySnapshotState(persistedSnapshot, nextSinceSequence)) {
+      return;
+    }
     this.latestSnapshotByThreadId.set(snapshotInput.threadId, persistedSnapshot);
     this.writeStreamEventsSinceSequence(snapshotInput.threadId, nextSinceSequence);
     this.lastAppliedThreadId = snapshotInput.threadId;
@@ -224,6 +364,61 @@ export class SelectedThreadSnapshotStateOwner {
       readThreadSnapshot,
       includeTurnsUsedForRead,
     };
+  }
+
+  private shouldApplySnapshotState(
+    nextSnapshot: SelectedThreadSnapshotCacheRecord,
+    nextSinceSequence: number | null,
+  ): boolean {
+    const previousSnapshot = this.latestSnapshotByThreadId.get(nextSnapshot.threadId);
+    if (previousSnapshot === undefined) {
+      return true;
+    }
+    if (
+      this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
+        previousSnapshot.liveStateSnapshot,
+        this.deps.appDefaultModel,
+        this.deps.appDefaultReasoningEffort,
+      ) !==
+      this.deps.conversationSyncSignatureBuilder.buildLiveStateSyncSignature(
+        nextSnapshot.liveStateSnapshot,
+        this.deps.appDefaultModel,
+        this.deps.appDefaultReasoningEffort,
+      )
+    ) {
+      return true;
+    }
+    if (
+      this.deps.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
+        previousSnapshot.readThreadSnapshot,
+        this.deps.appDefaultModel,
+        this.deps.appDefaultReasoningEffort,
+      ) !==
+      this.deps.conversationSyncSignatureBuilder.buildReadThreadSyncSignature(
+        nextSnapshot.readThreadSnapshot,
+        this.deps.appDefaultModel,
+        this.deps.appDefaultReasoningEffort,
+      )
+    ) {
+      return true;
+    }
+    if (
+      !areStreamEventSnapshotsEqual(
+        previousSnapshot.streamEventsSnapshot,
+        nextSnapshot.streamEventsSnapshot,
+      )
+    ) {
+      return true;
+    }
+    if (
+      previousSnapshot.streamEventsSinceSequenceUsed !== nextSnapshot.streamEventsSinceSequenceUsed
+    ) {
+      return true;
+    }
+    if (previousSnapshot.includeTurnsUsedForRead !== nextSnapshot.includeTurnsUsedForRead) {
+      return true;
+    }
+    return this.readStreamEventsSinceSequenceForRead(nextSnapshot.threadId) !== nextSinceSequence;
   }
 
   private applySnapshotState(
