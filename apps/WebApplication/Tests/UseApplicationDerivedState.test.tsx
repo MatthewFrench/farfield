@@ -60,10 +60,6 @@ interface ThreadListPresentationRequestRecord {
   deferredPromise: DeferredPromise<ApplicationDerivedState["threadListPresentationState"]>;
 }
 
-interface ConversationFlatteningRequestRecord {
-  deferredPromise: DeferredPromise<ApplicationDerivedState["flatConversationItems"]>;
-}
-
 interface DebugIssueDerivationRequestRecord {
   deferredPromise: DeferredPromise<DebugIssueDerivationResult>;
 }
@@ -91,35 +87,6 @@ class TestThreadListPresentationWorkerOwner {
     const requestRecord = this.requestRecords[requestIndex];
     if (!requestRecord) {
       throw new Error(`Missing thread-list worker request at index ${String(requestIndex)}`);
-    }
-    requestRecord.deferredPromise.resolve(value);
-  }
-}
-
-class TestConversationItemFlatteningWorkerOwner {
-  private readonly requestRecords: ConversationFlatteningRequestRecord[] = [];
-
-  public readFlattenedConversationItems(_input: {
-    turns: ConversationTurn[];
-    isGenerating: boolean;
-  }): Promise<ApplicationDerivedState["flatConversationItems"]> {
-    const deferredPromise =
-      createDeferredPromise<ApplicationDerivedState["flatConversationItems"]>();
-    this.requestRecords.push({
-      deferredPromise,
-    });
-    return deferredPromise.promise;
-  }
-
-  public dispose(): void {}
-
-  public resolveRequestByIndex(
-    requestIndex: number,
-    value: ApplicationDerivedState["flatConversationItems"],
-  ): void {
-    const requestRecord = this.requestRecords[requestIndex];
-    if (!requestRecord) {
-      throw new Error(`Missing conversation-item worker request at index ${String(requestIndex)}`);
     }
     requestRecord.deferredPromise.resolve(value);
   }
@@ -854,70 +821,6 @@ describe("useApplicationDerivedState", () => {
 
     expect(snapshotReference.current?.activeProjectGroups.length).toBeGreaterThan(0);
     expect(snapshotReference.current?.selectedThread?.id).toBe("thread-immediate");
-  });
-
-  it("keeps the newest conversation flatten projection when an older response resolves later", async () => {
-    const conversationItemFlattener = new ConversationItemFlattener();
-    const conversationItemFlatteningWorkerOwner = new TestConversationItemFlatteningWorkerOwner();
-    const firstTurns = [buildAgentMessageTurn("turn-first", "first")];
-    const secondTurns = [buildAgentMessageTurn("turn-second", "second")];
-    const firstInput: UseApplicationDerivedStateInput = {
-      ...createBaseInput(),
-      readThreadState: buildReadThreadSnapshot({
-        threadIdentifier: "thread-1",
-        turns: firstTurns,
-        latestModel: "gpt-5",
-        latestReasoningEffort: "medium",
-      }),
-      conversationItemFlatteningWorkerOwner,
-    };
-    const snapshotReference: { current: ApplicationDerivedState | null } = {
-      current: null,
-    };
-    const { rerender } = render(
-      <Harness
-        input={firstInput}
-        onDerivedState={(derivedState) => {
-          snapshotReference.current = derivedState;
-        }}
-      />,
-    );
-
-    const secondInput: UseApplicationDerivedStateInput = {
-      ...firstInput,
-      readThreadState: buildReadThreadSnapshot({
-        threadIdentifier: "thread-1",
-        turns: secondTurns,
-        latestModel: "gpt-5",
-        latestReasoningEffort: "medium",
-      }),
-    };
-    rerender(
-      <Harness
-        input={secondInput}
-        onDerivedState={(derivedState) => {
-          snapshotReference.current = derivedState;
-        }}
-      />,
-    );
-
-    await act(async () => {
-      conversationItemFlatteningWorkerOwner.resolveRequestByIndex(
-        1,
-        conversationItemFlattener.flattenConversationItems(secondTurns, false),
-      );
-      await Promise.resolve();
-    });
-    expect(snapshotReference.current?.flatConversationItems[0]?.key).toBe("item-turn-second");
-
-    await act(async () => {
-      conversationItemFlatteningWorkerOwner.resolveRequestByIndex(
-        0,
-        conversationItemFlattener.flattenConversationItems(firstTurns, false),
-      );
-      await Promise.resolve();
-    });
-    expect(snapshotReference.current?.flatConversationItems[0]?.key).toBe("item-turn-second");
   });
 
   it("keeps the newest debug-issue projection when an older response resolves later", async () => {

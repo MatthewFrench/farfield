@@ -178,7 +178,6 @@ export function useApplicationDerivedState(
     conversationSyncSignatureBuilder,
     pendingUserInputRequestSelector,
     conversationItemFlattener,
-    conversationItemFlatteningWorkerOwner,
     debugIssueStateResolver,
     debugIssueDerivationWorkerOwner,
     threadListPresentationWorkerOwner,
@@ -418,30 +417,24 @@ export function useApplicationDerivedState(
     debugIssueDerivationWorkerOwner,
   });
 
-  const { flatConversationItems, conversationItemFlatteningError } =
+  const { conversationItemCount, visibleConversationItems, conversationItemFlatteningError } =
     useFlatConversationItemsDerivedState({
       turns,
       isGenerating,
+      visibleChatItemLimit,
       conversationItemFlattener,
-      conversationItemFlatteningWorkerOwner,
     });
 
   if (conversationItemFlatteningError) {
     throw conversationItemFlatteningError;
   }
 
-  const conversationItemCount = flatConversationItems.length;
   // Clamp to zero so slicing never underflows when the visible limit is larger than the list.
   const firstVisibleChatItemIndex = Math.max(
     MINIMUM_VISIBLE_CHAT_ITEM_INDEX,
     conversationItemCount - visibleChatItemLimit,
   );
   const hasHiddenChatItems = firstVisibleChatItemIndex > MINIMUM_VISIBLE_CHAT_ITEM_INDEX;
-
-  const visibleConversationItems = useMemo(
-    () => flatConversationItems.slice(firstVisibleChatItemIndex),
-    [firstVisibleChatItemIndex, flatConversationItems],
-  );
 
   const { codexConfigured, openCodeConnected, allSystemsReady, hasAnySystemFailure } =
     readAgentConnectivityAndSystemHealth({
@@ -500,7 +493,6 @@ export function useApplicationDerivedState(
     runtimeRequestErrorOperationMetrics,
     filteredDebugIssues,
     selectedDebugIssue,
-    flatConversationItems,
     conversationItemCount,
     firstVisibleChatItemIndex,
     hasHiddenChatItems,

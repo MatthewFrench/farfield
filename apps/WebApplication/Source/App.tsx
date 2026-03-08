@@ -199,8 +199,6 @@ export function App(): React.JSX.Element {
     conversationSyncSignatureBuilder,
     pendingUserInputRequestSelector: applicationOwnerDependencies.pendingUserInputRequestSelector,
     conversationItemFlattener: applicationOwnerDependencies.conversationItemFlattener,
-    conversationItemFlatteningWorkerOwner:
-      applicationOwnerDependencies.conversationItemFlatteningWorkerOwner,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
     debugIssueDerivationWorkerOwner: applicationOwnerDependencies.debugIssueDerivationWorkerOwner,
     threadListPresentationWorkerOwner:

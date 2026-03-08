@@ -19,7 +19,6 @@ import {
   type PendingUserInputRequest,
   type PendingUserInputRequestSelector,
 } from "@/Features/Chat/DomainModel/PendingUserInputRequestSelector";
-import { type ConversationItemFlatteningReader } from "@/Features/Chat/StateManagement/ConversationItemFlatteningWorkerOwner";
 import { type ChatWorkspacePaneProps } from "@/Features/Chat/UserInterface/ChatWorkspacePane";
 import {
   type DebugErrorListResponse,
@@ -112,7 +111,6 @@ export interface UseApplicationDerivedStateInput {
   conversationSyncSignatureBuilder: ConversationSyncSignatureBuilder;
   pendingUserInputRequestSelector: PendingUserInputRequestSelector;
   conversationItemFlattener: ConversationItemFlattener;
-  conversationItemFlatteningWorkerOwner?: ConversationItemFlatteningReader | null;
   debugIssueStateResolver: DebugIssueStateResolver;
   debugIssueDerivationWorkerOwner?: DebugIssueDerivationReader | null;
   threadListPresentationWorkerOwner?: ThreadListPresentationReader | null;
@@ -216,7 +214,6 @@ export interface ApplicationDerivedState {
   runtimeRequestErrorOperationMetrics: RuntimeRequestErrorOperationMetric[];
   filteredDebugIssues: DebugIssue[];
   selectedDebugIssue: DebugIssue | null;
-  flatConversationItems: FlattenedConversationItem[];
   conversationItemCount: number;
   firstVisibleChatItemIndex: number;
   hasHiddenChatItems: boolean;

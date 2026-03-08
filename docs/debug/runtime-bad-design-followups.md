@@ -86,7 +86,9 @@ Why it is risky:
 
 Current status:
 
-1. open
+1. partially mitigated
+2. visible chat derivation now materializes only the visible suffix instead of constructing flattened item records for the entire hidden history
+3. remaining follow-up is to review whether total renderable-count scans can also be reduced further under large histories
 
 ### 5. Thread/project grouping still does broad collection work
 

@@ -148,4 +148,47 @@ describe("ConversationItemFlattener", () => {
     expect(flattenedItems[flattenedItems.length - 1]?.isLast).toBe(true);
     expect(elapsedMilliseconds).toBeLessThan(1_000);
   });
+
+  it("returns only the visible suffix while preserving total renderable count", () => {
+    const flattener = new ConversationItemFlattener();
+    const turns: ConversationTurn[] = [
+      createTurn({
+        status: "completed",
+        items: [
+          {
+            id: "agent-1",
+            type: "agentMessage",
+            text: "one",
+          },
+          {
+            id: "agent-2",
+            type: "agentMessage",
+            text: "two",
+          },
+        ],
+      }),
+      createTurn({
+        status: "completed",
+        items: [
+          {
+            id: "agent-3",
+            type: "agentMessage",
+            text: "three",
+          },
+          {
+            id: "agent-4",
+            type: "agentMessage",
+            text: "four",
+          },
+        ],
+      }),
+    ];
+
+    const result = flattener.readVisibleConversationItems(turns, false, 2);
+
+    expect(result.conversationItemCount).toBe(4);
+    expect(result.visibleItems.map((item) => item.key)).toEqual(["agent-3", "agent-4"]);
+    expect(result.visibleItems.map((item) => item.spacingTop)).toEqual([16, 10]);
+    expect(result.visibleItems.map((item) => item.isLast)).toEqual([false, true]);
+  });
 });

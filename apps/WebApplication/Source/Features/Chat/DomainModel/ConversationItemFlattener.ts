@@ -25,6 +25,11 @@ export interface FlattenedConversationItem {
   spacingTop: number;
 }
 
+export interface VisibleConversationItemsResult {
+  conversationItemCount: number;
+  visibleItems: FlattenedConversationItem[];
+}
+
 const ConversationTurnItemTypeSchema = z.enum([
   "userMessage",
   "steeringUserMessage",
@@ -128,6 +133,94 @@ export class ConversationItemFlattener {
       flattenedItemCount: result.length,
     });
     return result;
+  }
+
+  public readVisibleConversationItems(
+    turns: ConversationTurn[],
+    isGenerating: boolean,
+    visibleItemLimit: number,
+  ): VisibleConversationItemsResult {
+    const operationToken = beginGlobalPerformanceOperation(CONVERSATION_ITEM_FLATTEN_OPERATION, {
+      turnCount: turns.length,
+      isGenerating,
+      visibleItemLimit,
+      mode: "visible-suffix",
+    });
+    const normalizedVisibleItemLimit = Math.max(0, Math.trunc(visibleItemLimit));
+    const conversationItemCount = this.countRenderableConversationItems(turns);
+    const firstVisibleItemIndex = Math.max(0, conversationItemCount - normalizedVisibleItemLimit);
+    let renderableItemIndex = 0;
+    let previousRenderedTurnIndex = -1;
+    const visibleItems: FlattenedConversationItem[] = [];
+
+    turns.forEach((turn, turnIndex) => {
+      const items = turn.items;
+      const isLastTurn = turnIndex === turns.length - 1;
+      const turnInProgress = isLastTurn && isGenerating && this.isTurnInProgressStatus(turn.status);
+
+      items.forEach((item, itemIndexInTurn) => {
+        if (!this.shouldRenderConversationItem(item)) {
+          return;
+        }
+
+        const isFirstRenderedItem = renderableItemIndex === 0;
+        const startsNewTurn = previousRenderedTurnIndex !== turnIndex;
+        const spacingTop = isFirstRenderedItem
+          ? TOP_SPACING_FOR_FIRST_RENDERED_ITEM_PIXELS
+          : startsNewTurn
+            ? TOP_SPACING_FOR_NEW_TURN_PIXELS
+            : TOP_SPACING_FOR_CONTINUING_TURN_PIXELS;
+
+        if (renderableItemIndex >= firstVisibleItemIndex) {
+          const previousItemType = items[itemIndexInTurn - 1]?.type;
+          const nextItemType = items[itemIndexInTurn + 1]?.type;
+          const visibleItem: FlattenedConversationItem = {
+            key: item.id,
+            item,
+            isLast: false,
+            turnIsInProgress: turnInProgress,
+            spacingTop,
+          };
+          if (previousItemType !== undefined) {
+            visibleItem.previousItemType = previousItemType;
+          }
+          if (nextItemType !== undefined) {
+            visibleItem.nextItemType = nextItemType;
+          }
+          visibleItems.push(visibleItem);
+        }
+
+        previousRenderedTurnIndex = turnIndex;
+        renderableItemIndex += 1;
+      });
+    });
+
+    const lastVisibleItem = visibleItems.at(-1);
+    if (lastVisibleItem !== undefined) {
+      lastVisibleItem.isLast = true;
+    }
+
+    completeGlobalPerformanceOperation(operationToken, "succeeded", {
+      conversationItemCount,
+      visibleItemCount: visibleItems.length,
+      firstVisibleItemIndex,
+    });
+    return {
+      conversationItemCount,
+      visibleItems,
+    };
+  }
+
+  private countRenderableConversationItems(turns: ConversationTurn[]): number {
+    let renderableItemCount = 0;
+    for (const turn of turns) {
+      for (const item of turn.items) {
+        if (this.shouldRenderConversationItem(item)) {
+          renderableItemCount += 1;
+        }
+      }
+    }
+    return renderableItemCount;
   }
 
   private shouldRenderConversationItem(item: ConversationTurnItem): boolean {

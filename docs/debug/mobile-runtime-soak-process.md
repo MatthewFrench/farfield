@@ -985,6 +985,37 @@ Verification evidence:
 7. `bun run --cwd apps/WebApplication typecheck`
 8. manual browser probe on Saturday, March 7, 2026, showed client performance operation names including `conversation-item-flatten-in-thread`, `debug-issue-derive-in-thread`, `event-stream-refresh-decision-in-thread`, and `http-response-decode-in-thread`
 
+### March 7, 2026: Chat Visible-Item Derivation Stops Materializing Hidden History Entries
+
+Changed owner modules:
+
+1. [ConversationItemFlattener.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Features/Chat/DomainModel/ConversationItemFlattener.ts)
+2. [UseFlatConversationItemsDerivedState.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseFlatConversationItemsDerivedState.ts)
+3. [UseApplicationDerivedState.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedState.ts)
+4. [UseApplicationDerivedStateContracts.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationDerivedStateContracts.ts)
+5. [ConversationItemFlattener.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ConversationItemFlattener.test.ts)
+6. [UseFlatConversationItemsDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseFlatConversationItemsDerivedState.test.tsx)
+7. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+
+Implementation summary:
+
+1. chat derived state now computes total renderable conversation item count separately from visible item materialization
+2. the flattener now creates `FlattenedConversationItem` records only for the visible suffix needed by the UI instead of materializing the full hidden history and slicing afterward
+3. this reduces object creation and per-item derivation work for large threads where most older items are currently hidden behind `Show older messages`
+
+User-visible impact:
+
+1. large chat histories should do less post-request work before rendering the currently visible conversation section
+2. hidden older messages still contribute to the count shown in the `Show older messages` affordance, but they no longer require full visible-item object materialization on every update
+
+Verification evidence:
+
+1. [ConversationItemFlattener.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ConversationItemFlattener.test.ts)
+2. [UseFlatConversationItemsDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseFlatConversationItemsDerivedState.test.tsx)
+3. [UseApplicationDerivedState.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationDerivedState.test.tsx)
+4. `bun run --cwd apps/WebApplication typecheck`
+5. unchanged real soak rerun after this change did not produce a clean comparison signal because the local app-server hit upstream timeout churn and emitted `500` thread/runtime route errors during the scenario; treat the focused tests as valid and re-run the real soak on a settled stack before using this change as freeze evidence
+
 ## Current Status
 
 This process now has repeated green evidence on both supported mobile automation engines, including the stricter no-route-stub real-path version.
