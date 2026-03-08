@@ -3,6 +3,15 @@ const SCROLLABLE_OVERFLOW_VALUES = new Set(["auto", "scroll", "overlay"]);
 // Treat sub-pixel layout differences as being at the edge to avoid accidental overscroll.
 const SCROLL_EDGE_EPSILON_PX = 1;
 
+interface EdgeOverscrollPreventionInput {
+  scrollElement: HTMLElement;
+  applicationShellElement: HTMLElement;
+  movingDown: boolean;
+  movingUp: boolean;
+}
+
+// Owns coarse-pointer overscroll suppression for the app shell while preserving native
+// edge stretch/bounce inside nested scroll containers such as the chat thread viewport.
 export class PageTouchOverscrollGuardCoordinator {
   private touchStartX: number;
   private touchStartY: number;
@@ -48,14 +57,17 @@ export class PageTouchOverscrollGuardCoordinator {
         return;
       }
 
-      const atTop = this.scrollElement.scrollTop <= 0;
-      const atBottom =
-        this.scrollElement.scrollTop + this.scrollElement.clientHeight >=
-        this.scrollElement.scrollHeight - SCROLL_EDGE_EPSILON_PX;
       const movingDown = deltaY > 0;
       const movingUp = deltaY < 0;
 
-      if ((atTop && movingDown) || (atBottom && movingUp)) {
+      if (
+        this.shouldPreventEdgeOverscroll({
+          scrollElement: this.scrollElement,
+          applicationShellElement,
+          movingDown,
+          movingUp,
+        })
+      ) {
         event.preventDefault();
       }
     };
@@ -114,5 +126,20 @@ export class PageTouchOverscrollGuardCoordinator {
     }
 
     return element.scrollHeight > element.clientHeight + SCROLL_EDGE_EPSILON_PX;
+  }
+
+  private shouldPreventEdgeOverscroll(input: EdgeOverscrollPreventionInput): boolean {
+    const atTop = input.scrollElement.scrollTop <= 0;
+    const atBottom =
+      input.scrollElement.scrollTop + input.scrollElement.clientHeight >=
+      input.scrollElement.scrollHeight - SCROLL_EDGE_EPSILON_PX;
+
+    if (!((atTop && input.movingDown) || (atBottom && input.movingUp))) {
+      return false;
+    }
+
+    // Nested scrollers should keep native edge affordances; only the shell itself needs
+    // hard blocking to prevent page-level overscroll and pull-to-refresh gestures.
+    return input.scrollElement === input.applicationShellElement;
   }
 }

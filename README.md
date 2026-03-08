@@ -31,6 +31,15 @@ bun run dev
 
 Opens at `http://localhost:4312`. Defaults to Codex.
 
+Stable mode runs a slower, validated promotion loop on separate ports:
+
+```bash
+bun run dev:stable
+```
+
+Stable mode serves the validated web snapshot on `http://localhost:4412`, proxies the stable API on `http://localhost:4411`, and uses `http://localhost:4413` for live reload notifications. It waits for `60` seconds of no file changes, rebuilds, and only promotes the new snapshot when the build and the light stable test suite both pass.
+When the stable API child crashes, stable mode now writes durable artifacts to `.runtime/stable-dev/latest-status.json`, `.runtime/stable-dev/latest-crash.json`, and `.runtime/stable-dev/latest-crash.ndjson`.
+
 **Agent options:**
 
 ```bash
@@ -39,6 +48,8 @@ bun run dev -- --agents=codex,opencode       # both
 bun run dev -- --agents=all                  # expands to codex,opencode
 bun run dev:remote                           # network-accessible (codex)
 bun run dev:remote -- --agents=opencode      # network-accessible (opencode)
+bun run dev:stable -- --agents=opencode      # validated stable mode
+bun run dev:stable:remote                    # validated stable mode, network-accessible
 ```
 
 > **Warning:** `dev:remote` is network-exposed. If `API_TOKEN` is unset, `/api/*` and `/events` are unauthenticated.
@@ -59,6 +70,7 @@ Useful commands:
 bun run lint
 bun run typecheck
 bun run ci:targeted:gate
+bun run test:ci:stable
 bun run validate:lockfiles:governance
 ```
 

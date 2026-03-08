@@ -119,4 +119,78 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
 
     cleanup();
   });
+
+  it("preserves bottom-edge bounce inside a nested scrollable ancestor", () => {
+    installCoarsePointerSupport(true);
+    const coordinator = new PageTouchOverscrollGuardCoordinator();
+    const applicationShellElement = document.createElement("div");
+    const scrollableElement = document.createElement("div");
+    const innerElement = document.createElement("div");
+    scrollableElement.style.overflowY = "auto";
+    Object.defineProperty(scrollableElement, "clientHeight", {
+      configurable: true,
+      value: 100,
+    });
+    Object.defineProperty(scrollableElement, "scrollHeight", {
+      configurable: true,
+      value: 300,
+    });
+    Object.defineProperty(scrollableElement, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 200,
+    });
+    scrollableElement.appendChild(innerElement);
+    applicationShellElement.appendChild(scrollableElement);
+
+    const cleanup = coordinator.install(applicationShellElement);
+
+    innerElement.dispatchEvent(createTouchEvent("touchstart", { clientX: 16, clientY: 48 }));
+    const touchMoveEvent = createTouchEvent("touchmove", {
+      clientX: 16,
+      clientY: 20,
+    });
+    const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
+    innerElement.dispatchEvent(touchMoveEvent);
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it("still blocks edge overscroll when the application shell is the active scroll container", () => {
+    installCoarsePointerSupport(true);
+    const coordinator = new PageTouchOverscrollGuardCoordinator();
+    const applicationShellElement = document.createElement("div");
+    applicationShellElement.style.overflowY = "auto";
+    Object.defineProperty(applicationShellElement, "clientHeight", {
+      configurable: true,
+      value: 100,
+    });
+    Object.defineProperty(applicationShellElement, "scrollHeight", {
+      configurable: true,
+      value: 300,
+    });
+    Object.defineProperty(applicationShellElement, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 200,
+    });
+
+    const cleanup = coordinator.install(applicationShellElement);
+
+    applicationShellElement.dispatchEvent(
+      createTouchEvent("touchstart", { clientX: 16, clientY: 48 }),
+    );
+    const touchMoveEvent = createTouchEvent("touchmove", {
+      clientX: 16,
+      clientY: 20,
+    });
+    const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
+    applicationShellElement.dispatchEvent(touchMoveEvent);
+
+    expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
+
+    cleanup();
+  });
 });
