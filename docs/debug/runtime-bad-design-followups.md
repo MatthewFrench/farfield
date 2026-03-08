@@ -208,6 +208,7 @@ Evidence so far:
 1. recent clean freeze artifacts were dominated by overlapping `http-request` windows rather than one named in-thread computation surface
 2. named former-worker computations are now visible, but they have not yet shown up as the dominant overlap in the clean soak artifacts
 3. startup and reconnect audit now shows EventSource first-open was scheduling `refreshCore: true` even though startup refresh effects had already kicked off core loading, creating an avoidable second active-sidebar invalidation and reread path
+4. main-region commit telemetry showed chat-tab renders still committing when only inactive settings-pane props changed, which widened sidebar-triggered commit fan-out into the main region
 
 ## Next Remediation Order
 

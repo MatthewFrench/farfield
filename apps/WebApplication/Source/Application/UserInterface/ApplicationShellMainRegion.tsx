@@ -46,6 +46,83 @@ interface ApplicationShellMainRegionRenderSnapshot {
   apiSessionBootstrapOverlayProperties: ApiSessionBootstrapOverlayProperties;
 }
 
+export interface ApplicationShellMainRegionMemoSnapshot {
+  isMobileLayout: boolean;
+  desktopSidebarOpen: boolean;
+  activeTab: ApplicationShellActiveTab;
+  applicationHeaderBarProperties: object;
+  debugStatusBannersProperties: object;
+  chatWorkspacePaneProperties: object;
+  settingsWorkspacePaneProperties: object;
+  showApiSessionBootstrapOverlay: boolean;
+  apiSessionBootstrapOverlayProperties: object;
+}
+
+function buildApplicationShellMainRegionMemoSnapshot(
+  input: ApplicationShellMainRegionProps,
+): ApplicationShellMainRegionMemoSnapshot {
+  return {
+    isMobileLayout: input.isMobileLayout,
+    desktopSidebarOpen: input.desktopSidebarOpen,
+    activeTab: input.activeTab,
+    applicationHeaderBarProperties: input.applicationHeaderBarProperties,
+    debugStatusBannersProperties: input.debugStatusBannersProperties,
+    chatWorkspacePaneProperties: input.chatWorkspacePaneProperties,
+    settingsWorkspacePaneProperties: input.settingsWorkspacePaneProperties,
+    showApiSessionBootstrapOverlay: input.showApiSessionBootstrapOverlay,
+    apiSessionBootstrapOverlayProperties: input.apiSessionBootstrapOverlayProperties,
+  };
+}
+
+export function areApplicationShellMainRegionMemoSnapshotsEqual(
+  previousSnapshot: ApplicationShellMainRegionMemoSnapshot,
+  nextSnapshot: ApplicationShellMainRegionMemoSnapshot,
+): boolean {
+  if (previousSnapshot.isMobileLayout !== nextSnapshot.isMobileLayout) {
+    return false;
+  }
+  if (previousSnapshot.desktopSidebarOpen !== nextSnapshot.desktopSidebarOpen) {
+    return false;
+  }
+  if (previousSnapshot.activeTab !== nextSnapshot.activeTab) {
+    return false;
+  }
+  if (
+    previousSnapshot.applicationHeaderBarProperties !== nextSnapshot.applicationHeaderBarProperties
+  ) {
+    return false;
+  }
+  if (previousSnapshot.debugStatusBannersProperties !== nextSnapshot.debugStatusBannersProperties) {
+    return false;
+  }
+  if (
+    previousSnapshot.showApiSessionBootstrapOverlay !== nextSnapshot.showApiSessionBootstrapOverlay
+  ) {
+    return false;
+  }
+  if (
+    previousSnapshot.showApiSessionBootstrapOverlay &&
+    previousSnapshot.apiSessionBootstrapOverlayProperties !==
+      nextSnapshot.apiSessionBootstrapOverlayProperties
+  ) {
+    return false;
+  }
+  if (
+    nextSnapshot.activeTab === "chat" &&
+    previousSnapshot.chatWorkspacePaneProperties !== nextSnapshot.chatWorkspacePaneProperties
+  ) {
+    return false;
+  }
+  if (
+    nextSnapshot.activeTab === "debug" &&
+    previousSnapshot.settingsWorkspacePaneProperties !==
+      nextSnapshot.settingsWorkspacePaneProperties
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function readApplicationShellMainRegionChangedFields(
   previousSnapshot: ApplicationShellMainRegionRenderSnapshot | null,
   nextSnapshot: ApplicationShellMainRegionRenderSnapshot,
@@ -100,45 +177,8 @@ function readApplicationShellMainRegionChangedFields(
   return changedFields;
 }
 
-export const ApplicationShellMainRegion = memo(function ApplicationShellMainRegion({
-  isMobileLayout,
-  desktopSidebarOpen,
-  activeTab,
-  applicationHeaderBarProperties,
-  debugStatusBannersProperties,
-  chatWorkspacePaneProperties,
-  settingsWorkspacePaneProperties,
-  showApiSessionBootstrapOverlay,
-  apiSessionBootstrapOverlayProperties,
-}: ApplicationShellMainRegionProps): React.JSX.Element {
-  const previousRenderSnapshotReference = useRef<ApplicationShellMainRegionRenderSnapshot | null>(
-    null,
-  );
-
-  useEffect(() => {
-    const nextSnapshot: ApplicationShellMainRegionRenderSnapshot = {
-      isMobileLayout,
-      desktopSidebarOpen,
-      activeTab,
-      applicationHeaderBarProperties,
-      debugStatusBannersProperties,
-      chatWorkspacePaneProperties,
-      settingsWorkspacePaneProperties,
-      showApiSessionBootstrapOverlay,
-      apiSessionBootstrapOverlayProperties,
-    };
-    const changedFields = readApplicationShellMainRegionChangedFields(
-      previousRenderSnapshotReference.current,
-      nextSnapshot,
-    );
-    previousRenderSnapshotReference.current = nextSnapshot;
-    recordGlobalPerformanceInstantEvent("application-shell-main-region-committed", {
-      activeTab,
-      changedFields,
-      desktopSidebarOpen,
-      showApiSessionBootstrapOverlay,
-    });
-  }, [
+export const ApplicationShellMainRegion = memo(
+  function ApplicationShellMainRegion({
     isMobileLayout,
     desktopSidebarOpen,
     activeTab,
@@ -148,27 +188,71 @@ export const ApplicationShellMainRegion = memo(function ApplicationShellMainRegi
     settingsWorkspacePaneProperties,
     showApiSessionBootstrapOverlay,
     apiSessionBootstrapOverlayProperties,
-  ]);
+  }: ApplicationShellMainRegionProps): React.JSX.Element {
+    const previousRenderSnapshotReference = useRef<ApplicationShellMainRegionRenderSnapshot | null>(
+      null,
+    );
 
-  return (
-    <div
-      className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
-        !isMobileLayout && desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
-      } h-full overflow-hidden`}
-    >
-      <ApplicationHeaderBar {...applicationHeaderBarProperties} />
+    useEffect(() => {
+      const nextSnapshot: ApplicationShellMainRegionRenderSnapshot = {
+        isMobileLayout,
+        desktopSidebarOpen,
+        activeTab,
+        applicationHeaderBarProperties,
+        debugStatusBannersProperties,
+        chatWorkspacePaneProperties,
+        settingsWorkspacePaneProperties,
+        showApiSessionBootstrapOverlay,
+        apiSessionBootstrapOverlayProperties,
+      };
+      const changedFields = readApplicationShellMainRegionChangedFields(
+        previousRenderSnapshotReference.current,
+        nextSnapshot,
+      );
+      previousRenderSnapshotReference.current = nextSnapshot;
+      recordGlobalPerformanceInstantEvent("application-shell-main-region-committed", {
+        activeTab,
+        changedFields,
+        desktopSidebarOpen,
+        showApiSessionBootstrapOverlay,
+      });
+    }, [
+      isMobileLayout,
+      desktopSidebarOpen,
+      activeTab,
+      applicationHeaderBarProperties,
+      debugStatusBannersProperties,
+      chatWorkspacePaneProperties,
+      settingsWorkspacePaneProperties,
+      showApiSessionBootstrapOverlay,
+      apiSessionBootstrapOverlayProperties,
+    ]);
 
-      <DebugStatusBanners {...debugStatusBannersProperties} />
+    return (
+      <div
+        className={`relative flex-1 flex flex-col min-w-0 transition-[margin] duration-200 ${
+          !isMobileLayout && desktopSidebarOpen ? "md:ml-64" : "md:ml-0"
+        } h-full overflow-hidden`}
+      >
+        <ApplicationHeaderBar {...applicationHeaderBarProperties} />
 
-      {activeTab === "chat" && <ChatWorkspacePane {...chatWorkspacePaneProperties} />}
+        <DebugStatusBanners {...debugStatusBannersProperties} />
 
-      {activeTab === "debug" && <SettingsWorkspacePane {...settingsWorkspacePaneProperties} />}
+        {activeTab === "chat" && <ChatWorkspacePane {...chatWorkspacePaneProperties} />}
 
-      {showApiSessionBootstrapOverlay && (
-        <ApiSessionBootstrapOverlay {...apiSessionBootstrapOverlayProperties} />
-      )}
-    </div>
-  );
-});
+        {activeTab === "debug" && <SettingsWorkspacePane {...settingsWorkspacePaneProperties} />}
+
+        {showApiSessionBootstrapOverlay && (
+          <ApiSessionBootstrapOverlay {...apiSessionBootstrapOverlayProperties} />
+        )}
+      </div>
+    );
+  },
+  (previousProperties, nextProperties) =>
+    areApplicationShellMainRegionMemoSnapshotsEqual(
+      buildApplicationShellMainRegionMemoSnapshot(previousProperties),
+      buildApplicationShellMainRegionMemoSnapshot(nextProperties),
+    ),
+);
 
 ApplicationShellMainRegion.displayName = "ApplicationShellMainRegion";

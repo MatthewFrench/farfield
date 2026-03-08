@@ -705,6 +705,32 @@ Verification evidence:
 5. `bun run --cwd apps/WebApplication typecheck`
 6. unchanged Chromium real soak rerun on Sunday, March 8, 2026, was interrupted by `dev:remote` watch restarts triggered by the soak command's required protocol build, so use the focused tests plus the startup revalidation audit as the trustworthy signal for this change
 
+### March 8, 2026: Main Region Memo Stops Committing For Inactive Pane Prop Churn
+
+Changed owner modules:
+
+1. [ApplicationShellMainRegion.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/UserInterface/ApplicationShellMainRegion.tsx)
+2. [ApplicationShellMainRegion.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationShellMainRegion.test.ts)
+
+Implementation summary:
+
+1. the main shell region now uses a tab-aware memo comparator instead of default shallow prop equality
+2. while the chat tab is visible, settings-pane prop churn no longer forces a main-region commit; while the debug tab is visible, chat-pane prop churn no longer forces a main-region commit
+3. hidden API-session overlay prop churn is also ignored until the overlay is actually shown
+
+User-visible impact:
+
+1. sidebar and runtime-summary updates should cause less unnecessary main-region rerender pressure when the user is not looking at the pane whose props changed
+2. this specifically targets the mobile roughness where sidebar refresh activity broadened into `application-shell-main-region-committed` even though the visible tab content did not need to change
+
+Verification evidence:
+
+1. [ApplicationShellMainRegion.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationShellMainRegion.test.ts)
+2. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+3. `bun run --cwd apps/WebApplication test -- Tests/ApplicationShellMainRegion.test.ts Tests/ApplicationRuntimeComposition.test.tsx`
+4. `bun run --cwd apps/WebApplication typecheck`
+5. unchanged Chromium real soak rerun on Sunday, March 8, 2026, still hit `dev:remote` watch restarts from the required protocol build and surfaced unrelated `runtime-request-error` banners, so use the focused tests plus the prior commit-fan-out probe output as the trustworthy signal for this change
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:
