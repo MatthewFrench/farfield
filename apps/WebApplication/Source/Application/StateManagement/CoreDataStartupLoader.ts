@@ -269,6 +269,7 @@ function applyDeferredStartupSnapshotResult<ResultValue>(input: {
 export class CoreDataStartupLoader {
   private deps: CoreDataStartupLoaderDependencies;
   private deferredStartupSequence = 0;
+  private hasScheduledInitialDeferredStartupReads = false;
 
   public constructor(dependencies: CoreDataStartupLoaderDependencies) {
     this.deps = dependencies;
@@ -343,17 +344,22 @@ export class CoreDataStartupLoader {
       nextActiveThreadState,
     });
 
-    const deferredStartupSequence = this.deferredStartupSequence + 1;
-    this.deferredStartupSequence = deferredStartupSequence;
+    if (!this.hasScheduledInitialDeferredStartupReads) {
+      const deferredStartupSequence = this.deferredStartupSequence + 1;
+      this.deferredStartupSequence = deferredStartupSequence;
+      this.hasScheduledInitialDeferredStartupReads = true;
 
-    // Keep startup sequencing deterministic: apply critical thread state first, then defer non-critical reads.
-    this.scheduleDeferredStartupReads({
-      deferredStartupSequence,
-      retryAttemptCount: 0,
-      shouldRevalidateActiveThreads: nextActiveThreadState.loadedFromCache,
-      applySnapshotState,
-      reportDeferredStartupFailure,
-    });
+      // Keep the full deferred startup bundle one-time only. Later core refreshes should refresh
+      // critical thread state directly instead of re-running startup-only capability and sidebar
+      // hydration work on every tracked refresh.
+      this.scheduleDeferredStartupReads({
+        deferredStartupSequence,
+        retryAttemptCount: 0,
+        shouldRevalidateActiveThreads: nextActiveThreadState.loadedFromCache,
+        applySnapshotState,
+        reportDeferredStartupFailure,
+      });
+    }
   }
 
   private isDeferredStartupReadStale(deferredStartupSequence: number): boolean {

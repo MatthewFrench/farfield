@@ -373,7 +373,7 @@ describe("useCoreDataLoaders", () => {
     expect(harness.actionLog).not.toContain(STARTUP_DEFERRED_DEBUG_HISTORY_OPERATION);
   });
 
-  it("drops stale deferred startup completions when a newer startup sequence starts", async () => {
+  it("does not start a second deferred startup sequence during later core refreshes", async () => {
     const harness = createHarness("chat");
     const firstDeferredHealth = createControlledPromise<CapabilityHealthResponse>();
     const queuedHealthResponses: Array<Promise<CapabilityHealthResponse>> = [
@@ -417,8 +417,8 @@ describe("useCoreDataLoaders", () => {
       await vi.runOnlyPendingTimersAsync();
     });
 
-    expect(readHealthStatusSpy).toHaveBeenCalledTimes(2);
-    expect(harness.setHealthMock).toHaveBeenCalledTimes(1);
+    expect(readHealthStatusSpy).toHaveBeenCalledTimes(1);
+    expect(harness.setHealthMock).toHaveBeenCalledTimes(0);
 
     await act(async () => {
       firstDeferredHealth.resolve(HEALTH_RESPONSE);
@@ -472,6 +472,53 @@ describe("useCoreDataLoaders", () => {
         actionName: STARTUP_DEFERRED_THREADS_REVALIDATE_OPERATION,
       }),
     );
+  });
+
+  it("does not rerun deferred startup hydration on later core refreshes", async () => {
+    const harness = createHarness("chat");
+    const cachedActiveThreadState: LoadActiveThreadStateResult = {
+      ...ACTIVE_THREAD_STATE,
+      loadedFromCache: true,
+    };
+    const loadActiveThreadStateSpy = vi
+      .spyOn(harness.threadListStateController, "loadActiveThreadState")
+      .mockResolvedValue(cachedActiveThreadState);
+    const readHealthStatusSpy = vi
+      .spyOn(harness.capabilityServerClient, "readHealthStatus")
+      .mockResolvedValue(HEALTH_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listAgents").mockResolvedValue(AGENTS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "listCollaborationModes").mockResolvedValue(
+      COLLABORATION_MODES_RESPONSE,
+    );
+    vi.spyOn(harness.capabilityServerClient, "listModels").mockResolvedValue(MODELS_RESPONSE);
+    vi.spyOn(harness.capabilityServerClient, "readConfigDefaults").mockResolvedValue(
+      CONFIG_DEFAULTS_RESPONSE,
+    );
+
+    const loaders = await renderHarness(harness.input);
+
+    await act(async () => {
+      await loaders.loadCoreDataTracked();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    const actionCountAfterFirstRefresh = harness.actionLog.length;
+    const healthReadCountAfterFirstRefresh = readHealthStatusSpy.mock.calls.length;
+
+    await act(async () => {
+      await loaders.loadCoreDataTracked();
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(3);
+    expect(readHealthStatusSpy).toHaveBeenCalledTimes(healthReadCountAfterFirstRefresh);
+    expect(harness.actionLog.slice(actionCountAfterFirstRefresh)).toEqual([
+      STARTUP_CRITICAL_THREADS_OPERATION,
+    ]);
   });
 
   it("does not report deferred startup request-cancellation errors", async () => {

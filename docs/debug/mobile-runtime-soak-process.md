@@ -803,6 +803,32 @@ Verification evidence:
 4. `bun run --cwd apps/ServerApplication test -- Tests/ThreadCollectionRoutes.test.ts Tests/SidebarThreadSyncRoutes.test.ts Tests/ServerRequestHandler.test.ts`
 5. `bun run --cwd apps/ServerApplication typecheck`
 
+### March 9, 2026: Deferred Startup Bundle Becomes One-Time Only
+
+Changed owner modules:
+
+1. [CoreDataStartupLoader.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/CoreDataStartupLoader.ts)
+2. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+
+Implementation summary:
+
+1. the full deferred startup bundle now runs only on the first startup-driven core load
+2. later tracked core refreshes still reload critical thread data, but they no longer re-run startup-only deferred capability and active-thread revalidation work
+3. this specifically stops repeated reuse of `startup-deferred.*` semantics on later core refresh cycles
+
+User-visible impact:
+
+1. recurring core refreshes should do less hidden startup-style work after the first page bootstrap
+2. this targets the long-tail revalidate churn that kept showing up in stable observability as repeated `startup-deferred.threads.active.revalidate`
+
+Verification evidence:
+
+1. [UseCoreDataLoaders.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseCoreDataLoaders.test.tsx)
+2. [ApplicationRuntimeComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationRuntimeComposition.test.tsx)
+3. `bun run --cwd apps/WebApplication test -- Tests/UseCoreDataLoaders.test.tsx Tests/ApplicationRuntimeComposition.test.tsx`
+4. `bun run --cwd apps/WebApplication typecheck`
+5. stable Chromium soak rerun on Monday, March 9, 2026, completed all three iterations with flatter send timings (`5452`, `5428`, `9529`) and no UI/banner failures, but the final assertion still failed on separate push-route queue-delay budgets; treat the focused tests as the trustworthy signal for this specific loader change
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:
