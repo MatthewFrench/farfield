@@ -829,6 +829,32 @@ Verification evidence:
 4. `bun run --cwd apps/WebApplication typecheck`
 5. stable Chromium soak rerun on Monday, March 9, 2026, completed all three iterations with flatter send timings (`5452`, `5428`, `9529`) and no UI/banner failures, but the final assertion still failed on separate push-route queue-delay budgets; treat the focused tests as the trustworthy signal for this specific loader change
 
+### March 9, 2026: Chat Mount Stops Refreshing Push State Unnecessarily
+
+Changed owner modules:
+
+1. [UseApplicationRefreshEffects.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/StateManagement/UseApplicationRefreshEffects.ts)
+2. [UseApplicationRefreshEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationRefreshEffects.test.tsx)
+
+Implementation summary:
+
+1. normal chat-surface mount no longer calls `refreshPushClientState()`
+2. push diagnostics still refresh when the notifications settings surface is active through the owned push feature composition path
+
+User-visible impact:
+
+1. the default chat/sidebar path does less hidden push work on startup
+2. this removed the stable soak budget failure from hidden push diagnostics routes (`/api/push/status`, `/api/push/local-ca`, `/api/push/receipts/latest`, `/api/push/sends/latest`)
+
+Verification evidence:
+
+1. [UseApplicationRefreshEffects.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationRefreshEffects.test.tsx)
+2. [UseApplicationPushFeatureComposition.test.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/UseApplicationPushFeatureComposition.test.tsx)
+3. `bun run --cwd apps/WebApplication test -- Tests/UseApplicationRefreshEffects.test.tsx Tests/UseApplicationPushFeatureComposition.test.tsx`
+4. `bun run --cwd apps/WebApplication typecheck`
+5. stable Chromium soak rerun on Monday, March 9, 2026, passed clean with no push-route budget violations
+
+
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
 Changed owner modules:

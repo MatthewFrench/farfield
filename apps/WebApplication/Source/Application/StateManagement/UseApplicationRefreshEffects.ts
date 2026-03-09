@@ -267,12 +267,6 @@ export function useApplicationRefreshEffects(input: UseApplicationRefreshEffects
   }, [input.handleRuntimeRequestError, input.refreshCoreDataAndSelectedThread]);
 
   useEffect(() => {
-    void input.refreshPushClientState().catch((error) => {
-      input.handleRuntimeRequestError(error);
-    });
-  }, [input.handleRuntimeRequestError, input.refreshPushClientState]);
-
-  useEffect(() => {
     if (!input.isArchivedThreadsOpen) {
       return;
     }

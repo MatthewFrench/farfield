@@ -99,17 +99,13 @@ describe("useApplicationRefreshEffects", () => {
     vi.restoreAllMocks();
   });
 
-  it("routes push-client refresh failures to runtime request error ownership", async () => {
-    const expectedError = new Error("push-refresh-failed");
+  it("does not refresh push client state during normal chat-surface mount", async () => {
     const input = createBaseInput();
-    input.refreshPushClientState = vi.fn(async (): Promise<void> => {
-      throw expectedError;
-    });
 
     render(<Harness input={input} />);
     await Promise.resolve();
 
-    expect(input.handleRuntimeRequestError).toHaveBeenCalledWith(expectedError);
+    expect(input.refreshPushClientState).not.toHaveBeenCalled();
   });
 
   it("refreshes push diagnostics when notifications settings become active", async () => {
