@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAppServerIncomingLine } from "../Source/AppServerIncomingLineParser.js";
+import { parseAppServerIncomingLineWithLimit } from "../Source/AppServerIncomingLineParser.js";
 import {
   type AppServerTransport,
   buildAppServerSpawnEnvironment,
@@ -126,18 +126,18 @@ describe("isChildProcessAppServerTransportOptions", () => {
 
 describe("parseAppServerIncomingLine", () => {
   it("returns ignore for empty lines", () => {
-    expect(parseAppServerIncomingLine("  ")).toEqual({ kind: "ignore" });
+    expect(parseAppServerIncomingLineWithLimit("  ", 100)).toEqual({ kind: "ignore" });
   });
 
   it("returns invalid-json errors for malformed payloads", () => {
-    expect(parseAppServerIncomingLine("{")).toEqual({
+    expect(parseAppServerIncomingLineWithLimit("{", 100)).toEqual({
       kind: "error",
       errorKind: "invalid-json",
     });
   });
 
   it("returns schema-mismatch errors for non-JSON-RPC envelopes", () => {
-    const parsed = parseAppServerIncomingLine('{"id":1}');
+    const parsed = parseAppServerIncomingLineWithLimit('{"id":1}', 100);
     expect(parsed.kind).toBe("error");
     if (parsed.kind !== "error") {
       return;
@@ -152,7 +152,7 @@ describe("parseAppServerIncomingLine", () => {
   });
 
   it("returns parsed response messages for valid JSON-RPC responses", () => {
-    const parsed = parseAppServerIncomingLine('{"jsonrpc":"2.0","id":1,"result":{}}');
+    const parsed = parseAppServerIncomingLineWithLimit('{"jsonrpc":"2.0","id":1,"result":{}}', 100);
     expect(parsed.kind).toBe("message");
     if (parsed.kind !== "message") {
       return;
@@ -168,8 +168,9 @@ describe("parseAppServerIncomingLine", () => {
   });
 
   it("returns parsed server-request messages for JSON-RPC request envelopes", () => {
-    const parsed = parseAppServerIncomingLine(
+    const parsed = parseAppServerIncomingLineWithLimit(
       '{"jsonrpc":"2.0","id":2,"method":"item/tool/requestUserInput","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","questions":[]}}',
+      500,
     );
     expect(parsed.kind).toBe("message");
     if (parsed.kind !== "message") {
@@ -183,5 +184,18 @@ describe("parseAppServerIncomingLine", () => {
 
     expect(parsed.message.value.id).toBe(2);
     expect(parsed.message.value.method).toBe("item/tool/requestUserInput");
+  });
+
+  it("rejects oversized lines before JSON parsing", () => {
+    expect(
+      parseAppServerIncomingLineWithLimit(
+        '{"jsonrpc":"2.0","id":1,"result":{"text":"' + "x".repeat(64) + '"}}',
+        40,
+      ),
+    ).toEqual({
+      kind: "error",
+      errorKind: "line-too-large",
+      maximumCharacterCount: 40,
+    });
   });
 });

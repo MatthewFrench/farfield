@@ -195,6 +195,32 @@ Current status:
 3. debug-history detail retention and replay retention are now separate bounded stores with explicit byte budgets and eviction counters
 4. outbound preview frames still keep raw payloads so debug replay remains intact
 
+### 10. Notification byte budgeting still depended on full payload serialization
+
+Files:
+
+1. [AppServerNotificationBufferOwner.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationBufferOwner.ts)
+2. [AppServerTransport.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransport.ts)
+3. [AppServerIncomingLineParser.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerIncomingLineParser.ts)
+
+Why it was bad:
+
+1. the notification buffer had a byte budget, but it still computed cost by calling `JSON.stringify` on the fully parsed notification event
+2. that meant a single very large app-server line could still allocate a giant second string just to decide whether retention should evict it
+3. the transport also lacked an explicit incoming-line size boundary, so oversized stdout lines reached the deepest parse path first
+
+User-visible impact:
+
+1. stable API sessions could still drift toward heap OOM even after notification retention caps were added
+2. when this happened, users saw the validated stable API child crash instead of a deterministic boundary failure
+
+Current status:
+
+1. partially mitigated
+2. the transport now rejects oversized incoming lines before JSON parsing continues
+3. notification retention now consumes the raw line size estimate from the transport instead of reserializing parsed payloads
+4. multi-hour stable observation is still needed before declaring the OOM path fully closed
+
 ## Confirmed Mitigations Already Landed
 
 ### Sidebar freshness and stale selection

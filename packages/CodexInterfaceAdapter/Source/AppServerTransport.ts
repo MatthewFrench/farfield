@@ -14,7 +14,10 @@ import {
   isChildProcessAppServerTransportOptionsValue,
   parseChildProcessAppServerTransportOptions,
 } from "./AppServerChildProcessTransportOptionsContract.js";
-import { parseAppServerIncomingLine } from "./AppServerIncomingLineParser.js";
+import {
+  type AppServerIncomingLineParseResult,
+  parseAppServerIncomingLineWithLimit,
+} from "./AppServerIncomingLineParser.js";
 import {
   AppServerNotificationBufferOwner,
   type AppServerNotificationEvent,
@@ -35,6 +38,7 @@ import {
   APP_SERVER_JSON_RPC_VERSION,
   APP_SERVER_PROCESS_NAME,
   APP_SERVER_STANDARD_INPUT_LINE_TERMINATOR,
+  DEFAULT_APP_SERVER_MAXIMUM_INCOMING_LINE_CHARACTERS,
   DEFAULT_APP_SERVER_NOTIFICATION_EVENT_LIMIT,
   DEFAULT_APP_SERVER_NOTIFICATION_RETENTION_MAXIMUM_BYTES,
   DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS,
@@ -114,6 +118,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   private readonly cwd: string | undefined;
   private readonly env: NodeJS.ProcessEnv | undefined;
   private readonly requestTimeoutMs: number;
+  private readonly maximumIncomingLineCharacters: number;
   private readonly onStderr: ((line: string) => void) | undefined;
   private readonly notificationBufferOwner: AppServerNotificationBufferOwner;
   private process: ChildProcessWithoutNullStreams | null = null;
@@ -131,6 +136,9 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     this.cwd = parsedOptions.cwd;
     this.env = parsedOptions.env;
     this.requestTimeoutMs = parsedOptions.requestTimeoutMs ?? DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS;
+    this.maximumIncomingLineCharacters =
+      parsedOptions.maximumIncomingLineCharacters ??
+      DEFAULT_APP_SERVER_MAXIMUM_INCOMING_LINE_CHARACTERS;
     this.onStderr = parsedOptions.onStderr;
     this.notificationBufferOwner = new AppServerNotificationBufferOwner({
       maximumEventCount:
@@ -193,23 +201,26 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
 
     const lineReader = readline.createInterface({ input: child.stdout });
     lineReader.on("line", (line) => {
-      const parseResult = parseAppServerIncomingLine(line);
+      const parseResult = parseAppServerIncomingLineWithLimit(
+        line,
+        this.maximumIncomingLineCharacters,
+      );
       if (parseResult.kind === "ignore") {
         return;
       }
 
       if (parseResult.kind === "error") {
-        const parseFailureMessage =
-          parseResult.errorKind === "invalid-json"
-            ? `${APP_SERVER_PROCESS_NAME} returned invalid JSON`
-            : `${APP_SERVER_PROCESS_NAME} response schema mismatch: ${parseResult.errorMessage}`;
+        const parseFailureMessage = this.buildIncomingLineFailureMessage(parseResult);
         this.rejectAll(new AppServerTransportError(parseFailureMessage));
+        void this.close().catch(() => {
+          // Shutdown best-effort only; the primary error has already been surfaced.
+        });
         return;
       }
 
       const message = parseResult.message;
       if (message.kind === "notification") {
-        this.appendNotificationEvent(message.value.method, message.value.params ?? null);
+        this.appendNotificationEvent(message.value.method, message.value.params ?? null, line);
         return;
       }
 
@@ -272,8 +283,23 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     this.process = child;
   }
 
-  private appendNotificationEvent(method: string, params: JsonValue | null): void {
-    this.notificationBufferOwner.append(method, params, Date.now());
+  private buildIncomingLineFailureMessage(
+    parseResult: Exclude<
+      AppServerIncomingLineParseResult,
+      { kind: "ignore" } | { kind: "message" }
+    >,
+  ): string {
+    if (parseResult.errorKind === "line-too-large") {
+      return `${APP_SERVER_PROCESS_NAME} returned oversized JSON-RPC line exceeding ${String(parseResult.maximumCharacterCount)} characters`;
+    }
+    if (parseResult.errorKind === "invalid-json") {
+      return `${APP_SERVER_PROCESS_NAME} returned invalid JSON`;
+    }
+    return `${APP_SERVER_PROCESS_NAME} response schema mismatch: ${parseResult.errorMessage}`;
+  }
+
+  private appendNotificationEvent(method: string, params: JsonValue | null, line: string): void {
+    this.notificationBufferOwner.append(method, params, Date.now(), line.length);
   }
 
   private rejectAll(error: Error): void {

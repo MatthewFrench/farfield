@@ -27,14 +27,11 @@ interface AppServerNotificationBufferOwnerOptions {
 const INITIAL_NOTIFICATION_SEQUENCE = 0;
 const RESET_CURSOR_SEQUENCE_OFFSET = 1;
 
-function measureNotificationEventBytes(event: AppServerNotificationEvent): number {
-  return Buffer.byteLength(JSON.stringify(event), "utf8");
-}
-
 /**
  * Owns bounded in-memory retention for app-server notification events.
  * The owner enforces both event-count and byte budgets so long-lived adapter sessions
- * cannot retain unbounded notification payloads in memory.
+ * cannot retain unbounded notification payloads in memory. The transport provides the
+ * raw line size estimate so this owner never has to reserialize large notification params.
  */
 export class AppServerNotificationBufferOwner {
   private readonly maximumEventCount: number;
@@ -66,7 +63,17 @@ export class AppServerNotificationBufferOwner {
     this.totalRetainedBytes = 0;
   }
 
-  public append(method: string, params: JsonValue | null, receivedAtMilliseconds: number): void {
+  public append(
+    method: string,
+    params: JsonValue | null,
+    receivedAtMilliseconds: number,
+    retainedByteEstimate: number,
+  ): void {
+    if (!Number.isInteger(retainedByteEstimate) || retainedByteEstimate <= 0) {
+      throw new Error(
+        "AppServerNotificationBufferOwner requires positive integer retainedByteEstimate",
+      );
+    }
     const event: AppServerNotificationEvent = {
       sequence: this.nextSequence,
       method,
@@ -76,9 +83,8 @@ export class AppServerNotificationBufferOwner {
     this.nextSequence += 1;
 
     this.events.push(event);
-    const retainedBytes = measureNotificationEventBytes(event);
-    this.retainedBytesBySequence.set(event.sequence, retainedBytes);
-    this.totalRetainedBytes += retainedBytes;
+    this.retainedBytesBySequence.set(event.sequence, retainedByteEstimate);
+    this.totalRetainedBytes += retainedByteEstimate;
     this.evictUntilWithinBounds();
   }
 

@@ -883,6 +883,40 @@ Verification evidence:
 4. `bun run --cwd packages/CodexInterfaceAdapter test -- Tests/AppServerNotificationBufferOwner.test.ts Tests/AppServerTransport.test.ts Tests/AppServerClient.test.ts`
 5. `bun run --cwd packages/CodexInterfaceAdapter build`
 
+### March 9, 2026: App-Server Ingress Rejects Oversized Lines Before Parse
+
+Changed owner modules:
+
+1. [AppServerTransport.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransport.ts)
+2. [AppServerIncomingLineParser.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerIncomingLineParser.ts)
+3. [AppServerNotificationBufferOwner.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationBufferOwner.ts)
+4. [AppServerChildProcessTransportOptionsContract.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerChildProcessTransportOptionsContract.ts)
+5. [AppServerTransportConstants.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts)
+6. [AppServerTransport.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerTransport.test.ts)
+7. [AppServerNotificationBufferOwner.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationBufferOwner.test.ts)
+
+Implementation summary:
+
+1. the app-server transport now enforces a strict maximum incoming stdout line size before JSON parsing continues
+2. oversized JSON-RPC lines now fail hard with a transport error and close the transport instead of flowing into deeper parse and retention paths
+3. notification retention now uses the already-available raw line length estimate from the transport instead of calling `JSON.stringify` on parsed notification payloads just to measure retention cost
+
+User-visible impact:
+
+1. long-lived stable API sessions should be less likely to climb toward heap OOM from a single oversized app-server line or repeated large notification payloads
+2. if the app-server emits an oversized protocol line, the failure should now be immediate and explicit rather than surfacing later as memory pressure
+
+Verification evidence:
+
+1. [AppServerTransport.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerTransport.test.ts)
+2. [AppServerNotificationBufferOwner.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationBufferOwner.test.ts)
+3. [AppServerClient.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerClient.test.ts)
+4. `bun run --cwd packages/CodexInterfaceAdapter test -- Tests/AppServerNotificationBufferOwner.test.ts Tests/AppServerTransport.test.ts Tests/AppServerClient.test.ts`
+5. `bun run --cwd packages/CodexInterfaceAdapter build`
+6. `bun run end-to-end:real:mobile-soak:stable`
+7. stable Chromium soak on Monday, March 9, 2026, passed clean on build `2026-03-09T23-13-31-894Z` with `freezeCount=0`, no sentinel API/banner/page failures, and stable status returned to `ready` with `crashSummary: null`
+8. this is a bounded-ingress mitigation, not full proof that multi-hour stable OOM is eliminated; longer stable observation is still needed
+
 
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 

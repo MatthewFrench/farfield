@@ -10,6 +10,7 @@ export interface ChildProcessAppServerTransportOptions {
   requestTimeoutMs?: number;
   notificationEventLimit?: number;
   notificationEventRetentionMaximumBytes?: number;
+  maximumIncomingLineCharacters?: number;
   onStderr?: (line: string) => void;
 }
 
@@ -23,6 +24,7 @@ const ChildProcessAppServerTransportOptionsSchema = z
     requestTimeoutMs: z.number().int().positive().optional(),
     notificationEventLimit: z.number().int().positive().optional(),
     notificationEventRetentionMaximumBytes: z.number().int().positive().optional(),
+    maximumIncomingLineCharacters: z.number().int().positive().optional(),
     onStderr: z.function().args(z.string()).returns(z.void()).optional(),
   })
   .strict();
@@ -53,6 +55,9 @@ export function parseChildProcessAppServerTransportOptions(
           notificationEventRetentionMaximumBytes:
             parsedOptions.notificationEventRetentionMaximumBytes,
         }
+      : {}),
+    ...(parsedOptions.maximumIncomingLineCharacters !== undefined
+      ? { maximumIncomingLineCharacters: parsedOptions.maximumIncomingLineCharacters }
       : {}),
     ...(parsedOptions.onStderr !== undefined ? { onStderr: parsedOptions.onStderr } : {}),
   };
