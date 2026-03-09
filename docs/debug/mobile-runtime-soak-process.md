@@ -854,6 +854,35 @@ Verification evidence:
 4. `bun run --cwd apps/WebApplication typecheck`
 5. stable Chromium soak rerun on Monday, March 9, 2026, passed clean with no push-route budget violations
 
+### March 9, 2026: App-Server Notification Buffer Gains Byte Budget
+
+Changed owner modules:
+
+1. [AppServerNotificationBufferOwner.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationBufferOwner.ts)
+2. [AppServerTransport.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransport.ts)
+3. [AppServerChildProcessTransportOptionsContract.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerChildProcessTransportOptionsContract.ts)
+4. [AppServerTransportConstants.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransportConstants.ts)
+5. [AppServerNotificationBufferOwner.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationBufferOwner.test.ts)
+
+Implementation summary:
+
+1. app-server notification retention is now owned by a dedicated bounded buffer instead of a raw unbounded event array
+2. the buffer enforces both event-count and total-byte budgets with oldest-first eviction
+3. `readNotificationEvents()` still preserves the same cursor/reset contract while reading from the bounded owner
+
+User-visible impact:
+
+1. no direct UI change
+2. long-lived adapter sessions should be less likely to retain multi-megabyte notification payload windows in memory
+
+Verification evidence:
+
+1. [AppServerNotificationBufferOwner.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationBufferOwner.test.ts)
+2. [AppServerTransport.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerTransport.test.ts)
+3. [AppServerClient.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerClient.test.ts)
+4. `bun run --cwd packages/CodexInterfaceAdapter test -- Tests/AppServerNotificationBufferOwner.test.ts Tests/AppServerTransport.test.ts Tests/AppServerClient.test.ts`
+5. `bun run --cwd packages/CodexInterfaceAdapter build`
+
 
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 

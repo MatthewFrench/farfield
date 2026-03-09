@@ -15,6 +15,12 @@ import {
   parseChildProcessAppServerTransportOptions,
 } from "./AppServerChildProcessTransportOptionsContract.js";
 import { parseAppServerIncomingLine } from "./AppServerIncomingLineParser.js";
+import {
+  AppServerNotificationBufferOwner,
+  type AppServerNotificationEvent,
+  type AppServerReadNotificationEventsInput,
+  type AppServerReadNotificationEventsResult,
+} from "./AppServerNotificationBufferOwner.js";
 import { isHandledAppServerServerRequestMethod } from "./AppServerServerRequestMethodConstants.js";
 import {
   type BuildAppServerSpawnEnvironmentInput,
@@ -29,6 +35,8 @@ import {
   APP_SERVER_JSON_RPC_VERSION,
   APP_SERVER_PROCESS_NAME,
   APP_SERVER_STANDARD_INPUT_LINE_TERMINATOR,
+  DEFAULT_APP_SERVER_NOTIFICATION_EVENT_LIMIT,
+  DEFAULT_APP_SERVER_NOTIFICATION_RETENTION_MAXIMUM_BYTES,
   DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS,
 } from "./AppServerTransportConstants.js";
 import { AppServerRpcError, AppServerTransportError } from "./Errors.js";
@@ -37,25 +45,11 @@ import { type JsonRpcIncomingRequest, JsonRpcRequestSchema } from "./JsonRpc.js"
 export type { BuildAppServerSpawnEnvironmentInput };
 export { buildAppServerSpawnEnvironment };
 export type { ChildProcessAppServerTransportOptions };
-
-export interface AppServerNotificationEvent {
-  sequence: number;
-  method: string;
-  params: JsonValue | null;
-  receivedAtMilliseconds: number;
-}
-
-export interface AppServerReadNotificationEventsInput {
-  limit: number;
-  sinceSequence: number | null;
-}
-
-export interface AppServerReadNotificationEventsResult {
-  events: AppServerNotificationEvent[];
-  nextSequence: number;
-  firstAvailableSequence: number;
-  resetRequired: boolean;
-}
+export type {
+  AppServerNotificationEvent,
+  AppServerReadNotificationEventsInput,
+  AppServerReadNotificationEventsResult,
+} from "./AppServerNotificationBufferOwner.js";
 
 export interface AppServerPendingServerRequest {
   requestId: number;
@@ -88,9 +82,6 @@ const AppServerReadNotificationEventsInputSchema = z
   })
   .strict();
 
-const DEFAULT_APP_SERVER_NOTIFICATION_EVENT_LIMIT = 400;
-const INITIAL_NOTIFICATION_SEQUENCE = 0;
-const RESET_CURSOR_SEQUENCE_OFFSET = 1;
 const JSON_RPC_METHOD_NOT_FOUND_ERROR_CODE = -32_601;
 const JSON_RPC_INVALID_PARAMS_ERROR_CODE = -32_602;
 const UNSUPPORTED_SERVER_REQUEST_ERROR_MESSAGE_PREFIX =
@@ -124,15 +115,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   private readonly env: NodeJS.ProcessEnv | undefined;
   private readonly requestTimeoutMs: number;
   private readonly onStderr: ((line: string) => void) | undefined;
-  private readonly notificationEventLimit: number;
+  private readonly notificationBufferOwner: AppServerNotificationBufferOwner;
   private process: ChildProcessWithoutNullStreams | null = null;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly pendingServerRequestsById = new Map<number, AppServerPendingServerRequest>();
-  private readonly notificationEvents: AppServerNotificationEvent[] = [];
   private requestId = 0;
   private initialized = false;
   private initializeInFlight: Promise<void> | null = null;
-  private notificationSequence = INITIAL_NOTIFICATION_SEQUENCE;
 
   public constructor(options: ChildProcessAppServerTransportOptions) {
     const parsedOptions = parseChildProcessAppServerTransportOptions(options);
@@ -143,8 +132,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     this.env = parsedOptions.env;
     this.requestTimeoutMs = parsedOptions.requestTimeoutMs ?? DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS;
     this.onStderr = parsedOptions.onStderr;
-    this.notificationEventLimit =
-      parsedOptions.notificationEventLimit ?? DEFAULT_APP_SERVER_NOTIFICATION_EVENT_LIMIT;
+    this.notificationBufferOwner = new AppServerNotificationBufferOwner({
+      maximumEventCount:
+        parsedOptions.notificationEventLimit ?? DEFAULT_APP_SERVER_NOTIFICATION_EVENT_LIMIT,
+      maximumRetainedBytes:
+        parsedOptions.notificationEventRetentionMaximumBytes ??
+        DEFAULT_APP_SERVER_NOTIFICATION_RETENTION_MAXIMUM_BYTES,
+    });
   }
 
   private resetProcessState(): void {
@@ -152,8 +146,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     this.initialized = false;
     this.initializeInFlight = null;
     this.pendingServerRequestsById.clear();
-    this.notificationEvents.length = 0;
-    this.notificationSequence = INITIAL_NOTIFICATION_SEQUENCE;
+    this.notificationBufferOwner.reset();
   }
 
   private ensureStarted(): void {
@@ -280,21 +273,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   }
 
   private appendNotificationEvent(method: string, params: JsonValue | null): void {
-    const event: AppServerNotificationEvent = {
-      sequence: this.notificationSequence,
-      method,
-      params,
-      receivedAtMilliseconds: Date.now(),
-    };
-    this.notificationEvents.push(event);
-    this.notificationSequence += 1;
-
-    if (this.notificationEvents.length > this.notificationEventLimit) {
-      this.notificationEvents.splice(
-        0,
-        this.notificationEvents.length - this.notificationEventLimit,
-      );
-    }
+    this.notificationBufferOwner.append(method, params, Date.now());
   }
 
   private rejectAll(error: Error): void {
@@ -549,29 +528,7 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
     input: AppServerReadNotificationEventsInput,
   ): AppServerReadNotificationEventsResult {
     const parsedInput = AppServerReadNotificationEventsInputSchema.parse(input);
-    const nextSequence = this.notificationSequence;
-    const firstEvent = this.notificationEvents[0];
-    const firstAvailableSequence = firstEvent ? firstEvent.sequence : nextSequence;
-
-    const resetRequired =
-      parsedInput.sinceSequence !== null &&
-      (parsedInput.sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET ||
-        parsedInput.sinceSequence >= nextSequence);
-
-    const sinceSequence = parsedInput.sinceSequence;
-    let selectedEvents: AppServerNotificationEvent[];
-    if (resetRequired || sinceSequence === null) {
-      selectedEvents = this.notificationEvents.slice(-parsedInput.limit);
-    } else {
-      selectedEvents = this.notificationEvents.filter((event) => event.sequence > sinceSequence);
-    }
-
-    return {
-      events: selectedEvents,
-      nextSequence,
-      firstAvailableSequence,
-      resetRequired,
-    };
+    return this.notificationBufferOwner.read(parsedInput);
   }
 
   public readPendingServerRequests(): AppServerPendingServerRequest[] {

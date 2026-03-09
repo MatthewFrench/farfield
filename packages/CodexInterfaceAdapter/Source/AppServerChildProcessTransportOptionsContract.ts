@@ -9,6 +9,7 @@ export interface ChildProcessAppServerTransportOptions {
   env?: NodeJS.ProcessEnv;
   requestTimeoutMs?: number;
   notificationEventLimit?: number;
+  notificationEventRetentionMaximumBytes?: number;
   onStderr?: (line: string) => void;
 }
 
@@ -21,6 +22,7 @@ const ChildProcessAppServerTransportOptionsSchema = z
     env: ProcessEnvironmentSchema.optional(),
     requestTimeoutMs: z.number().int().positive().optional(),
     notificationEventLimit: z.number().int().positive().optional(),
+    notificationEventRetentionMaximumBytes: z.number().int().positive().optional(),
     onStderr: z.function().args(z.string()).returns(z.void()).optional(),
   })
   .strict();
@@ -45,6 +47,12 @@ export function parseChildProcessAppServerTransportOptions(
       : {}),
     ...(parsedOptions.notificationEventLimit !== undefined
       ? { notificationEventLimit: parsedOptions.notificationEventLimit }
+      : {}),
+    ...(parsedOptions.notificationEventRetentionMaximumBytes !== undefined
+      ? {
+          notificationEventRetentionMaximumBytes:
+            parsedOptions.notificationEventRetentionMaximumBytes,
+        }
       : {}),
     ...(parsedOptions.onStderr !== undefined ? { onStderr: parsedOptions.onStderr } : {}),
   };
