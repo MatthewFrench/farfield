@@ -24,6 +24,7 @@ import {
   type AppServerReadNotificationEventsInput,
   type AppServerReadNotificationEventsResult,
 } from "./AppServerNotificationBufferOwner.js";
+import { parseAppServerNotificationIdentity } from "./AppServerNotificationIdentityContract.js";
 import { isHandledAppServerServerRequestMethod } from "./AppServerServerRequestMethodConstants.js";
 import {
   type BuildAppServerSpawnEnvironmentInput,
@@ -299,7 +300,13 @@ export class ChildProcessAppServerTransport implements AppServerTransport {
   }
 
   private appendNotificationEvent(method: string, params: JsonValue | null, line: string): void {
-    this.notificationBufferOwner.append(method, params, Date.now(), line.length);
+    this.notificationBufferOwner.append(
+      method,
+      params,
+      parseAppServerNotificationIdentity(params),
+      Date.now(),
+      line.length,
+    );
   }
 
   private rejectAll(error: Error): void {

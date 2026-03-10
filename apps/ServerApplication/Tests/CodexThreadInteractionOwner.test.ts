@@ -211,6 +211,8 @@ class TestAppServerTransport implements AppServerTransport {
       sequence: number;
       method: string;
       params: JsonValue | null;
+      threadId: string | null;
+      turnId: string | null;
       receivedAtMilliseconds: number;
     }>;
     nextSequence: number;
@@ -226,6 +228,8 @@ class TestAppServerTransport implements AppServerTransport {
       sequence: number;
       method: string;
       params: JsonValue | null;
+      threadId: string | null;
+      turnId: string | null;
       receivedAtMilliseconds: number;
     }>;
     nextSequence: number;
@@ -832,6 +836,8 @@ describe("CodexThreadInteractionOwner", () => {
             status: "inProgress",
             turnId: "turn-1",
           },
+          threadId: "thread-live",
+          turnId: "turn-1",
           receivedAtMilliseconds: 100,
         },
         {
@@ -843,6 +849,8 @@ describe("CodexThreadInteractionOwner", () => {
             },
             turn_id: "turn-1",
           },
+          threadId: "thread-live",
+          turnId: "turn-1",
           receivedAtMilliseconds: 101,
         },
         {
@@ -851,6 +859,8 @@ describe("CodexThreadInteractionOwner", () => {
           params: {
             threadId: "other-thread",
           },
+          threadId: "other-thread",
+          turnId: null,
           receivedAtMilliseconds: 102,
         },
       ],
@@ -908,6 +918,48 @@ describe("CodexThreadInteractionOwner", () => {
       {
         limit: 25,
         sinceSequence: 8,
+      },
+    ]);
+  });
+
+  it("uses projected notification identity instead of reparsing payloads on every read", async () => {
+    const context = createOwnerTestContext({
+      ipcReady: false,
+    });
+    context.appServerTransport.setNotificationEventsResult({
+      events: [
+        {
+          sequence: 15,
+          method: "turn/updated",
+          params: "not-an-envelope",
+          threadId: "thread-live",
+          turnId: "turn-2",
+          receivedAtMilliseconds: 150,
+        },
+      ],
+      nextSequence: 16,
+      firstAvailableSequence: 15,
+      resetRequired: false,
+    });
+
+    const streamEvents = await context.owner.readStreamEvents("thread-live", {
+      limit: 10,
+      sinceSequence: 14,
+    });
+
+    expect(streamEvents.events).toEqual([
+      {
+        type: "broadcast",
+        method: "turn/updated",
+        sourceClientId: "app-server",
+        version: 1,
+        params: {
+          sequence: 15,
+          receivedAtMilliseconds: 150,
+          threadId: "thread-live",
+          turnId: "turn-2",
+          payload: "not-an-envelope",
+        },
       },
     ]);
   });

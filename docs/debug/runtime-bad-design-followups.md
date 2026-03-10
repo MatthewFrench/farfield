@@ -221,6 +221,31 @@ Current status:
 3. notification retention now consumes the raw line size estimate from the transport instead of reserializing parsed payloads
 4. multi-hour stable observation is still needed before declaring the OOM path fully closed
 
+### 11. App-server notification identity was reparsed inside the selected-thread read loop
+
+Files:
+
+1. [CodexThreadInteractionOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadInteractionOwner.ts)
+2. [AppServerTransport.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransport.ts)
+3. [AppServerNotificationIdentityContract.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationIdentityContract.ts)
+
+Why it was bad:
+
+1. app-server mode `readStreamEvents` was still calling Zod `safeParse` for each notification payload every time the selected thread asked for stream events
+2. that scaled parse work with the full notification batch instead of with already-owned projected notification identity
+3. under long-lived or notification-heavy sessions, this widened selected-thread reread cost and send-follow-up variance for no product gain
+
+User-visible impact:
+
+1. app-server selected-thread reads could burn extra CPU after data arrived even though the transport had already seen the same notification envelope
+2. send-follow-up and thread-open latency became more variable under heavier notification traffic
+
+Current status:
+
+1. mitigated
+2. notification `threadId` and `turnId` are now projected once at transport ingress
+3. `CodexThreadInteractionOwner` now filters typed notification events directly instead of reparsing raw payloads inside the hot loop
+
 ## Confirmed Mitigations Already Landed
 
 ### Sidebar freshness and stale selection

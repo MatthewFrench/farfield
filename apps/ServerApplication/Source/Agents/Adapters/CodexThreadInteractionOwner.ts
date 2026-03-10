@@ -15,7 +15,6 @@ import {
   parseThreadConversationRequestResponse,
   UserInputRequestMethod,
 } from "@farfield/protocol";
-import { z } from "zod";
 import type {
   AgentInterruptInput,
   AgentNotificationEvents,
@@ -39,23 +38,6 @@ const TURN_IN_PROGRESS_STATUS = "inProgress";
 const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
 const INTERRUPT_TURN_IDENTIFIER_UNAVAILABLE_ERROR =
   "Cannot interrupt because there is no in-progress turn for this thread.";
-const AppServerNotificationEnvelopeSchema = z
-  .object({
-    threadId: z.string().min(1).optional(),
-    thread_id: z.string().min(1).optional(),
-    conversationId: z.string().min(1).optional(),
-    conversation_id: z.string().min(1).optional(),
-    turnId: z.string().min(1).optional(),
-    turn_id: z.string().min(1).optional(),
-    thread: z
-      .object({
-        id: z.string().min(1),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
-
 type IpcRequestParameters = IpcRequestFrame["params"];
 
 function createPreviewRequestFrame(
@@ -215,15 +197,8 @@ export class CodexThreadInteractionOwner {
       return {
         ownerClientId: APP_SERVER_OWNER_CLIENT_IDENTIFIER,
         events: notificationBatch.events
-          .map((event) => {
-            const identity = readAppServerNotificationIdentity(event.params);
-            return {
-              event,
-              identity,
-            };
-          })
-          .filter((entry) => entry.identity.threadId === threadId)
-          .map((entry) => createAppServerNotificationStreamFrame(entry.event, entry.identity)),
+          .filter((event) => event.threadId === threadId)
+          .map((event) => createAppServerNotificationStreamFrame(event)),
         nextSequence: notificationBatch.nextSequence,
         firstAvailableSequence: notificationBatch.firstAvailableSequence,
         resetRequired: notificationBatch.resetRequired,
@@ -344,46 +319,7 @@ export class CodexThreadInteractionOwner {
   }
 }
 
-interface AppServerNotificationIdentity {
-  threadId: string | null;
-  turnId: string | null;
-}
-
-function readAppServerNotificationIdentity(
-  params: JsonValue | null,
-): AppServerNotificationIdentity {
-  if (params === null) {
-    return {
-      threadId: null,
-      turnId: null,
-    };
-  }
-
-  const parsedNotificationEnvelope = AppServerNotificationEnvelopeSchema.safeParse(params);
-  if (!parsedNotificationEnvelope.success) {
-    return {
-      threadId: null,
-      turnId: null,
-    };
-  }
-
-  const parsedEnvelope = parsedNotificationEnvelope.data;
-  return {
-    threadId:
-      parsedEnvelope.threadId ??
-      parsedEnvelope.thread_id ??
-      parsedEnvelope.conversationId ??
-      parsedEnvelope.conversation_id ??
-      parsedEnvelope.thread?.id ??
-      null,
-    turnId: parsedEnvelope.turnId ?? parsedEnvelope.turn_id ?? null,
-  };
-}
-
-function createAppServerNotificationStreamFrame(
-  event: AppServerNotificationEvent,
-  identity: AppServerNotificationIdentity,
-): IpcFrame {
+function createAppServerNotificationStreamFrame(event: AppServerNotificationEvent): IpcFrame {
   return parseIpcFrame({
     type: "broadcast",
     method: event.method,
@@ -392,8 +328,8 @@ function createAppServerNotificationStreamFrame(
     params: {
       sequence: event.sequence,
       receivedAtMilliseconds: event.receivedAtMilliseconds,
-      ...(identity.threadId !== null ? { threadId: identity.threadId } : {}),
-      ...(identity.turnId !== null ? { turnId: identity.turnId } : {}),
+      ...(event.threadId !== null ? { threadId: event.threadId } : {}),
+      ...(event.turnId !== null ? { turnId: event.turnId } : {}),
       payload: event.params,
     },
   });

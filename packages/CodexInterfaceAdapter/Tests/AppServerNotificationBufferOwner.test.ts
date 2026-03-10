@@ -8,9 +8,27 @@ describe("AppServerNotificationBufferOwner", () => {
       maximumRetainedBytes: 10_000,
     });
 
-    owner.append("event-1", { threadId: "thread-1" }, 10, 10);
-    owner.append("event-2", { threadId: "thread-2" }, 20, 10);
-    owner.append("event-3", { threadId: "thread-3" }, 30, 10);
+    owner.append(
+      "event-1",
+      { threadId: "thread-1" },
+      { threadId: "thread-1", turnId: null },
+      10,
+      10,
+    );
+    owner.append(
+      "event-2",
+      { threadId: "thread-2" },
+      { threadId: "thread-2", turnId: null },
+      20,
+      10,
+    );
+    owner.append(
+      "event-3",
+      { threadId: "thread-3" },
+      { threadId: "thread-3", turnId: null },
+      30,
+      10,
+    );
 
     const result = owner.read({
       limit: 10,
@@ -28,9 +46,9 @@ describe("AppServerNotificationBufferOwner", () => {
       maximumRetainedBytes: 220,
     });
 
-    owner.append("event-1", { text: "x".repeat(80) }, 10, 120);
-    owner.append("event-2", { text: "y".repeat(80) }, 20, 120);
-    owner.append("event-3", { text: "z".repeat(80) }, 30, 120);
+    owner.append("event-1", { text: "x".repeat(80) }, { threadId: null, turnId: null }, 10, 120);
+    owner.append("event-2", { text: "y".repeat(80) }, { threadId: null, turnId: null }, 20, 120);
+    owner.append("event-3", { text: "z".repeat(80) }, { threadId: null, turnId: null }, 30, 120);
 
     const result = owner.read({
       limit: 10,
@@ -47,10 +65,34 @@ describe("AppServerNotificationBufferOwner", () => {
       maximumRetainedBytes: 10_000,
     });
 
-    owner.append("event-1", { threadId: "thread-1" }, 10, 10);
-    owner.append("event-2", { threadId: "thread-2" }, 20, 10);
-    owner.append("event-3", { threadId: "thread-3" }, 30, 10);
-    owner.append("event-4", { threadId: "thread-4" }, 40, 10);
+    owner.append(
+      "event-1",
+      { threadId: "thread-1" },
+      { threadId: "thread-1", turnId: null },
+      10,
+      10,
+    );
+    owner.append(
+      "event-2",
+      { threadId: "thread-2" },
+      { threadId: "thread-2", turnId: null },
+      20,
+      10,
+    );
+    owner.append(
+      "event-3",
+      { threadId: "thread-3" },
+      { threadId: "thread-3", turnId: null },
+      30,
+      10,
+    );
+    owner.append(
+      "event-4",
+      { threadId: "thread-4" },
+      { threadId: "thread-4", turnId: null },
+      40,
+      10,
+    );
 
     const result = owner.read({
       limit: 10,
@@ -68,8 +110,14 @@ describe("AppServerNotificationBufferOwner", () => {
       maximumRetainedBytes: 10_000,
     });
 
-    expect(() => owner.append("event-1", { threadId: "thread-1" }, 10, 0)).toThrowError(
-      /retainedByteEstimate/,
-    );
+    expect(() =>
+      owner.append(
+        "event-1",
+        { threadId: "thread-1" },
+        { threadId: "thread-1", turnId: null },
+        10,
+        0,
+      ),
+    ).toThrowError(/retainedByteEstimate/);
   });
 });

@@ -1,9 +1,12 @@
 import type { JsonValue } from "@farfield/protocol";
+import type { AppServerNotificationIdentity } from "./AppServerNotificationIdentityContract.js";
 
 export interface AppServerNotificationEvent {
   sequence: number;
   method: string;
   params: JsonValue | null;
+  threadId: string | null;
+  turnId: string | null;
   receivedAtMilliseconds: number;
 }
 
@@ -66,6 +69,7 @@ export class AppServerNotificationBufferOwner {
   public append(
     method: string,
     params: JsonValue | null,
+    identity: AppServerNotificationIdentity,
     receivedAtMilliseconds: number,
     retainedByteEstimate: number,
   ): void {
@@ -78,6 +82,8 @@ export class AppServerNotificationBufferOwner {
       sequence: this.nextSequence,
       method,
       params,
+      threadId: identity.threadId,
+      turnId: identity.turnId,
       receivedAtMilliseconds,
     };
     this.nextSequence += 1;

@@ -917,6 +917,64 @@ Verification evidence:
 7. stable Chromium soak on Monday, March 9, 2026, passed clean on build `2026-03-09T23-13-31-894Z` with `freezeCount=0`, no sentinel API/banner/page failures, and stable status returned to `ready` with `crashSummary: null`
 8. this is a bounded-ingress mitigation, not full proof that multi-hour stable OOM is eliminated; longer stable observation is still needed
 
+### March 9, 2026: Hidden Mobile Sidebar Stops Re-rendering On Non-Readiness Churn
+
+Changed owner modules:
+
+1. [ApplicationShellSidebarRegion.tsx](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Source/Application/UserInterface/ApplicationShellSidebarRegion.tsx)
+2. [ApplicationShellSidebarRegion.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationShellSidebarRegion.test.ts)
+
+Implementation summary:
+
+1. the sidebar shell region now uses a visibility-aware memo comparator similar to the main region
+2. while the mobile sidebar is closed, heavy thread-list/runtime-summary prop churn no longer forces sidebar-region commits
+3. hidden-sidebar suppression still allows readiness-critical `threadListState` and `isCoreLoading` transitions through, so the mobile sidebar can move from `loading` to `ready` before it is opened
+
+User-visible impact:
+
+1. mobile browsing should do less hidden sidebar commit work while the user stays in the chat surface
+2. the sidebar no longer regresses into a stuck `Loading threads...` state from over-aggressive hidden-tree memo suppression
+
+Verification evidence:
+
+1. [ApplicationShellSidebarRegion.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationShellSidebarRegion.test.ts)
+2. [ApplicationShellMainRegion.test.ts](/Users/matthewfrench/GitHub/farfield/apps/WebApplication/Tests/ApplicationShellMainRegion.test.ts)
+3. `bun run --cwd apps/WebApplication typecheck`
+4. stable Chromium soak rerun on Monday, March 9, 2026, completed all three iterations with `freezeCount=0` and no sentinel API/banner/page failures; the only remaining failure was the already-known push-route queue-delay budget on hidden push diagnostics routes
+
+### March 9, 2026: App-Server Notification Identity Is Projected Once At Ingress
+
+Changed owner modules:
+
+1. [AppServerNotificationIdentityContract.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationIdentityContract.ts)
+2. [AppServerNotificationBufferOwner.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerNotificationBufferOwner.ts)
+3. [AppServerTransport.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Source/AppServerTransport.ts)
+4. [CodexThreadInteractionOwner.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Source/Agents/Adapters/CodexThreadInteractionOwner.ts)
+5. [AppServerNotificationIdentityContract.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationIdentityContract.test.ts)
+6. [CodexThreadInteractionOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadInteractionOwner.test.ts)
+
+Implementation summary:
+
+1. app-server notification `threadId` and `turnId` are now parsed once at transport ingress and stored on the typed notification event
+2. the app-server `readStreamEvents` path no longer Zod-parses notification envelopes inside its hot filter loop on every selected-thread read
+3. downstream stream-frame creation now consumes strict projected notification identity instead of reparsing raw payloads
+
+User-visible impact:
+
+1. app-server selected-thread stream reads should do less repeated parse work under notification-heavy sessions
+2. this reduces one concrete source of send-path and selected-thread reread variance when the adapter is in app-server mode
+
+Verification evidence:
+
+1. [AppServerNotificationIdentityContract.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationIdentityContract.test.ts)
+2. [AppServerNotificationBufferOwner.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerNotificationBufferOwner.test.ts)
+3. [AppServerTransport.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerTransport.test.ts)
+4. [AppServerClient.test.ts](/Users/matthewfrench/GitHub/farfield/packages/CodexInterfaceAdapter/Tests/AppServerClient.test.ts)
+5. [CodexThreadInteractionOwner.test.ts](/Users/matthewfrench/GitHub/farfield/apps/ServerApplication/Tests/CodexThreadInteractionOwner.test.ts)
+6. `bun run --cwd packages/CodexInterfaceAdapter build`
+7. `bun run --cwd apps/ServerApplication typecheck`
+8. stable Chromium soak rerun on Monday, March 9, 2026, completed all three iterations with zero sentinel API/banner/page failures; the remaining failure was the separate push-route queue-delay budget
+
 
 ### March 7, 2026: Send Path Stops Blocking On Full Thread Read For Turn Template
 
