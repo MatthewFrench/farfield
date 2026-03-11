@@ -60,6 +60,7 @@ import {
 } from "./ThreadSidebarRuntimeSummaryProjection";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
 import {
+  createEmptyThreadRuntimeStatusByThreadIdentifier,
   useRuntimeProjectionResetEffect,
   useRuntimeWarningThreadSwitchEffect,
 } from "./UseEventStreamProjectionEffects";

@@ -11,7 +11,7 @@ import {
 import { RuntimeWarningBannerPolicyOwner } from "./RuntimeWarningBannerPolicyOwner";
 import { createInitialThreadSidebarRuntimeSummary } from "./ThreadSidebarRuntimeSummaryProjection";
 
-function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatusByThreadIdentifier {
+export function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatusByThreadIdentifier {
   return {};
 }
 
