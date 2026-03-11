@@ -718,7 +718,7 @@ describe("useCoreDataLoaders", () => {
     expect(readDefaultsSpy).not.toHaveBeenCalled();
   });
 
-  it("skips archived-thread refresh during tracked core refresh before archived surface is loaded", async () => {
+  it("refreshes archived threads during tracked core refresh before archived surface is loaded", async () => {
     const harness = createHarness("chat");
     const loadActiveThreadStateSpy = vi
       .spyOn(harness.threadListStateController, "loadActiveThreadState")
@@ -748,7 +748,7 @@ describe("useCoreDataLoaders", () => {
     });
 
     expect(loadActiveThreadStateSpy).toHaveBeenCalledTimes(1);
-    expect(loadArchivedThreadStateSpy).toHaveBeenCalledTimes(0);
+    expect(loadArchivedThreadStateSpy).toHaveBeenCalledTimes(1);
     expect(harness.input.lastCoreRefreshAtRef.current).toBeGreaterThan(0);
   });
 

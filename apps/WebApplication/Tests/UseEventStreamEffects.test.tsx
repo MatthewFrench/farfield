@@ -854,6 +854,37 @@ describe("useEventStreamEffects", () => {
     });
   });
 
+  it("stores notification cursors as the last seen sequence for follow-up reads", async () => {
+    setDocumentVisibilityState("visible");
+
+    const eventStreamConnectionCoordinator = new TestEventStreamConnectionCoordinator();
+    const input = createBaseInput(
+      eventStreamConnectionCoordinator,
+      new TestDebugWorkspaceDataReader(createDebugSnapshot()),
+    );
+    input.canReadNotificationEvents = true;
+    const readNotificationEvents = vi
+      .spyOn(input.capabilityServerClient, "readNotificationEvents")
+      .mockResolvedValue(createNotificationEventsResponse());
+
+    render(<Harness input={input} />);
+
+    const startInput = await readStartInputOrThrow(eventStreamConnectionCoordinator);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+    await startInput.executeScheduledRefresh(NOTIFICATION_PROJECTION_ONLY_REFRESH_FLAGS);
+
+    expect(readNotificationEvents).toHaveBeenNthCalledWith(1, {
+      agentId: "codex",
+      limit: 80,
+      sinceSequence: null,
+    });
+    expect(readNotificationEvents).toHaveBeenNthCalledWith(2, {
+      agentId: "codex",
+      limit: 80,
+      sinceSequence: 41,
+    });
+  });
+
   it("suppresses transient notification-projection restart errors from runtime error reporting", async () => {
     setDocumentVisibilityState("visible");
 

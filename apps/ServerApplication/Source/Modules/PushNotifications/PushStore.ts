@@ -145,35 +145,53 @@ export class PushStore {
     const existingIndex = this.state.completionWatermarks.findIndex(
       (candidate) => candidate.threadId === threadId,
     );
+    const nextCompletionWatermarks = this.state.completionWatermarks.map((entry) => ({
+      threadId: entry.threadId,
+      marker: entry.marker,
+    }));
 
     if (existingIndex >= 0) {
-      const existing = this.state.completionWatermarks[existingIndex];
+      const existing = nextCompletionWatermarks[existingIndex];
       if (!existing) {
         throw new Error(COMPLETION_WATERMARK_INDEX_RESOLUTION_ERROR_MESSAGE);
       }
       if (existing.marker === marker) {
         return false;
       }
-      this.state.completionWatermarks[existingIndex] = {
+      nextCompletionWatermarks[existingIndex] = {
         threadId,
         marker,
       };
-      await this.persist();
+      const nextState = {
+        ...this.state,
+        completionWatermarks: nextCompletionWatermarks,
+      };
+      await this.persistState(nextState);
+      this.state = nextState;
       return true;
     }
 
-    this.state.completionWatermarks.push({
+    nextCompletionWatermarks.push({
       threadId,
       marker,
     });
-    await this.persist();
+    const nextState = {
+      ...this.state,
+      completionWatermarks: nextCompletionWatermarks,
+    };
+    await this.persistState(nextState);
+    this.state = nextState;
     return true;
   }
 
   private persist(): Promise<void> {
+    return this.persistState(this.state);
+  }
+
+  private persistState(state: PushStateStore): Promise<void> {
     // Mutations update in-memory state first, then enqueue asynchronous durable writes.
     // Capturing the encoded snapshot here ensures each queued write matches mutation order.
-    const encodedState = `${JSON.stringify(this.state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
+    const encodedState = `${JSON.stringify(state, null, JSON_INDENT_SPACES)}${LINE_FEED}`;
     const runPersistWrite = async (): Promise<void> => {
       await this.persistEncodedState(encodedState);
     };

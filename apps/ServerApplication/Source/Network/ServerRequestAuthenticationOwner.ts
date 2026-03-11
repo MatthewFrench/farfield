@@ -28,12 +28,13 @@ export class ServerRequestAuthenticationOwner {
   }
 
   public requireApiAuth(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
-    if (pathname === RequestPathnameByName.apiEventsSession) {
+    const normalizedPathname = normalizeAuthenticationPathname(pathname);
+    if (normalizedPathname === RequestPathnameByName.apiEventsSession) {
       return true;
     }
     if (
-      !pathname.startsWith(RequestPathnameByName.apiPrefix) &&
-      pathname !== RequestPathnameByName.events
+      !normalizedPathname.startsWith(RequestPathnameByName.apiPrefix) &&
+      normalizedPathname !== RequestPathnameByName.events
     ) {
       return true;
     }
@@ -65,4 +66,12 @@ export class ServerRequestAuthenticationOwner {
     }
     return providedToken === this.deps.apiToken;
   }
+}
+
+function normalizeAuthenticationPathname(pathname: string): string {
+  if (pathname.length === 0) {
+    return RequestPathnameByName.root;
+  }
+
+  return pathname.replace(/^\/+/, "/");
 }

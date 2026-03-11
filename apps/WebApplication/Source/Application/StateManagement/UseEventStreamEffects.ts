@@ -6,10 +6,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import {
-  type CapabilityReadNotificationEventsOptions,
-  type CapabilityServerClient,
-} from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
+import { type CapabilityServerClient } from "@/Features/Capabilities/DataAccess/CapabilityServerClient";
 import { isThreadNotLoadedReadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 import { type ApplySelectedThreadStreamDeltaInput } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
 import type {
@@ -28,6 +25,12 @@ import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import { EventRefreshScheduler } from "./EventRefreshScheduler";
 import { EventStreamConnectionCoordinator } from "./EventStreamConnectionCoordinator";
+import {
+  createInitialRuntimeNotificationProjectionCursorState,
+  type RuntimeNotificationProjectionCursorState,
+  readNotificationEventsRequestOptions,
+  readRuntimeNotificationProjectionSinceSequence,
+} from "./EventStreamNotificationProjectionCursor";
 import { type EventStreamRefreshDecisionReader } from "./EventStreamRefreshDecisionEngine";
 import {
   isScheduledRefreshDocumentVisible,
@@ -44,7 +47,6 @@ import { RuntimeNotificationReadObservabilityOwner } from "./RuntimeNotification
 import { applyRuntimeThreadStatusUpdates } from "./RuntimeThreadStatusStateReducer";
 import { RuntimeWarningBannerPolicyOwner } from "./RuntimeWarningBannerPolicyOwner";
 import {
-  createInitialThreadSidebarRuntimeSummary,
   readLatestModelRerouteEventForThread,
   readLatestThreadProgressEventForThread,
   readLatestThreadTokenUsageUpdateForThread,
@@ -57,9 +59,12 @@ import {
   readThreadSidebarTokenUsageSummary,
 } from "./ThreadSidebarRuntimeSummaryProjection";
 import type { SelectedThreadLoaderOptions } from "./UseCoreDataLoaders";
+import {
+  useRuntimeProjectionResetEffect,
+  useRuntimeWarningThreadSwitchEffect,
+} from "./UseEventStreamProjectionEffects";
 import { useThreadSidebarRuntimeHydrationEffect } from "./UseThreadSidebarRuntimeHydrationEffect";
 
-const NOTIFICATION_EVENTS_REFRESH_LIMIT = 80;
 const SIDEBAR_APPS_LIST_LIMIT = 100;
 const SELECTED_THREAD_INCREMENTAL_REFRESH_OPTIONS: SelectedThreadLoaderOptions = {
   includeReadThread: true,
@@ -75,89 +80,6 @@ const TRANSIENT_NOTIFICATION_PROJECTION_ROUTE_PATTERNS = [
 const TRANSIENT_NOTIFICATION_PROJECTION_FAILED_TO_FETCH_PATTERN = /failed to fetch status=n\/a/i;
 const TRANSIENT_NOTIFICATION_PROJECTION_EMPTY_RESPONSE_PATTERN = /empty response status=200/i;
 const TRANSIENT_NOTIFICATION_PROJECTION_STATUS_PATTERN = /status=(502|503|504)\b/i;
-
-interface RuntimeNotificationProjectionCursorState {
-  nextSequence: number | null;
-}
-
-function createInitialRuntimeNotificationProjectionCursorState(): RuntimeNotificationProjectionCursorState {
-  return {
-    nextSequence: null,
-  };
-}
-
-function createEmptyThreadRuntimeStatusByThreadIdentifier(): ThreadRuntimeStatusByThreadIdentifier {
-  return {};
-}
-
-function readNotificationEventsRequestOptions(input: {
-  selectedAgentId: AgentId;
-  notificationProjectionCursorState: RuntimeNotificationProjectionCursorState;
-}): CapabilityReadNotificationEventsOptions {
-  return {
-    agentId: input.selectedAgentId,
-    limit: NOTIFICATION_EVENTS_REFRESH_LIMIT,
-    sinceSequence: input.notificationProjectionCursorState.nextSequence,
-  };
-}
-
-interface UseRuntimeProjectionResetEffectInput {
-  selectedAgentId: AgentId;
-  setThreadRuntimeStatusByThreadIdentifier: Dispatch<
-    SetStateAction<ThreadRuntimeStatusByThreadIdentifier>
-  >;
-  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
-}
-
-function useRuntimeProjectionResetEffect(
-  input: UseRuntimeProjectionResetEffectInput,
-  runtimeNotificationProjectionCursorStateRef: MutableRefObject<RuntimeNotificationProjectionCursorState>,
-  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>,
-): void {
-  useEffect(() => {
-    const runtimeNotificationProjectionCursorState = runtimeNotificationProjectionCursorStateRef;
-    runtimeNotificationProjectionCursorState.current =
-      createInitialRuntimeNotificationProjectionCursorState();
-    runtimeWarningBannerPolicyOwnerRef.current.resetSelectedThread(null);
-    input.setThreadRuntimeStatusByThreadIdentifier(
-      createEmptyThreadRuntimeStatusByThreadIdentifier(),
-    );
-    input.setThreadSidebarRuntimeSummary(createInitialThreadSidebarRuntimeSummary());
-  }, [
-    input.selectedAgentId,
-    input.setThreadRuntimeStatusByThreadIdentifier,
-    input.setThreadSidebarRuntimeSummary,
-  ]);
-}
-
-interface UseRuntimeWarningThreadSwitchEffectInput {
-  selectedThreadId: string | null;
-  setThreadSidebarRuntimeSummary: Dispatch<SetStateAction<ThreadSidebarRuntimeSummary>>;
-}
-
-function useRuntimeWarningThreadSwitchEffect(
-  input: UseRuntimeWarningThreadSwitchEffectInput,
-  runtimeWarningBannerPolicyOwnerRef: MutableRefObject<RuntimeWarningBannerPolicyOwner>,
-): void {
-  useEffect(() => {
-    const threadSwitchRequiresWarningClear =
-      runtimeWarningBannerPolicyOwnerRef.current.readThreadSwitchRequiresWarningClear(
-        input.selectedThreadId,
-      );
-    if (!threadSwitchRequiresWarningClear) {
-      return;
-    }
-    input.setThreadSidebarRuntimeSummary((previousSummary) => {
-      if (previousSummary.warning === null) {
-        return previousSummary;
-      }
-      return {
-        ...previousSummary,
-        warning: null,
-      };
-    });
-  }, [input.selectedThreadId, input.setThreadSidebarRuntimeSummary]);
-}
 
 function isMissingSelectedThreadReadError<ErrorType>(error: ErrorType): boolean {
   return isThreadNotLoadedReadError(toErrorMessage(error));
@@ -243,7 +165,9 @@ async function applyNotificationProjectionRefresh(
     notificationEventsResponse,
   );
   runtimeNotificationProjectionCursorState.current = {
-    nextSequence: runtimeNotificationProjection.nextSequence,
+    nextSequence: readRuntimeNotificationProjectionSinceSequence(
+      runtimeNotificationProjection.nextSequence,
+    ),
   };
 
   input.input.setThreadRuntimeStatusByThreadIdentifier((previousThreadStatusByThreadId) => {

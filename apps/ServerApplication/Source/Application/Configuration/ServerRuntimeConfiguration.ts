@@ -160,9 +160,7 @@ export function readServerRuntimeConfiguration(env: NodeJS.ProcessEnv): ServerRu
   const apiToken = resolveApiTokenFromEnvironment(env);
   const apiAuthRequired = apiToken.length > 0;
   const apiSessionSigningSecret = resolveApiSessionSigningSecret(env, apiToken);
-  const apiSessionSecureCookieDefault = apiAuthRequired
-    ? true
-    : ServerRuntimeDefaultValues.apiSessionSecureCookie;
+  const apiSessionSecureCookieDefault = ServerRuntimeDefaultValues.apiSessionSecureCookie;
   const apiSessionSecureCookie = readBooleanEnvironmentValue(
     env,
     ServerRuntimeEnvironmentVariableNames.apiSessionSecureCookie,

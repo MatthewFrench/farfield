@@ -1,6 +1,7 @@
 import * as fileSystemPromises from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { extname, isAbsolute } from "node:path";
+import { tmpdir } from "node:os";
+import path, { extname, isAbsolute } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import type { ThreadRouteDependencies } from "./ThreadRoutes.js";
@@ -8,6 +9,7 @@ import type { ThreadRouteDependencies } from "./ThreadRoutes.js";
 const LOCAL_IMAGE_ROUTE_PATH = "/api/files/local-image";
 const LOCAL_IMAGE_QUERY_PATH_KEY = "path";
 const MAXIMUM_LOCAL_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const DEFAULT_ALLOWED_LOCAL_IMAGE_ROOTS = [path.resolve(process.cwd()), path.resolve(tmpdir())];
 
 const LocalImageRouteStatusCodeByName = {
   successOk: 200,
@@ -22,6 +24,7 @@ const LocalImageRouteStatusCodeByName = {
 const LocalImageRouteErrorByName = {
   invalidImagePath: "Invalid image path",
   imagePathMustBeAbsolute: "Image path must be absolute",
+  imagePathOutsideAllowedRoots: "Image path is outside the allowed roots",
   imageFileNotFound: "Image file not found",
   imageFileAccessDenied: "Image file access denied",
   unsupportedImageType: "Unsupported image type",
@@ -58,6 +61,7 @@ interface LocalImageRouteDependencies {
   pathname: string;
   url: URL;
   jsonResponse: ThreadRouteDependencies["jsonResponse"];
+  allowedRoots?: readonly string[];
   openFile?: typeof fileSystemPromises.open;
 }
 
@@ -99,6 +103,17 @@ export async function handleLocalImageRoutes(
       {
         ok: false,
         error: LocalImageRouteErrorByName.imagePathMustBeAbsolute,
+      },
+    );
+    return true;
+  }
+  if (!isPathWithinAllowedRoots(imagePath, dependencies.allowedRoots)) {
+    dependencies.jsonResponse(
+      dependencies.res,
+      LocalImageRouteStatusCodeByName.clientErrorForbidden,
+      {
+        ok: false,
+        error: LocalImageRouteErrorByName.imagePathOutsideAllowedRoots,
       },
     );
     return true;
@@ -149,6 +164,19 @@ function parseLocalImageQuery(url: URL) {
 function readImageContentType(imagePath: string): string | null {
   const extension = extname(imagePath).toLowerCase() as keyof typeof MIME_TYPE_BY_FILE_EXTENSION;
   return MIME_TYPE_BY_FILE_EXTENSION[extension] ?? null;
+}
+
+function isPathWithinAllowedRoots(
+  imagePath: string,
+  allowedRoots: readonly string[] | undefined,
+): boolean {
+  const normalizedImagePath = path.resolve(imagePath);
+  const normalizedAllowedRoots = (allowedRoots ?? DEFAULT_ALLOWED_LOCAL_IMAGE_ROOTS).map((root) =>
+    path.resolve(root),
+  );
+  return normalizedAllowedRoots.some((root) => {
+    return normalizedImagePath === root || normalizedImagePath.startsWith(`${root}${path.sep}`);
+  });
 }
 
 async function readImageFileMetadata(

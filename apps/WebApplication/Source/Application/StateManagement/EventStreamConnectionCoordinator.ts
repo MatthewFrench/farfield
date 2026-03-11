@@ -129,6 +129,7 @@ export class EventStreamConnectionCoordinator {
   private reconnectDelayMs: number;
   private reconnectTimerId: number | null;
   private pendingEventMessageExecution: Promise<void>;
+  private connectionGeneration: number;
   private source: EventSourceLike | null;
   private context: EventStreamConnectionCoordinatorContext | null;
   private disposed: boolean;
@@ -160,6 +161,7 @@ export class EventStreamConnectionCoordinator {
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.reconnectTimerId = null;
     this.pendingEventMessageExecution = Promise.resolve();
+    this.connectionGeneration = 0;
     this.source = null;
     this.context = null;
     this.disposed = true;
@@ -178,6 +180,7 @@ export class EventStreamConnectionCoordinator {
       onConnectionStatusChange: input.onConnectionStatusChange,
       eventsUrl: input.eventsUrl ?? DEFAULT_EVENTS_URL,
     };
+    this.connectionGeneration += 1;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.pendingEventMessageExecution = Promise.resolve();
     this.disposed = false;
@@ -197,6 +200,7 @@ export class EventStreamConnectionCoordinator {
       this.context.onConnectionStatusChange(false);
     }
     this.context = null;
+    this.connectionGeneration += 1;
     this.reconnectDelayMs = this.initialReconnectDelayMs;
     this.pendingEventMessageExecution = Promise.resolve();
     this.hasConnectedBefore = false;
@@ -237,17 +241,21 @@ export class EventStreamConnectionCoordinator {
   }
 
   private handleEventSourceMessage(event: MessageEvent<string>): void {
+    const messageGeneration = this.connectionGeneration;
     this.pendingEventMessageExecution = this.pendingEventMessageExecution
       .then(async () => {
-        await this.executeEventSourceMessage(event);
+        await this.executeEventSourceMessage(event, messageGeneration);
       })
       .catch(() => {
         // Message-specific failures are handled in executeEventSourceMessage.
       });
   }
 
-  private async executeEventSourceMessage(event: MessageEvent<string>): Promise<void> {
-    if (!this.context) {
+  private async executeEventSourceMessage(
+    event: MessageEvent<string>,
+    messageGeneration: number,
+  ): Promise<void> {
+    if (!this.context || messageGeneration !== this.connectionGeneration) {
       return;
     }
 
@@ -258,6 +266,9 @@ export class EventStreamConnectionCoordinator {
         selectedThreadId: snapshot.selectedThreadId,
         eventData: event.data,
       });
+      if (!this.context || messageGeneration !== this.connectionGeneration) {
+        return;
+      }
       this.scheduleRefresh(readRefreshFlagsFromDecision(refreshDecision));
       if (refreshDecision.threadStreamDelta) {
         this.context.applyThreadStreamDelta(refreshDecision.threadStreamDelta);

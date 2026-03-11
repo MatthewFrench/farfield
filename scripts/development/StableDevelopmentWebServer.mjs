@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
+import { z } from "zod";
 import {
   parseStableDevelopmentTrustedOrigins,
   shouldInjectApiTokenForStableDevelopmentProxy,
@@ -22,6 +24,11 @@ const FileContentTypeByExtension = new Map([
   [".txt", "text/plain; charset=utf-8"],
   [".webp", "image/webp"],
 ]);
+const FileSystemErrorSchema = z
+  .object({
+    code: z.string().optional(),
+  })
+  .passthrough();
 
 function escapeHtml(value) {
   return value
@@ -205,6 +212,75 @@ function isSinglePageApplicationPath(pathnameValue) {
   return !basename.includes(".");
 }
 
+function writeBuildAssetErrorResponse(response, statusCode, message) {
+  response.statusCode = statusCode;
+  response.setHeader("Cache-Control", "no-store");
+  response.end(message);
+}
+
+function isMissingFileSystemError(error) {
+  const parsedError = FileSystemErrorSchema.safeParse(error);
+  return (
+    parsedError.success &&
+    (parsedError.data.code === "ENOENT" || parsedError.data.code === "ENOTDIR")
+  );
+}
+
+function isForbiddenFileSystemError(error) {
+  const parsedError = FileSystemErrorSchema.safeParse(error);
+  return (
+    parsedError.success && (parsedError.data.code === "EACCES" || parsedError.data.code === "EPERM")
+  );
+}
+
+async function streamBuildAssetFile(requestedFilePath, response) {
+  const fileHandle = await fs.promises.open(requestedFilePath, "r");
+
+  try {
+    response.statusCode = 200;
+    response.setHeader("Content-Type", getContentType(requestedFilePath));
+    response.setHeader("Cache-Control", "no-store");
+    await Promise.resolve();
+    if (response.destroyed) {
+      return;
+    }
+
+    const readStream = fileHandle.createReadStream({ autoClose: false });
+    const closePromise = new Promise((resolve) => {
+      response.once("close", () => {
+        readStream.destroy();
+        resolve("closed");
+      });
+    });
+    const pipelinePromise = pipeline(readStream, response);
+    const streamResult = await Promise.race([
+      pipelinePromise.then(() => "completed"),
+      closePromise,
+    ]);
+    if (streamResult === "closed") {
+      await pipelinePromise.catch(() => undefined);
+    }
+  } finally {
+    await fileHandle.close().catch(() => undefined);
+  }
+}
+
+function writeProxyFailureResponse(response, error) {
+  if (response.headersSent || response.destroyed) {
+    response.destroy();
+    return;
+  }
+
+  response.statusCode = 502;
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(
+    JSON.stringify({
+      ok: false,
+      error: `Stable API proxy request failed: ${String(error)}`,
+    }),
+  );
+}
+
 /**
  * Owns the validated web surface for stable development mode, including static asset serving,
  * pending-state pages, and API proxying to the stable API server.
@@ -383,15 +459,34 @@ export class StableDevelopmentWebServer {
       return;
     }
 
-    response.statusCode = 200;
-    response.setHeader("Content-Type", getContentType(requestedFilePath));
-    response.setHeader("Cache-Control", "no-store");
     if (request.method === "HEAD") {
+      response.statusCode = 200;
+      response.setHeader("Content-Type", getContentType(requestedFilePath));
+      response.setHeader("Cache-Control", "no-store");
       response.end();
       return;
     }
 
-    fs.createReadStream(requestedFilePath).pipe(response);
+    try {
+      await streamBuildAssetFile(requestedFilePath, response);
+    } catch (error) {
+      if (response.headersSent || response.destroyed) {
+        response.destroy();
+        return;
+      }
+
+      if (isMissingFileSystemError(error)) {
+        writeBuildAssetErrorResponse(response, 404, "Not found");
+        return;
+      }
+
+      if (isForbiddenFileSystemError(error)) {
+        writeBuildAssetErrorResponse(response, 403, "Forbidden");
+        return;
+      }
+
+      writeBuildAssetErrorResponse(response, 500, "Failed to read build asset");
+    }
   }
 
   async proxyApiRequest(request, response) {
@@ -412,6 +507,14 @@ export class StableDevelopmentWebServer {
     }
 
     await new Promise((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(undefined);
+      };
       const proxyRequest = http.request(
         {
           hostname: this.apiHost,
@@ -422,23 +525,44 @@ export class StableDevelopmentWebServer {
         },
         (proxyResponse) => {
           response.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
-          proxyResponse.pipe(response);
-          proxyResponse.on("end", resolve);
+          const closePromise = new Promise((closeResolve) => {
+            response.once("close", () => {
+              proxyResponse.destroy();
+              closeResolve("closed");
+            });
+          });
+          const pipelinePromise = pipeline(proxyResponse, response);
+          void Promise.race([pipelinePromise.then(() => "completed"), closePromise])
+            .then(async (result) => {
+              if (result === "closed") {
+                await pipelinePromise.catch(() => undefined);
+              }
+              settle();
+            })
+            .catch((error) => {
+              writeProxyFailureResponse(response, error);
+              settle();
+            });
         },
       );
 
       proxyRequest.on("error", (error) => {
-        response.statusCode = 502;
-        response.setHeader("Content-Type", "application/json; charset=utf-8");
-        response.end(
-          JSON.stringify({
-            ok: false,
-            error: `Stable API proxy request failed: ${error.message}`,
-          }),
-        );
-        resolve(undefined);
+        writeProxyFailureResponse(response, error);
+        settle();
       });
 
+      response.once("close", () => {
+        proxyRequest.destroy();
+        settle();
+      });
+      response.once("error", () => {
+        proxyRequest.destroy();
+        settle();
+      });
+      request.once("aborted", () => {
+        proxyRequest.destroy();
+        settle();
+      });
       request.pipe(proxyRequest);
     });
   }

@@ -119,6 +119,6 @@ export class CodexThreadStreamEventHistoryOwner {
       return entries.slice(-limit);
     }
 
-    return entries.filter((entry) => entry.sequence > sinceSequence);
+    return entries.filter((entry) => entry.sequence > sinceSequence).slice(0, limit);
   }
 }

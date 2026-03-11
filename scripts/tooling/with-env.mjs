@@ -1,6 +1,6 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { parse } from "dotenv";
 import { z } from "zod";
 
@@ -30,6 +30,7 @@ const INHERITED_ENVIRONMENT_EXACT_KEYS = new Set([
   "PATH",
   "PORT",
   "PWD",
+  "Path",
   "SHELL",
   "SHLVL",
   "SSL_CERT_DIR",
@@ -48,7 +49,7 @@ const INHERITED_ENVIRONMENT_EXACT_KEYS = new Set([
   "XDG_CACHE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
-  "XDG_STATE_HOME"
+  "XDG_STATE_HOME",
 ]);
 
 const INHERITED_ENVIRONMENT_PREFIXES = [
@@ -71,7 +72,7 @@ const INHERITED_ENVIRONMENT_PREFIXES = [
   "THREAD_",
   "VITE_",
   "WEB_",
-  "npm_"
+  "npm_",
 ];
 
 function shouldIncludeInheritedEnvironmentKey(environmentKey) {
@@ -129,10 +130,10 @@ const child = spawn(commandText, {
   cwd,
   env: {
     ...loadedEnvironment,
-    ...inheritedEnvironment
+    ...inheritedEnvironment,
   },
   shell: true,
-  stdio: "inherit"
+  stdio: "inherit",
 });
 
 child.on("error", (error) => {

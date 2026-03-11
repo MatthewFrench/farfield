@@ -128,7 +128,7 @@ function parseOptionalPositiveIntegerQueryValue(value: string | null): number | 
     return null;
   }
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) {
+  if (!Number.isInteger(parsed) || parsed < 1) {
     return null;
   }
   return parsed;

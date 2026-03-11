@@ -191,13 +191,6 @@ export interface CoreDataLoaders {
   refreshActiveThreadListTracked: () => Promise<void>;
 }
 
-function shouldRefreshArchivedThreadsDuringTrackedCoreRefresh(
-  isArchivedThreadsOpenRef: MutableRefObject<boolean>,
-  hasLoadedArchivedThreadsRef: MutableRefObject<boolean>,
-): boolean {
-  return isArchivedThreadsOpenRef.current || hasLoadedArchivedThreadsRef.current;
-}
-
 /**
  * Thin composition hook that wires core-data startup and archived-thread owner modules.
  */
@@ -248,21 +241,11 @@ export function useCoreDataLoaders(input: UseCoreDataLoadersInput): CoreDataLoad
     const lastCoreRefreshAtRef = input.lastCoreRefreshAtRef;
     await input.coreDataRefreshConcurrencyCoordinator.run(async () => {
       await loadCoreData();
-      // Keep archived refresh scoped to sessions that already surfaced archived data.
-      if (
-        shouldRefreshArchivedThreadsDuringTrackedCoreRefresh(
-          input.isArchivedThreadsOpenRef,
-          input.hasLoadedArchivedThreadsRef,
-        )
-      ) {
-        await loadArchivedThreads();
-      }
+      await loadArchivedThreads();
       lastCoreRefreshAtRef.current = Date.now();
     });
   }, [
     input.coreDataRefreshConcurrencyCoordinator,
-    input.hasLoadedArchivedThreadsRef,
-    input.isArchivedThreadsOpenRef,
     input.lastCoreRefreshAtRef,
     loadArchivedThreads,
     loadCoreData,

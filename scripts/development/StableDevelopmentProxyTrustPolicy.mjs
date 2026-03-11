@@ -3,6 +3,7 @@ import { z } from "zod";
 const HTTP_PROTOCOL = "http:";
 const HTTPS_PROTOCOL = "https:";
 const LOOPBACK_REMOTE_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+const LOOPBACK_ORIGIN_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 const TrustedOriginSchema = z.string().trim().min(1);
 
 function normalizeOrigin(origin) {
@@ -19,6 +20,11 @@ function normalizeOriginHeader(origin) {
   } catch {
     return null;
   }
+}
+
+function isLoopbackTrustedOrigin(origin) {
+  const parsedOrigin = new URL(origin);
+  return LOOPBACK_ORIGIN_HOSTNAMES.has(parsedOrigin.hostname);
 }
 
 export function buildStableDevelopmentDefaultTrustedOrigins(webPort) {
@@ -64,6 +70,12 @@ export function shouldInjectApiTokenForStableDevelopmentProxy(input) {
   }
 
   if (input.trustedOrigins.has(normalizedOrigin)) {
+    if (
+      isLoopbackTrustedOrigin(normalizedOrigin) &&
+      !LOOPBACK_REMOTE_ADDRESSES.has(input.remoteAddress ?? "")
+    ) {
+      return false;
+    }
     return true;
   }
 

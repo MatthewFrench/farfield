@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { Readable, Writable } from "node:stream";
+import { Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
   DebugFileDownloadError,
@@ -55,19 +55,6 @@ async function readRejectedDownloadError(
     throw error;
   }
   throw new Error("Expected streamDebugFileDownload to reject");
-}
-
-function createFailingReadStream(fileSystemErrorCode: string): fs.ReadStream {
-  const failingStream = new Readable({
-    read() {
-      const streamError: NodeJS.ErrnoException = new Error(
-        `Simulated stream failure with code ${fileSystemErrorCode}`,
-      );
-      streamError.code = fileSystemErrorCode;
-      this.destroy(streamError);
-    },
-  });
-  return failingStream as fs.ReadStream;
 }
 
 describe("streamDebugFileDownload", () => {
@@ -167,13 +154,14 @@ describe("streamDebugFileDownload", () => {
     }
   });
 
-  it("maps create-read-stream missing-path failures to typed not-found errors", async () => {
+  it("maps stream-open missing-path failures to typed not-found errors before sending headers", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-stream-404-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
     fs.writeFileSync(filePath, '{"ok":true}\n', "utf8");
-    const streamSpy = vi
-      .spyOn(fs, "createReadStream")
-      .mockImplementation((): fs.ReadStream => createFailingReadStream("ENOENT"));
+    const fileSystemError = Object.assign(new Error("missing"), {
+      code: "ENOENT",
+    });
+    const openSpy = vi.spyOn(fs.promises, "open").mockRejectedValue(fileSystemError);
 
     try {
       const response = new DownloadResponseRecorder();
@@ -184,10 +172,10 @@ describe("streamDebugFileDownload", () => {
       );
 
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.notFound);
-      expect(response.statusCode).toBe(200);
-      expect(response.headers?.["Content-Disposition"]).toBe('attachment; filename="trace.ndjson"');
+      expect(response.statusCode).toBeNull();
+      expect(response.headers).toBeNull();
     } finally {
-      streamSpy.mockRestore();
+      openSpy.mockRestore();
       fs.rmSync(temporaryDirectory, {
         recursive: true,
         force: true,
@@ -195,13 +183,14 @@ describe("streamDebugFileDownload", () => {
     }
   });
 
-  it("maps non-recoverable create-read-stream failures to typed stream-failed errors", async () => {
+  it("maps non-recoverable stream-open failures to typed stream-failed errors", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "debug-download-stream-500-"));
     const filePath = path.join(temporaryDirectory, "trace.ndjson");
     fs.writeFileSync(filePath, '{"ok":true}\n', "utf8");
-    const streamSpy = vi
-      .spyOn(fs, "createReadStream")
-      .mockImplementation((): fs.ReadStream => createFailingReadStream("EACCES"));
+    const fileSystemError = Object.assign(new Error("denied"), {
+      code: "EACCES",
+    });
+    const openSpy = vi.spyOn(fs.promises, "open").mockRejectedValue(fileSystemError);
 
     try {
       const response = new DownloadResponseRecorder();
@@ -212,8 +201,9 @@ describe("streamDebugFileDownload", () => {
       );
       expect(error.code).toBe(DebugFileDownloadErrorCodeByName.streamFailed);
       expect(error.message).toBe("Failed to stream debug download file");
+      expect(response.statusCode).toBeNull();
     } finally {
-      streamSpy.mockRestore();
+      openSpy.mockRestore();
       fs.rmSync(temporaryDirectory, {
         recursive: true,
         force: true,

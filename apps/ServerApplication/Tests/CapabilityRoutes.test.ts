@@ -1779,6 +1779,21 @@ describe("handleCapabilityRoutes", () => {
     });
   });
 
+  it("returns 400 when command execution timeout is zero", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/commands/exec",
+      url: new URL("http://localhost/api/commands/exec?command=pwd&timeoutMs=0"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    expect(readRouteBody(result)).toMatchObject({
+      ok: false,
+      error: "Invalid timeoutMs query parameter.",
+    });
+  });
+
   it("returns 400 when account login cancel omits loginId", async () => {
     const result = await executeCapabilityRoute({
       method: "POST",
@@ -2105,6 +2120,21 @@ describe("handleCapabilityRoutes", () => {
     expect(parsedEnvelope).toEqual({
       ok: true,
       authorizationUrl: "https://example.com/oauth/mcp/github",
+    });
+  });
+
+  it("returns 400 when mcp oauth login timeoutSeconds is zero", async () => {
+    const result = await executeCapabilityRoute({
+      method: "POST",
+      pathname: "/api/mcp-servers/oauth/login",
+      url: new URL("http://localhost/api/mcp-servers/oauth/login?name=github&timeoutSeconds=0"),
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.statusCode).toBe(400);
+    expect(readRouteBody(result)).toMatchObject({
+      ok: false,
+      error: "Invalid timeoutSeconds query parameter.",
     });
   });
 

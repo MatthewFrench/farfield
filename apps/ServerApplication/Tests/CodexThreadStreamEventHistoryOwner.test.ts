@@ -107,4 +107,24 @@ describe("CodexThreadStreamEventHistoryOwner", () => {
     expect(threadBSlice.nextSequence).toBe(1);
     expect(threadBSlice.events).toHaveLength(1);
   });
+
+  it("caps incremental reads to the requested limit", () => {
+    const owner = new CodexThreadStreamEventHistoryOwner(10);
+
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-1"));
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-2"));
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-3"));
+    owner.appendStreamEvent("thread-1", createRequestFrame("request-4"));
+
+    const streamSlice = owner.readStreamEvents("thread-1", "client-a", {
+      limit: 2,
+      sinceSequence: 0,
+    });
+
+    expect(streamSlice.resetRequired).toBe(false);
+    expect(streamSlice.events).toEqual([
+      createRequestFrame("request-2"),
+      createRequestFrame("request-3"),
+    ]);
+  });
 });

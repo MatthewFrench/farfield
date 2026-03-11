@@ -45,6 +45,18 @@ describe("StableDevelopmentProxyTrustPolicy", () => {
     ).toBe(false);
   });
 
+  it("rejects remote callers that spoof loopback trusted origins", () => {
+    expect(
+      shouldInjectApiTokenForStableDevelopmentProxy({
+        apiToken: "token",
+        originHeader: "http://localhost:4312",
+        hostHeader: "192.168.7.56:4312",
+        remoteAddress: "192.168.7.10",
+        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4312),
+      }),
+    ).toBe(false);
+  });
+
   it("rejects untrusted cross-origin browser requests", () => {
     expect(
       shouldInjectApiTokenForStableDevelopmentProxy({

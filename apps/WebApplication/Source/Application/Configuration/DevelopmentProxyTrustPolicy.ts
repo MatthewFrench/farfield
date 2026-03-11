@@ -13,6 +13,7 @@ const DEVELOPMENT_PROXY_DEFAULT_TRUSTED_ORIGIN_VALUES = [
   "http://[::1]:4312",
 ] as const;
 const LOOPBACK_REMOTE_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+const LOOPBACK_ORIGIN_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
 export interface DevelopmentProxyTrustDecisionInput {
   apiToken: string;
@@ -36,6 +37,11 @@ function normalizeOriginHeader(origin: string): string | null {
   } catch {
     return null;
   }
+}
+
+function isLoopbackTrustedOrigin(origin: string): boolean {
+  const parsedOrigin = new URL(origin);
+  return LOOPBACK_ORIGIN_HOSTNAMES.has(parsedOrigin.hostname);
 }
 
 export function parseTrustedDevelopmentProxyOrigins(
@@ -76,6 +82,12 @@ export function shouldInjectApiTokenForDevelopmentProxy(
   }
 
   if (input.trustedOrigins.has(normalizedOrigin)) {
+    if (
+      isLoopbackTrustedOrigin(normalizedOrigin) &&
+      !LOOPBACK_REMOTE_ADDRESSES.has(input.remoteAddress ?? "")
+    ) {
+      return false;
+    }
     return true;
   }
   return false;

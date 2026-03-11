@@ -69,6 +69,18 @@ describe("DevelopmentProxyTrustPolicy", () => {
     ).toBe(true);
   });
 
+  it("does not inject token for remote callers that spoof loopback trusted origins", () => {
+    expect(
+      shouldInjectApiTokenForDevelopmentProxy({
+        apiToken: "token",
+        originHeader: "http://localhost:4312",
+        hostHeader: "192.168.7.56:4312",
+        remoteAddress: "192.168.7.21",
+        trustedOrigins: DEFAULT_TRUSTED_DEVELOPMENT_PROXY_ORIGINS,
+      }),
+    ).toBe(false);
+  });
+
   it("does not inject token for cross-origin remote requests", () => {
     expect(
       shouldInjectApiTokenForDevelopmentProxy({

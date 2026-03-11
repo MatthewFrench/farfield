@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
 
 const tempDirectories: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const directory of tempDirectories.splice(0)) {
     if (fs.existsSync(directory)) {
       fs.rmSync(directory, { recursive: true, force: true });
@@ -136,5 +137,27 @@ describe("PushStore", () => {
 
     expect(removed).toBe(false);
     expect(store.getSubscriptionCount()).toBe(0);
+  });
+
+  it("retries completion watermark persistence after an earlier durable-write failure", async () => {
+    const { store, filePath } = createStoreWithTempPath();
+    store.load();
+    const renameSpy = vi
+      .spyOn(fs.promises, "rename")
+      .mockRejectedValueOnce(new Error("simulated durable write failure"));
+
+    await expect(
+      store.setCompletionWatermark("thread_1", "thread_1:turn_1:item_1"),
+    ).rejects.toThrow("simulated durable write failure");
+    expect(store.getCompletionWatermark("thread_1")).toBeNull();
+
+    await expect(store.setCompletionWatermark("thread_1", "thread_1:turn_1:item_1")).resolves.toBe(
+      true,
+    );
+
+    const reloaded = new PushStore(filePath);
+    reloaded.load();
+    expect(reloaded.getCompletionWatermark("thread_1")).toBe("thread_1:turn_1:item_1");
+    renameSpy.mockRestore();
   });
 });

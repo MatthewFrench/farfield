@@ -212,7 +212,7 @@ describe("readServerRuntimeConfiguration", () => {
     expect(invalidSecureCookieTokenConfiguration.apiSessionSecureCookie).toBe(false);
   });
 
-  it("defaults secure session cookies to true when API auth is required", () => {
+  it("defaults secure session cookies to false when API auth is required on plain HTTP", () => {
     const temporaryDirectoryPath = createTemporaryDirectory();
     const configuration = readServerRuntimeConfiguration({
       ...buildBaseEnvironment(temporaryDirectoryPath),
@@ -220,7 +220,7 @@ describe("readServerRuntimeConfiguration", () => {
     });
 
     expect(configuration.apiAuthRequired).toBe(true);
-    expect(configuration.apiSessionSecureCookie).toBe(true);
+    expect(configuration.apiSessionSecureCookie).toBe(false);
   });
 
   it("uses default client error maximum entries when configured value is not a positive integer", () => {

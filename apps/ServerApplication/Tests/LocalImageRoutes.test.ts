@@ -2,7 +2,7 @@ import * as fileSystemPromises from "node:fs/promises";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import path, { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { handleLocalImageRoutes } from "../Source/Network/Routes/LocalImageRoutes.js";
@@ -97,11 +97,34 @@ describe("handleLocalImageRoutes", () => {
     }
   });
 
+  it("returns forbidden when the image path is outside the allowed roots", async () => {
+    const outsideRootPath = path.resolve(path.sep, "outside-root", "sample.png");
+
+    const server = await startRouteTestServer({
+      allowedRoots: [path.resolve(process.cwd())],
+    });
+    try {
+      const response = await fetch(
+        `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent(outsideRootPath)}`,
+      );
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(responseBody).toMatchObject({
+        ok: false,
+        error: "Image path is outside the allowed roots",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("returns not-found when the image file does not exist", async () => {
+    const missingImagePath = join(tmpdir(), "farfield-missing.png");
     const server = await startRouteTestServer();
     try {
       const response = await fetch(
-        `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent("/tmp/farfield-missing.png")}`,
+        `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent(missingImagePath)}`,
       );
       const responseBody = await response.json();
 
@@ -152,6 +175,7 @@ async function createTemporaryDirectory(): Promise<string> {
 }
 
 async function startRouteTestServer(input?: {
+  allowedRoots?: readonly string[];
   openFile?: typeof fileSystemPromises.open;
 }): Promise<RouteTestServer> {
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
@@ -161,6 +185,7 @@ async function startRouteTestServer(input?: {
       res: response,
       pathname: requestUrl.pathname,
       url: requestUrl,
+      allowedRoots: input?.allowedRoots,
       openFile: input?.openFile,
       jsonResponse: (nextResponse, statusCode, payload) => {
         nextResponse.statusCode = statusCode;

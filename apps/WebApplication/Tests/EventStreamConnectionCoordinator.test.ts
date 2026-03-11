@@ -25,6 +25,11 @@ const INITIAL_RECONNECT_DELAY_VALIDATION_ERROR_MESSAGE =
 const RECONNECT_DELAY_RELATIONSHIP_ERROR_MESSAGE =
   "EventStreamConnectionCoordinator requires maximumReconnectDelayMs to be greater than or equal to initialReconnectDelayMs";
 
+interface DeferredPromise<ValueType> {
+  promise: Promise<ValueType>;
+  resolve: (value: ValueType) => void;
+}
+
 function createActivityHistoryAppendedMessageData(): string {
   return JSON.stringify({
     sequence: 4,
@@ -75,6 +80,20 @@ function createThreadStreamDeltaMessageData(): string {
       },
     },
   });
+}
+
+function createDeferredPromise<ValueType>(): DeferredPromise<ValueType> {
+  let resolvePromise: ((value: ValueType) => void) | null = null;
+  const promise = new Promise<ValueType>((resolve) => {
+    resolvePromise = resolve;
+  });
+  if (resolvePromise === null) {
+    throw new Error("Expected deferred promise resolver");
+  }
+  return {
+    promise,
+    resolve: resolvePromise,
+  };
 }
 
 class TestEventSource implements EventSourceLike {
@@ -435,6 +454,117 @@ describe("EventStreamConnectionCoordinator", () => {
         refreshNotificationProjections: false,
       },
     ]);
+
+    coordinator.stop();
+  });
+
+  it("ignores queued messages from an earlier coordinator session after restart", async () => {
+    vi.useFakeTimers();
+    const createdSources: TestEventSource[] = [];
+    const coordinator = createCoordinator({ createdSources });
+    const scheduler = new EventRefreshScheduler(20);
+    const deferredDecision = createDeferredPromise<{
+      refreshCore: false;
+      refreshHistory: false;
+      refreshSelectedThread: false;
+      refreshNotificationProjections: false;
+      threadStreamDelta: {
+        threadId: "thread-stale";
+        liveStateSnapshot: {
+          ok: true;
+          threadId: "thread-stale";
+          ownerClientId: null;
+          conversationState: null;
+          liveStateError: null;
+        };
+        streamEventsSnapshot: {
+          ok: true;
+          threadId: "thread-stale";
+          ownerClientId: null;
+          events: [];
+          nextSequence: 0;
+          firstAvailableSequence: 0;
+          resetRequired: false;
+        };
+        streamEventsSinceSequenceUsed: null;
+      };
+    }>();
+    const decisionReader: EventStreamRefreshDecisionReader = {
+      readDecision: async () => deferredDecision.promise,
+    };
+    const appliedDeltaThreadIds: string[] = [];
+
+    coordinator.start({
+      eventRefreshScheduler: scheduler,
+      eventStreamRefreshDecisionEngine: decisionReader,
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: "thread-1",
+        selectedThreadHydrated: true,
+      }),
+      executeScheduledRefresh: async () => {},
+      applyThreadStreamDelta: (threadStreamDelta) => {
+        appliedDeltaThreadIds.push(threadStreamDelta.threadId);
+      },
+      onConnectionStatusChange: () => {},
+    });
+
+    const firstSource = createdSources[0];
+    if (!firstSource) {
+      throw new Error("Expected initial event source instance");
+    }
+    firstSource.onmessage?.(
+      new MessageEvent<string>(EVENT_NAME_MESSAGE, {
+        data: createThreadStreamDeltaMessageData(),
+      }),
+    );
+
+    coordinator.stop();
+    coordinator.start({
+      eventRefreshScheduler: new EventRefreshScheduler(20),
+      eventStreamRefreshDecisionEngine: new EventStreamRefreshDecisionEngine(THREAD_ONLY_METHODS),
+      readSnapshot: () => ({
+        activeTab: "chat",
+        selectedThreadId: "thread-2",
+        selectedThreadHydrated: true,
+      }),
+      executeScheduledRefresh: async () => {},
+      applyThreadStreamDelta: (threadStreamDelta) => {
+        appliedDeltaThreadIds.push(threadStreamDelta.threadId);
+      },
+      onConnectionStatusChange: () => {},
+    });
+
+    deferredDecision.resolve({
+      refreshCore: false,
+      refreshHistory: false,
+      refreshSelectedThread: false,
+      refreshNotificationProjections: false,
+      threadStreamDelta: {
+        threadId: "thread-stale",
+        liveStateSnapshot: {
+          ok: true,
+          threadId: "thread-stale",
+          ownerClientId: null,
+          conversationState: null,
+          liveStateError: null,
+        },
+        streamEventsSnapshot: {
+          ok: true,
+          threadId: "thread-stale",
+          ownerClientId: null,
+          events: [],
+          nextSequence: 0,
+          firstAvailableSequence: 0,
+          resetRequired: false,
+        },
+        streamEventsSinceSequenceUsed: null,
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(appliedDeltaThreadIds).toEqual([]);
 
     coordinator.stop();
   });

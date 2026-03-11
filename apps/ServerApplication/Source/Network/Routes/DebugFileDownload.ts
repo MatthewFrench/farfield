@@ -160,17 +160,18 @@ export async function streamDebugFileDownload(
     );
   }
 
-  res.writeHead(200, {
-    "Content-Type": DEBUG_DOWNLOAD_CONTENT_TYPE,
-    "Content-Length": fileStats.size,
-    "Content-Disposition": `attachment; filename=\"${parsedInput.downloadFileName}\"`,
-    "Access-Control-Allow-Origin": DEBUG_DOWNLOAD_ACCESS_CONTROL_ALLOW_ORIGIN,
-  });
-
+  let fileHandle: fs.promises.FileHandle | null = null;
   try {
     // File-system state can change between stat and stream open; map the stream error code
     // so callers keep deterministic status behavior for not-found/non-file conditions.
-    await pipeline(fs.createReadStream(parsedInput.filePath), res);
+    fileHandle = await fs.promises.open(parsedInput.filePath, "r");
+    res.writeHead(200, {
+      "Content-Type": DEBUG_DOWNLOAD_CONTENT_TYPE,
+      "Content-Length": fileStats.size,
+      "Content-Disposition": `attachment; filename=\"${parsedInput.downloadFileName}\"`,
+      "Access-Control-Allow-Origin": DEBUG_DOWNLOAD_ACCESS_CONTROL_ALLOW_ORIGIN,
+    });
+    await pipeline(fileHandle.createReadStream({ autoClose: false }), res);
   } catch (error) {
     const parsedFileSystemError = DebugFileSystemErrorSchema.safeParse(error);
     const fileSystemErrorCode = parsedFileSystemError.success
@@ -180,5 +181,7 @@ export async function streamDebugFileDownload(
       fileSystemErrorCode,
       DebugFileDownloadMessageByName.streamFailed,
     );
+  } finally {
+    await fileHandle?.close().catch(() => undefined);
   }
 }
