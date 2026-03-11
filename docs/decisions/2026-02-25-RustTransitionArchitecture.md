@@ -146,3 +146,6 @@ Adopt a phased Rust transition with explicit boundary ownership and contract com
 
 2026-03-31
 
+## Execution tracking
+
+Execution tracking and the rewrite checklist live in [docs/RustServerRewriteImplementationPlan.md](/Users/matthewfrench/GitHub/farfield/docs/RustServerRewriteImplementationPlan.md).
