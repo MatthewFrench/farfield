@@ -144,8 +144,12 @@ export class EventStreamClientRegistry {
 
   private writeEvent(client: ServerResponse, envelope: FarfieldEventStreamEnvelope): void {
     try {
-      client.write(`id: ${String(envelope.sequence)}\n`);
-      client.write(`data: ${JSON.stringify(envelope)}\n\n`);
+      const eventFrame = `id: ${String(envelope.sequence)}\ndata: ${JSON.stringify(envelope)}\n\n`;
+      if (!client.write(eventFrame)) {
+        this.eventWriteFailureCount += 1;
+        this.removeClient(client);
+        client.destroy();
+      }
     } catch {
       this.eventWriteFailureCount += 1;
       this.removeClient(client);
@@ -155,7 +159,11 @@ export class EventStreamClientRegistry {
   private writeKeepalive(): void {
     for (const client of this.clientSet) {
       try {
-        client.write(EVENT_STREAM_KEEPALIVE_FRAME);
+        if (!client.write(EVENT_STREAM_KEEPALIVE_FRAME)) {
+          this.keepaliveWriteFailureCount += 1;
+          this.removeClient(client);
+          client.destroy();
+        }
       } catch {
         this.keepaliveWriteFailureCount += 1;
         this.removeClient(client);

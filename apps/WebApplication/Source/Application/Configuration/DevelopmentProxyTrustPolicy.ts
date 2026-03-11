@@ -2,8 +2,8 @@ import { z } from "zod";
 
 /**
  * Owns trusted-origin decisions for Vite dev-proxy API token injection.
- * Browser requests from the same served host are trusted, while originless requests remain
- * loopback-only so command-line traffic does not inherit protected API access by accident.
+ * Only explicitly configured browser origins may receive injected API auth, while originless
+ * requests remain loopback-only so command-line traffic does not inherit protected access.
  */
 const HTTP_PROTOCOL = "http:";
 const HTTPS_PROTOCOL = "https:";
@@ -36,22 +36,6 @@ function normalizeOriginHeader(origin: string): string | null {
   } catch {
     return null;
   }
-}
-
-function buildSameHostTrustedOrigins(hostHeader: string | undefined): Set<string> {
-  if (typeof hostHeader !== "string" || hostHeader.trim().length === 0) {
-    return new Set<string>();
-  }
-
-  const normalizedHostHeader = hostHeader.trim();
-  const sameHostOrigins = new Set<string>();
-  for (const protocol of [HTTP_PROTOCOL, HTTPS_PROTOCOL]) {
-    const normalizedOrigin = normalizeOriginHeader(`${protocol}//${normalizedHostHeader}`);
-    if (normalizedOrigin !== null) {
-      sameHostOrigins.add(normalizedOrigin);
-    }
-  }
-  return sameHostOrigins;
 }
 
 export function parseTrustedDevelopmentProxyOrigins(
@@ -94,8 +78,7 @@ export function shouldInjectApiTokenForDevelopmentProxy(
   if (input.trustedOrigins.has(normalizedOrigin)) {
     return true;
   }
-
-  return buildSameHostTrustedOrigins(input.hostHeader).has(normalizedOrigin);
+  return false;
 }
 
 const DevelopmentProxyTrustedOriginSchema = z.string().trim().min(1);

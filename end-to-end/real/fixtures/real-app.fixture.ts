@@ -13,8 +13,8 @@ export type RealAppFixtures = {
 
 const DEFAULT_REAL_API_URL = "http://127.0.0.1:4311";
 const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4312";
-const STABLE_REAL_API_URL = "http://127.0.0.1:4411";
-const STABLE_REAL_BASE_URL = "http://127.0.0.1:4412";
+const STABLE_REAL_API_URL = "http://127.0.0.1:4311";
+const STABLE_REAL_BASE_URL = "http://127.0.0.1:4312";
 
 function readRealApiBaseUrl(): string {
   const explicitApiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "").trim();

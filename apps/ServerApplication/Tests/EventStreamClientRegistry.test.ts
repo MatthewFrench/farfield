@@ -92,8 +92,10 @@ describe("EventStreamClientRegistry", () => {
 
     expect(firstWriteSpy).toHaveBeenCalled();
     expect(secondWriteSpy).toHaveBeenNthCalledWith(1, EVENT_STREAM_RETRY_DIRECTIVE);
-    expect(secondWriteSpy).toHaveBeenNthCalledWith(2, "id: 1\n");
-    expect(secondWriteSpy).toHaveBeenNthCalledWith(3, expect.stringContaining('"sequence":1'));
+    expect(secondWriteSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('id: 1\ndata: {"sequence":1'),
+    );
   });
 
   it("removes clients and increments failure counters when event writes throw", () => {
@@ -116,6 +118,25 @@ describe("EventStreamClientRegistry", () => {
     expect(statistics.broadcastDeliveryAttemptCount).toBe(1);
   });
 
+  it("drops clients when event writes signal backpressure", () => {
+    const registry = new EventStreamClientRegistry(1_000);
+    const { req, res } = createHttpPair();
+    const writeSpy = vi.spyOn(res, "write").mockImplementation(() => true);
+    const destroySpy = vi.spyOn(res, "destroy").mockImplementation(() => res);
+    const initialEvent = buildRuntimeStateChangedEvent();
+
+    registry.addClient(req, res, initialEvent);
+    writeSpy.mockImplementation(() => false);
+
+    registry.broadcast(initialEvent);
+
+    const statistics = registry.readStatistics();
+    expect(statistics.activeClientCount).toBe(0);
+    expect(statistics.removedClientCount).toBe(1);
+    expect(statistics.eventWriteFailureCount).toBe(1);
+    expect(destroySpy).toHaveBeenCalledTimes(1);
+  });
+
   it("starts one keepalive interval when called repeatedly", async () => {
     vi.useFakeTimers();
     const registry = new EventStreamClientRegistry(1_000);
@@ -126,10 +147,10 @@ describe("EventStreamClientRegistry", () => {
     registry.addClient(req, res, initialEvent);
     registry.startKeepalive();
     registry.startKeepalive();
-    await vi.advanceTimersByTimeAsync(1_000);
+    vi.advanceTimersByTime(1_000);
     registry.stopKeepalive();
 
-    expect(writeSpy).toHaveBeenCalledTimes(4);
+    expect(writeSpy).toHaveBeenCalledTimes(3);
     expect(writeSpy).toHaveBeenLastCalledWith(EVENT_STREAM_KEEPALIVE_FRAME);
   });
 
@@ -146,7 +167,7 @@ describe("EventStreamClientRegistry", () => {
       throw new Error("keepalive failed");
     });
 
-    await vi.advanceTimersByTimeAsync(1_000);
+    vi.advanceTimersByTime(1_000);
     registry.stopKeepalive();
 
     const statistics = registry.readStatistics();
@@ -154,5 +175,27 @@ describe("EventStreamClientRegistry", () => {
     expect(statistics.removedClientCount).toBe(1);
     expect(statistics.keepaliveWriteFailureCount).toBe(1);
     expect(statistics.keepaliveEnabled).toBe(false);
+  });
+
+  it("drops clients when keepalive writes signal backpressure", async () => {
+    vi.useFakeTimers();
+    const registry = new EventStreamClientRegistry(1_000);
+    const { req, res } = createHttpPair();
+    const writeSpy = vi.spyOn(res, "write").mockImplementation(() => true);
+    const destroySpy = vi.spyOn(res, "destroy").mockImplementation(() => res);
+    const initialEvent = buildRuntimeStateChangedEvent();
+
+    registry.addClient(req, res, initialEvent);
+    registry.startKeepalive();
+    writeSpy.mockImplementation(() => false);
+
+    vi.advanceTimersByTime(1_000);
+    registry.stopKeepalive();
+
+    const statistics = registry.readStatistics();
+    expect(statistics.activeClientCount).toBe(0);
+    expect(statistics.removedClientCount).toBe(1);
+    expect(statistics.keepaliveWriteFailureCount).toBe(1);
+    expect(destroySpy).toHaveBeenCalledTimes(1);
   });
 });

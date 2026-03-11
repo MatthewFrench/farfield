@@ -7,8 +7,8 @@ import {
 
 describe("StableDevelopmentProxyTrustPolicy", () => {
   it("includes stable-development loopback origins by default", () => {
-    expect(buildStableDevelopmentDefaultTrustedOrigins(4412)).toEqual(
-      new Set(["http://localhost:4412", "http://127.0.0.1:4412", "http://[::1]:4412"]),
+    expect(buildStableDevelopmentDefaultTrustedOrigins(4312)).toEqual(
+      new Set(["http://localhost:4312", "http://127.0.0.1:4312", "http://[::1]:4312"]),
     );
   });
 
@@ -26,23 +26,23 @@ describe("StableDevelopmentProxyTrustPolicy", () => {
       shouldInjectApiTokenForStableDevelopmentProxy({
         apiToken: "token",
         originHeader: undefined,
-        hostHeader: "127.0.0.1:4412",
+        hostHeader: "127.0.0.1:4312",
         remoteAddress: "127.0.0.1",
-        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4412),
+        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4312),
       }),
     ).toBe(true);
   });
 
-  it("injects the token for same-host browser requests", () => {
+  it("rejects same-host browser requests unless the origin is explicitly trusted", () => {
     expect(
       shouldInjectApiTokenForStableDevelopmentProxy({
         apiToken: "token",
-        originHeader: "http://192.168.7.56:4412",
-        hostHeader: "192.168.7.56:4412",
+        originHeader: "http://192.168.7.56:4312",
+        hostHeader: "192.168.7.56:4312",
         remoteAddress: "192.168.7.10",
-        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4412),
+        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4312),
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("rejects untrusted cross-origin browser requests", () => {
@@ -50,9 +50,9 @@ describe("StableDevelopmentProxyTrustPolicy", () => {
       shouldInjectApiTokenForStableDevelopmentProxy({
         apiToken: "token",
         originHeader: "https://evil.example.test",
-        hostHeader: "192.168.7.56:4412",
+        hostHeader: "192.168.7.56:4312",
         remoteAddress: "192.168.7.10",
-        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4412),
+        trustedOrigins: buildStableDevelopmentDefaultTrustedOrigins(4312),
       }),
     ).toBe(false);
   });

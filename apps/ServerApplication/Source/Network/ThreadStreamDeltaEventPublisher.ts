@@ -40,6 +40,12 @@ interface ThreadStreamDeltaEventBuildInput {
   streamEventsSnapshot: AgentThreadStreamEvents;
 }
 
+interface ThreadLiveStateBroadcastMarker {
+  ownerClientId: AgentThreadLiveState["ownerClientId"];
+  conversationState: AgentThreadLiveState["conversationState"];
+  liveStateError: AgentThreadLiveState["liveStateError"];
+}
+
 /**
  * Owns stream-delta publication from in-memory thread projections to the shared event stream.
  * The owner coalesces per-thread triggers and publishes deterministic cursor-based deltas so
@@ -57,7 +63,7 @@ export class ThreadStreamDeltaEventPublisher {
   private readonly inFlightThreadIdSet: Set<string>;
   private readonly pendingThreadIdSet: Set<string>;
   private readonly lastDeliveredSequenceByThreadId: Map<string, number>;
-  private readonly lastBroadcastLiveStateSignatureByThreadId: Map<string, string>;
+  private readonly lastBroadcastMarkerByThreadId: Map<string, ThreadLiveStateBroadcastMarker>;
   private scheduledPublishCount: number;
   private startedPublishCount: number;
   private completedPublishCount: number;
@@ -73,7 +79,7 @@ export class ThreadStreamDeltaEventPublisher {
     this.inFlightThreadIdSet = new Set<string>();
     this.pendingThreadIdSet = new Set<string>();
     this.lastDeliveredSequenceByThreadId = new Map<string, number>();
-    this.lastBroadcastLiveStateSignatureByThreadId = new Map<string, string>();
+    this.lastBroadcastMarkerByThreadId = new Map<string, ThreadLiveStateBroadcastMarker>();
     this.scheduledPublishCount = 0;
     this.startedPublishCount = 0;
     this.completedPublishCount = 0;
@@ -155,13 +161,12 @@ export class ThreadStreamDeltaEventPublisher {
       this.lastDeliveredSequenceByThreadId.set(threadId, nextSinceSequence);
     }
 
-    const liveStateSignature = buildLiveStateSignature(liveStateSnapshot);
-    const previousLiveStateSignature =
-      this.lastBroadcastLiveStateSignatureByThreadId.get(threadId) ?? null;
+    const liveStateMarker = createThreadLiveStateBroadcastMarker(liveStateSnapshot);
+    const previousLiveStateMarker = this.lastBroadcastMarkerByThreadId.get(threadId) ?? null;
     if (
       shouldSuppressBroadcast({
-        liveStateSignature,
-        previousLiveStateSignature,
+        liveStateMarker,
+        previousLiveStateMarker,
         streamEventsSnapshot,
       })
     ) {
@@ -187,7 +192,7 @@ export class ThreadStreamDeltaEventPublisher {
       nowEpochMilliseconds,
       liveStateSnapshot,
     );
-    this.lastBroadcastLiveStateSignatureByThreadId.set(threadId, liveStateSignature);
+    this.lastBroadcastMarkerByThreadId.set(threadId, liveStateMarker);
     this.broadcastCount += 1;
   }
 
@@ -221,19 +226,22 @@ export class ThreadStreamDeltaEventPublisher {
 }
 
 function shouldSuppressBroadcast(input: {
-  liveStateSignature: string;
-  previousLiveStateSignature: string | null;
+  liveStateMarker: ThreadLiveStateBroadcastMarker;
+  previousLiveStateMarker: ThreadLiveStateBroadcastMarker | null;
   streamEventsSnapshot: AgentThreadStreamEvents;
 }): boolean {
   if (input.streamEventsSnapshot.events.length > 0 || input.streamEventsSnapshot.resetRequired) {
     return false;
   }
 
-  if (input.previousLiveStateSignature === null) {
-    return !hasMeaningfulLiveState(input.liveStateSignature);
+  if (input.previousLiveStateMarker === null) {
+    return !hasMeaningfulLiveState(input.liveStateMarker);
   }
 
-  return input.previousLiveStateSignature === input.liveStateSignature;
+  return areThreadLiveStateBroadcastMarkersEqual(
+    input.previousLiveStateMarker,
+    input.liveStateMarker,
+  );
 }
 
 function resolveNextStreamEventsSinceSequence(
@@ -261,16 +269,50 @@ function toErrorMessage<ErrorType>(error: ErrorType): string {
   return String(error);
 }
 
-function buildLiveStateSignature(liveStateSnapshot: AgentThreadLiveState): string {
-  return JSON.stringify({
+function createThreadLiveStateBroadcastMarker(
+  liveStateSnapshot: AgentThreadLiveState,
+): ThreadLiveStateBroadcastMarker {
+  return {
     ownerClientId: liveStateSnapshot.ownerClientId,
     conversationState: liveStateSnapshot.conversationState,
     liveStateError: liveStateSnapshot.liveStateError,
-  });
+  };
 }
 
-function hasMeaningfulLiveState(liveStateSignature: string): boolean {
+function hasMeaningfulLiveState(liveStateMarker: ThreadLiveStateBroadcastMarker): boolean {
   return (
-    liveStateSignature !== '{"ownerClientId":null,"conversationState":null,"liveStateError":null}'
+    liveStateMarker.ownerClientId !== null ||
+    liveStateMarker.conversationState !== null ||
+    liveStateMarker.liveStateError !== null
+  );
+}
+
+function areThreadLiveStateBroadcastMarkersEqual(
+  left: ThreadLiveStateBroadcastMarker,
+  right: ThreadLiveStateBroadcastMarker,
+): boolean {
+  return (
+    left.ownerClientId === right.ownerClientId &&
+    left.conversationState === right.conversationState &&
+    areLiveStateErrorsEqual(left.liveStateError, right.liveStateError)
+  );
+}
+
+function areLiveStateErrorsEqual(
+  left: AgentThreadLiveState["liveStateError"],
+  right: AgentThreadLiveState["liveStateError"],
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left === null || right === null) {
+    return false;
+  }
+
+  return (
+    left.kind === right.kind &&
+    left.message === right.message &&
+    left.eventIndex === right.eventIndex &&
+    left.patchIndex === right.patchIndex
   );
 }

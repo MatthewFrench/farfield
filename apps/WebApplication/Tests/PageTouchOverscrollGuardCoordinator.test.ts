@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageTouchOverscrollGuardCoordinator } from "../Source/Application/StateManagement/PageTouchOverscrollGuardCoordinator";
 
 const originalMatchMedia = window.matchMedia;
+const originalInnerWidth = window.innerWidth;
 
 function installCoarsePointerSupport(enabled: boolean): void {
   Object.defineProperty(window, "matchMedia", {
@@ -42,6 +43,11 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
       writable: true,
       value: originalMatchMedia,
     });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: originalInnerWidth,
+    });
     document.body.innerHTML = "";
   });
 
@@ -81,6 +87,70 @@ describe("PageTouchOverscrollGuardCoordinator", () => {
 
     cleanup();
   }, 15_000);
+
+  it("prevents native edge back swipe navigation on coarse-pointer mobile layouts", () => {
+    installCoarsePointerSupport(true);
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 390,
+    });
+    const coordinator = new PageTouchOverscrollGuardCoordinator();
+    const applicationShellElement = document.createElement("div");
+    applicationShellElement.style.paddingLeft = "12px";
+
+    const cleanup = coordinator.install(applicationShellElement);
+
+    applicationShellElement.dispatchEvent(
+      createTouchEvent("touchstart", {
+        clientX: 8,
+        clientY: 24,
+      }),
+    );
+
+    const touchMoveEvent = createTouchEvent("touchmove", {
+      clientX: 76,
+      clientY: 28,
+    });
+    const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
+    applicationShellElement.dispatchEvent(touchMoveEvent);
+
+    expect(preventDefaultSpy).toHaveBeenCalledTimes(1);
+
+    cleanup();
+  });
+
+  it("does not prevent horizontal swipes that start away from the sidebar edge threshold", () => {
+    installCoarsePointerSupport(true);
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 390,
+    });
+    const coordinator = new PageTouchOverscrollGuardCoordinator();
+    const applicationShellElement = document.createElement("div");
+    applicationShellElement.style.paddingLeft = "12px";
+
+    const cleanup = coordinator.install(applicationShellElement);
+
+    applicationShellElement.dispatchEvent(
+      createTouchEvent("touchstart", {
+        clientX: 72,
+        clientY: 24,
+      }),
+    );
+
+    const touchMoveEvent = createTouchEvent("touchmove", {
+      clientX: 140,
+      clientY: 28,
+    });
+    const preventDefaultSpy = vi.spyOn(touchMoveEvent, "preventDefault");
+    applicationShellElement.dispatchEvent(touchMoveEvent);
+
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+
+    cleanup();
+  });
 
   it("allows vertical touch movement inside a scrollable ancestor away from edges", () => {
     installCoarsePointerSupport(true);

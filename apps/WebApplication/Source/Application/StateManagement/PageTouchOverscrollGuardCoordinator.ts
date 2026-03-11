@@ -1,3 +1,9 @@
+import {
+  MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
+  MOBILE_SIDEBAR_SWIPE_EDGE_PX,
+  MOBILE_SIDEBAR_SWIPE_MAXIMUM_VERTICAL_DRIFT_PX,
+} from "@/Application/Configuration/ApplicationBehaviorConfiguration";
+
 const COARSE_POINTER_MEDIA_QUERY = "(pointer: coarse)";
 const SCROLLABLE_OVERFLOW_VALUES = new Set(["auto", "scroll", "overlay"]);
 // Treat sub-pixel layout differences as being at the edge to avoid accidental overscroll.
@@ -8,6 +14,12 @@ interface EdgeOverscrollPreventionInput {
   applicationShellElement: HTMLElement;
   movingDown: boolean;
   movingUp: boolean;
+}
+
+interface EdgeBackSwipePreventionInput {
+  applicationShellElement: HTMLElement;
+  deltaX: number;
+  deltaY: number;
 }
 
 // Owns coarse-pointer overscroll suppression for the app shell while preserving native
@@ -48,6 +60,16 @@ export class PageTouchOverscrollGuardCoordinator {
 
       const deltaX = touch.clientX - this.touchStartX;
       const deltaY = touch.clientY - this.touchStartY;
+      if (
+        this.shouldPreventEdgeBackSwipeNavigation({
+          applicationShellElement,
+          deltaX,
+          deltaY,
+        })
+      ) {
+        event.preventDefault();
+        return;
+      }
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         return;
       }
@@ -141,5 +163,34 @@ export class PageTouchOverscrollGuardCoordinator {
     // Nested scrollers should keep native edge affordances; only the shell itself needs
     // hard blocking to prevent page-level overscroll and pull-to-refresh gestures.
     return input.scrollElement === input.applicationShellElement;
+  }
+
+  private shouldPreventEdgeBackSwipeNavigation(input: EdgeBackSwipePreventionInput): boolean {
+    if (window.innerWidth >= MOBILE_LAYOUT_MAXIMUM_WIDTH_PX) {
+      return false;
+    }
+
+    const shellPaddingLeftPixels = this.readApplicationShellLeftInsetPx(
+      input.applicationShellElement,
+    );
+    const edgeThresholdPixels = shellPaddingLeftPixels + MOBILE_SIDEBAR_SWIPE_EDGE_PX;
+    if (this.touchStartX > edgeThresholdPixels) {
+      return false;
+    }
+
+    const absoluteDeltaX = Math.abs(input.deltaX);
+    const absoluteDeltaY = Math.abs(input.deltaY);
+    return (
+      input.deltaX > 0 &&
+      absoluteDeltaX > absoluteDeltaY &&
+      absoluteDeltaY <= MOBILE_SIDEBAR_SWIPE_MAXIMUM_VERTICAL_DRIFT_PX
+    );
+  }
+
+  private readApplicationShellLeftInsetPx(applicationShellElement: HTMLElement): number {
+    const parsedPaddingLeftPixels = Number.parseFloat(
+      window.getComputedStyle(applicationShellElement).paddingLeft,
+    );
+    return Number.isFinite(parsedPaddingLeftPixels) ? parsedPaddingLeftPixels : 0;
   }
 }

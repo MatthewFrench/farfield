@@ -52,8 +52,10 @@ export interface ThreadActionHandlers {
 async function refreshCreatedThreadData(
   loadCoreDataTracked: () => Promise<void>,
   loadSelectedThreadTracked: (threadId: string) => Promise<void>,
+  threadListStateController: ThreadListStateController,
   threadId: string,
 ): Promise<void> {
+  await threadListStateController.prepareActiveThreadQueryForExplicitRefresh();
   await loadCoreDataTracked();
   await loadSelectedThreadTracked(threadId);
 }
@@ -65,9 +67,10 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       refreshCreatedThreadData(
         input.loadCoreDataTracked,
         input.loadSelectedThreadTracked,
+        input.threadListStateController,
         threadId,
       ),
-    [input.loadCoreDataTracked, input.loadSelectedThreadTracked],
+    [input.loadCoreDataTracked, input.loadSelectedThreadTracked, input.threadListStateController],
   );
   const markThreadPendingMaterialization = useCallback(
     (threadId: string): void => {

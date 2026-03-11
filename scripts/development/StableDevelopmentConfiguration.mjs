@@ -8,9 +8,9 @@ const OptionalNonEmptyStringSchema = z.string().trim().min(1).optional();
 const ALL_AGENT_IDS = ["codex", "opencode"];
 const DEFAULT_AGENT_IDS = ["codex"];
 const DEFAULT_STABLE_DEVELOPMENT_HOST = "127.0.0.1";
-const DEFAULT_STABLE_DEVELOPMENT_API_PORT = 4_411;
-const DEFAULT_STABLE_DEVELOPMENT_WEB_PORT = 4_412;
-const DEFAULT_STABLE_DEVELOPMENT_LIVE_RELOAD_PORT = 4_413;
+const DEFAULT_STABLE_DEVELOPMENT_API_PORT = 4_311;
+const DEFAULT_STABLE_DEVELOPMENT_WEB_PORT = 4_312;
+const DEFAULT_STABLE_DEVELOPMENT_LIVE_RELOAD_PORT = 4_313;
 const DEFAULT_STABLE_DEVELOPMENT_IDLE_MILLISECONDS = 60_000;
 const DEFAULT_STABLE_DEVELOPMENT_POLL_INTERVAL_MILLISECONDS = 1_000;
 
@@ -124,9 +124,9 @@ export function formatStableDevelopmentHelpText() {
     "  --help                        Show this help message",
     "",
     "Environment:",
-    "  FARFIELD_STABLE_DEV_API_PORT          Stable API port (default: 4411)",
-    "  FARFIELD_STABLE_DEV_WEB_PORT          Stable web port (default: 4412)",
-    "  FARFIELD_STABLE_DEV_LIVE_RELOAD_PORT  Stable live-reload port (default: 4413)",
+    "  FARFIELD_STABLE_DEV_API_PORT          Stable API port (default: 4311)",
+    "  FARFIELD_STABLE_DEV_WEB_PORT          Stable web port (default: 4312)",
+    "  FARFIELD_STABLE_DEV_LIVE_RELOAD_PORT  Stable live-reload port (default: 4313)",
     "  FARFIELD_STABLE_DEV_IDLE_MS           Quiet window before validation (default: 60000)",
     "  FARFIELD_STABLE_DEV_POLL_INTERVAL_MS  Repository polling interval (default: 1000)",
   ].join("\n");

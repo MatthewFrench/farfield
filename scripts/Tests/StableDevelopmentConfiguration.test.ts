@@ -9,9 +9,9 @@ describe("StableDevelopmentConfiguration", () => {
     const configuration = readStableDevelopmentConfiguration([], {});
 
     expect(configuration.host).toBe("127.0.0.1");
-    expect(configuration.apiPort).toBe(4411);
-    expect(configuration.webPort).toBe(4412);
-    expect(configuration.liveReloadPort).toBe(4413);
+    expect(configuration.apiPort).toBe(4311);
+    expect(configuration.webPort).toBe(4312);
+    expect(configuration.liveReloadPort).toBe(4313);
     expect(configuration.idleMilliseconds).toBe(60000);
     expect(configuration.pollIntervalMilliseconds).toBe(1000);
     expect(configuration.agentIds).toEqual(["codex"]);
@@ -43,9 +43,9 @@ describe("StableDevelopmentConfiguration", () => {
   it("rejects duplicate stable-development ports", () => {
     expect(() =>
       readStableDevelopmentConfiguration([], {
-        FARFIELD_STABLE_DEV_API_PORT: "4411",
-        FARFIELD_STABLE_DEV_WEB_PORT: "4411",
-        FARFIELD_STABLE_DEV_LIVE_RELOAD_PORT: "4413",
+        FARFIELD_STABLE_DEV_API_PORT: "4311",
+        FARFIELD_STABLE_DEV_WEB_PORT: "4311",
+        FARFIELD_STABLE_DEV_LIVE_RELOAD_PORT: "4313",
       }),
     ).toThrowError("Stable development ports must be distinct");
   });

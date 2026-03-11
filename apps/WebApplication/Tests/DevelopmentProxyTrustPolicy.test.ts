@@ -45,7 +45,7 @@ describe("DevelopmentProxyTrustPolicy", () => {
     ).toBe(false);
   });
 
-  it("injects token for same-host browser requests from a remote device", () => {
+  it("does not inject token for same-host browser requests unless the origin is explicitly trusted", () => {
     expect(
       shouldInjectApiTokenForDevelopmentProxy({
         apiToken: "token",
@@ -54,7 +54,7 @@ describe("DevelopmentProxyTrustPolicy", () => {
         remoteAddress: "192.168.7.21",
         trustedOrigins: DEFAULT_TRUSTED_DEVELOPMENT_PROXY_ORIGINS,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("injects token for explicitly trusted non-localhost origins", () => {

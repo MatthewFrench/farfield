@@ -27,6 +27,7 @@ const GovernanceViolationSchema = z
 
 const LegacyPathRulesSchema = z.array(LegacyPathRuleSchema).min(1);
 const GovernanceViolationsSchema = z.array(GovernanceViolationSchema);
+const GovernanceExcludedScriptPathSchema = z.array(z.string().trim().min(1)).min(1);
 
 const legacyPathRules = LegacyPathRulesSchema.parse([
   {
@@ -53,6 +54,11 @@ const legacyPathRules = LegacyPathRulesSchema.parse([
 
 const repositoryRootDirectoryPath = process.cwd();
 const scriptsDirectoryPath = path.join(repositoryRootDirectoryPath, "scripts");
+const governanceExcludedRelativeScriptPaths = new Set(
+  GovernanceExcludedScriptPathSchema.parse([
+    path.join("scripts", "tooling", "validate-script-path-governance.mjs")
+  ]),
+);
 
 function fail(message) {
   process.stderr.write(`[script-path-governance] ${message}\n`);
@@ -81,6 +87,10 @@ function collectScriptFilePaths(directoryPath) {
 
 function collectFileViolations(scriptFilePath) {
   const relativeFilePath = path.relative(repositoryRootDirectoryPath, scriptFilePath);
+  if (governanceExcludedRelativeScriptPaths.has(relativeFilePath)) {
+    return [];
+  }
+
   const fileLines = fs.readFileSync(scriptFilePath, "utf8").split(/\r?\n/);
   const violations = [];
 

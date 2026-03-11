@@ -21,22 +21,6 @@ function normalizeOriginHeader(origin) {
   }
 }
 
-function buildSameHostTrustedOrigins(hostHeader) {
-  if (typeof hostHeader !== "string" || hostHeader.trim().length === 0) {
-    return new Set();
-  }
-
-  const normalizedHostHeader = hostHeader.trim();
-  const sameHostOrigins = new Set();
-  for (const protocol of [HTTP_PROTOCOL, HTTPS_PROTOCOL]) {
-    const normalizedOrigin = normalizeOriginHeader(`${protocol}//${normalizedHostHeader}`);
-    if (normalizedOrigin !== null) {
-      sameHostOrigins.add(normalizedOrigin);
-    }
-  }
-  return sameHostOrigins;
-}
-
 export function buildStableDevelopmentDefaultTrustedOrigins(webPort) {
   return new Set(
     [
@@ -83,5 +67,5 @@ export function shouldInjectApiTokenForStableDevelopmentProxy(input) {
     return true;
   }
 
-  return buildSameHostTrustedOrigins(input.hostHeader).has(normalizedOrigin);
+  return false;
 }

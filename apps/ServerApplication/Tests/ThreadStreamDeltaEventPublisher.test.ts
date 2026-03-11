@@ -237,9 +237,19 @@ describe("ThreadStreamDeltaEventPublisher", () => {
   it("publishes a live-state-only delta when stream events are empty but live state changed", async () => {
     const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
     const broadcastSpy = vi.spyOn(eventStreamClientRegistry, "broadcast");
+    const firstConversationState = createConversationState("thread-1");
+    const secondConversationState = {
+      ...createConversationState("thread-1"),
+      turns: [
+        {
+          status: "completed" as const,
+          items: [],
+        },
+      ],
+    };
     const liveStateSnapshots: AgentThreadLiveState[] = [
-      createLiveStateSnapshot(createConversationState("thread-1")),
-      createLiveStateSnapshot(createConversationState("thread-1")),
+      createLiveStateSnapshot(firstConversationState),
+      createLiveStateSnapshot(secondConversationState),
     ];
     const readThreadLiveState = vi.fn(async () => {
       const nextSnapshot = liveStateSnapshots.shift();
@@ -270,12 +280,51 @@ describe("ThreadStreamDeltaEventPublisher", () => {
     publisher.schedulePublish("thread-1");
     await waitForScheduledPublish();
 
-    expect(broadcastSpy).toHaveBeenCalledTimes(1);
+    expect(broadcastSpy).toHaveBeenCalledTimes(2);
     expect(publisher.readStatistics()).toMatchObject({
       scheduledPublishCount: 2,
-      broadcastCount: 1,
-      suppressedBroadcastCount: 1,
+      broadcastCount: 2,
+      suppressedBroadcastCount: 0,
     });
+  });
+
+  it("suppresses unchanged live-state reads without full-state serialization", async () => {
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const broadcastSpy = vi.spyOn(eventStreamClientRegistry, "broadcast");
+    const stringifySpy = vi.spyOn(JSON, "stringify");
+    const conversationState = createConversationState("thread-budget");
+    const liveStateSnapshots: AgentThreadLiveState[] = [
+      createLiveStateSnapshot(conversationState),
+      createLiveStateSnapshot(conversationState),
+    ];
+    const readThreadLiveState = vi.fn(async () => {
+      const nextSnapshot = liveStateSnapshots.shift();
+      if (!nextSnapshot) {
+        throw new Error("Expected live-state snapshot fixture");
+      }
+      return nextSnapshot;
+    });
+    const readThreadStreamEvents = vi.fn(async () =>
+      createStreamEventsSnapshot({
+        nextSequence: 0,
+        firstAvailableSequence: 0,
+        resetRequired: false,
+      }),
+    );
+    const publisher = new ThreadStreamDeltaEventPublisher({
+      eventStreamClientRegistry,
+      threadSendProgressObservabilityOwner: new ThreadSendProgressObservabilityOwner(),
+      readThreadLiveState,
+      readThreadStreamEvents,
+    });
+
+    publisher.schedulePublish("thread-budget");
+    await waitForScheduledPublish();
+    publisher.schedulePublish("thread-budget");
+    await waitForScheduledPublish();
+
+    expect(broadcastSpy).toHaveBeenCalledTimes(1);
+    expect(stringifySpy).toHaveBeenCalledTimes(0);
   });
 
   it("records failed publish cycles and recovers on later schedules", async () => {

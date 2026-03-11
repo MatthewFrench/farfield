@@ -23,6 +23,72 @@ const DEFAULT_SAFE_RUN_PERFORMANCE_BUDGET_MODE = "warn";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:4311";
 const DEFAULT_READINESS_TIMEOUT_MILLISECONDS = 30_000;
 const DEFAULT_READINESS_POLL_INTERVAL_MILLISECONDS = 1_000;
+const InheritedEnvironmentSchema = z.record(z.string().min(1), z.string());
+const INHERITED_ENVIRONMENT_EXACT_KEYS = new Set([
+  "ALL_PROXY",
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "COLORTERM",
+  "ComSpec",
+  "EDITOR",
+  "FORCE_COLOR",
+  "HOME",
+  "HOST",
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "LOG_LEVEL",
+  "NO_COLOR",
+  "NO_PROXY",
+  "PATH",
+  "PORT",
+  "PWD",
+  "SHELL",
+  "SHLVL",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SystemRoot",
+  "TERM",
+  "TERM_PROGRAM",
+  "TMP",
+  "TMPDIR",
+  "TEMP",
+  "TZ",
+  "USER",
+  "USERNAME",
+  "USERPROFILE",
+  "VISUAL",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME",
+]);
+const INHERITED_ENVIRONMENT_PREFIXES = [
+  "API_",
+  "APP_SMOKE_",
+  "BUN_",
+  "CADDY_",
+  "CODEX_",
+  "DEBUG_",
+  "E2E_REAL_",
+  "FARFIELD_",
+  "GITHUB_",
+  "IOS_",
+  "NODE_",
+  "NTFY_",
+  "NPM_",
+  "PLAYWRIGHT_",
+  "PUSH_",
+  "STREAM_BURST_",
+  "THREAD_",
+  "VITE_",
+  "WEB_",
+  "npm_",
+];
 
 function readStressRuntimeConfiguration() {
   const durationSecondsRaw = process.env["CI_STRESS_GUARD_DURATION_SECONDS"]?.trim() ?? "";
@@ -60,6 +126,30 @@ function readStressRuntimeConfiguration() {
 
 function normalizeExitCode(code) {
   return typeof code === "number" ? code : 1;
+}
+
+function shouldIncludeInheritedEnvironmentKey(environmentKey) {
+  if (INHERITED_ENVIRONMENT_EXACT_KEYS.has(environmentKey)) {
+    return true;
+  }
+
+  return INHERITED_ENVIRONMENT_PREFIXES.some((prefix) => environmentKey.startsWith(prefix));
+}
+
+function buildInheritedEnvironment(sourceEnvironment) {
+  const inheritedEnvironment = {};
+
+  for (const [environmentKey, environmentValue] of Object.entries(sourceEnvironment)) {
+    if (!shouldIncludeInheritedEnvironmentKey(environmentKey)) {
+      continue;
+    }
+    if (typeof environmentValue !== "string") {
+      continue;
+    }
+    inheritedEnvironment[environmentKey] = environmentValue;
+  }
+
+  return InheritedEnvironmentSchema.parse(inheritedEnvironment);
 }
 
 function sleep(milliseconds) {
@@ -170,6 +260,7 @@ async function main() {
   const operationsDirectoryPath = path.resolve(process.cwd(), "scripts", "operations");
   const manualGuardScriptPath = path.join(operationsDirectoryPath, "playwright-manual-guard.mjs");
   const safeRunScriptPath = path.join(operationsDirectoryPath, "end-to-end-real-safe-run.mjs");
+  const inheritedEnvironment = buildInheritedEnvironment(process.env);
 
   process.stdout.write(
     `[ci-mode-stress] Waiting for runtime readiness at ${configuration.apiBaseUrl}\n`,
@@ -181,7 +272,7 @@ async function main() {
     cwd: process.cwd(),
     stdio: "inherit",
     env: {
-      ...process.env,
+      ...inheritedEnvironment,
       PLAYWRIGHT_MANUAL_GUARD_DURATION_SECONDS: String(configuration.guardDurationSeconds),
       PLAYWRIGHT_MANUAL_GUARD_BUDGET_MODE: "warn",
       PLAYWRIGHT_MANUAL_GUARD_ALLOW_DEBUG_ERROR_MESSAGE_SUBSTRINGS:
@@ -196,7 +287,7 @@ async function main() {
     cwd: process.cwd(),
     stdio: "inherit",
     env: {
-      ...process.env,
+      ...inheritedEnvironment,
       E2E_REAL_PERFORMANCE_BUDGET_MODE: configuration.safeRunPerformanceBudgetMode,
     },
   });
