@@ -9,6 +9,7 @@ import {
   ThreadCollectionRouteMethodByName,
   ThreadCollectionRoutePathnameByName,
 } from "./ThreadCollectionRouteContracts.js";
+import { handleThreadCollectionRuntimeStatusRoute } from "./ThreadCollectionRuntimeStatusRouteOwner.js";
 import {
   buildAggregationAdapterListThreadsInput,
   loadThreadListAggregationSnapshot,
@@ -61,6 +62,10 @@ export type { ThreadCollectionRouteDependencies } from "./ThreadCollectionRouteC
 export async function handleThreadCollectionRoutes(
   deps: ThreadCollectionRouteDependencies,
 ): Promise<boolean> {
+  if (await handleThreadCollectionRuntimeStatusRoute(deps)) {
+    return true;
+  }
+
   if (
     isThreadCollectionRouteRequest(
       deps.req.method,

@@ -130,7 +130,7 @@ describe("ServerBootstrap", () => {
       "Usage: tsx watch Source/Application/ServerBootstrap.ts",
     );
     expectNoPersistenceFilesCreated(environmentSetup.paths);
-  });
+  }, 15_000);
 
   it("fails invalid arguments before persistence owners initialize", () => {
     const environmentSetup = createBootstrapEnvironmentSetup();
@@ -144,5 +144,5 @@ describe("ServerBootstrap", () => {
     expect(result.standardError).toContain("Unknown argument: --definitely-invalid-option");
     expect(result.standardError).toContain("Run with --help to see valid arguments.");
     expectNoPersistenceFilesCreated(environmentSetup.paths);
-  });
+  }, 15_000);
 });

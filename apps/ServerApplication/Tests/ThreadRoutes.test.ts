@@ -2,6 +2,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentAdapter, AgentCapabilities } from "../Source/Agents/Types.js";
+import { CreatedThreadListProjectionOwner } from "../Source/Network/Routes/CreatedThreadListProjectionOwner.js";
 import {
   handleThreadRoutes,
   type ThreadRouteDependencies,
@@ -81,8 +82,13 @@ function createThreadRouteDependencies(input: {
     url: input.url,
     defaultWorkspace: "/tmp/workspace",
     threadListAggregationCache: new ThreadListAggregationCache(1_000, 4),
+    createdThreadListProjectionOwner: new CreatedThreadListProjectionOwner({
+      timeToLiveMilliseconds: 60_000,
+      maximumEntries: 16,
+    }),
     listEnabledAdapters: () => [],
     registerThreadAdapterOwnership: () => {},
+    shouldIncludeThreadInList: () => true,
     parseInteger: (value, defaultValue) => {
       if (!value) {
         return defaultValue;

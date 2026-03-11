@@ -164,12 +164,10 @@ describe("ThreadSidebarPanel", () => {
       "Account Type pro",
     );
     expect(screen.queryByTestId("sidebar-runtime-rate-limit-summary")).toBeNull();
-    expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("Apps 3");
-    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
-      "Progress started",
-    );
+    expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("3 Apps");
+    expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe("Thread one");
     expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
-      "Tokens 21%",
+      "42000 Tokens",
     );
   });
 
@@ -197,7 +195,7 @@ describe("ThreadSidebarPanel", () => {
     });
 
     expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
-      "Progress compacted",
+      "thread/compacted",
     );
   });
 
@@ -225,7 +223,7 @@ describe("ThreadSidebarPanel", () => {
     });
 
     expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
-      "Progress turn completed",
+      "turn/completed",
     );
   });
 
@@ -253,7 +251,7 @@ describe("ThreadSidebarPanel", () => {
     });
 
     expect(screen.getByTestId("sidebar-runtime-progress-summary").textContent).toBe(
-      "Progress turn diff updated",
+      "turn/diff/updated",
     );
   });
 
@@ -290,8 +288,10 @@ describe("ThreadSidebarPanel", () => {
       },
     });
 
-    expect(screen.queryByTestId("sidebar-runtime-app-summary")).toBeNull();
-    expect(screen.queryByTestId("sidebar-runtime-token-usage-summary")).toBeNull();
+    expect(screen.getByTestId("sidebar-runtime-app-summary").textContent).toBe("0 Apps");
+    expect(screen.getByTestId("sidebar-runtime-token-usage-summary").textContent).toBe(
+      "Tokens n/a",
+    );
   });
 
   it("calls desktop close handler", () => {

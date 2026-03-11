@@ -1,6 +1,11 @@
 import type { ThreadListLoadOptions, ThreadListResponse } from "../DomainModel/ThreadGroupTypes";
 import { type ApiListThreadsOptions, listThreads } from "./ThreadApi";
 import {
+  type ApiReadThreadRuntimeStatusesInput,
+  type ApiReadThreadRuntimeStatusesResponse,
+  readThreadRuntimeStatuses,
+} from "./ThreadRuntimeStatusApi";
+import {
   type ApiThreadSidebarSyncInput,
   type ApiThreadSidebarSyncResult,
   syncSidebarThreadList,
@@ -29,6 +34,12 @@ export class ThreadServerClient {
     knownSnapshotVersion: string | null;
   }): Promise<ApiThreadSidebarSyncResult> {
     return syncSidebarThreadList(this.buildThreadSidebarSyncRequestOptions(options));
+  }
+
+  public async readThreadRuntimeStatuses(
+    options: ApiReadThreadRuntimeStatusesInput,
+  ): Promise<ApiReadThreadRuntimeStatusesResponse> {
+    return readThreadRuntimeStatuses(options);
   }
 
   private buildListThreadsRequestOptions(options: ThreadListLoadOptions): ApiListThreadsOptions {

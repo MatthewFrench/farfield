@@ -106,16 +106,16 @@ describe("App", () => {
     }));
 
     environment.renderApp();
-    expect(await screen.findByText("gpt-old-codex")).toBeTruthy();
+    expect(await screen.findByTestId("chat-mode-toolbar-model-select")).toBeTruthy();
 
     modelId = "gpt-new-codex";
     environment.emitHistoryEventForThread(threadId);
 
     await waitFor(() => {
-      expect(screen.queryByText("gpt-old-codex")).toBeNull();
+      expect(screen.getByTestId("chat-mode-toolbar-model-select").textContent).toContain(
+        "gpt-new-codex",
+      );
     });
-
-    expect(await screen.findByText("gpt-new-codex")).toBeTruthy();
   });
 
   it("keeps loaded turns when thread refresh skips turns payload", async () => {
@@ -235,7 +235,7 @@ describe("App", () => {
     expect(screen.getByText("No thread selected")).toBeTruthy();
   });
 
-  it("shows unread marker for a newly updated thread and clears it when opened", async () => {
+  it("keeps an updated thread selectable when another thread refresh arrives", async () => {
     const selectedId = "thread-1";
     const updatedId = "thread-2";
     environment.setPathname(`/threads/${selectedId}`);
@@ -258,6 +258,7 @@ describe("App", () => {
           createdAt: 1700000001,
           updatedAt: 1700000000,
           hasUnreadTurn: false,
+          latestActivityIsUserMessage: false,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -297,6 +298,7 @@ describe("App", () => {
           createdAt: 1700000001,
           updatedAt: 1700000050,
           hasUnreadTurn: true,
+          latestActivityIsUserMessage: false,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -309,19 +311,15 @@ describe("App", () => {
 
     environment.emitHistoryEventForThread(updatedId);
 
-    await waitFor(() => {
-      expect(screen.getByTestId(`thread-unread-indicator-${updatedId}`)).toBeTruthy();
-    });
-
     const updatedThreadButton = await waitForThreadListItemByIdentifier(updatedId);
     fireEvent.click(updatedThreadButton);
 
     await waitFor(() => {
-      expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
+      expect(window.location.pathname).toBe(`/threads/${updatedId}`);
     });
   });
 
-  it("does not show unread marker when latest thread activity is a user message", async () => {
+  it("preserves explicit unread marker when latest thread activity is a user message", async () => {
     const selectedId = "thread-1";
     const updatedId = "thread-2";
     environment.setPathname(`/threads/${selectedId}`);
@@ -344,6 +342,7 @@ describe("App", () => {
           createdAt: 1700000001,
           updatedAt: 1700000000,
           hasUnreadTurn: true,
+          latestActivityIsUserMessage: false,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -382,18 +381,7 @@ describe("App", () => {
           createdAt: 1700000001,
           updatedAt: 1700000050,
           hasUnreadTurn: true,
-          turns: [
-            {
-              id: "turn-user-1",
-              items: [
-                {
-                  id: "user-item-1",
-                  type: "userMessage",
-                  content: [{ type: "text", text: "user just replied in this thread" }],
-                },
-              ],
-            },
-          ],
+          latestActivityIsUserMessage: true,
           cwd: "/tmp/project",
           source: "opencode",
           agentId: "codex",
@@ -407,7 +395,7 @@ describe("App", () => {
     environment.emitHistoryEventForThread(updatedId);
 
     await waitFor(() => {
-      expect(screen.queryByTestId(`thread-unread-indicator-${updatedId}`)).toBeNull();
+      expect(screen.getByTestId(`thread-unread-indicator-${updatedId}`)).toBeTruthy();
     });
   });
 });

@@ -11,6 +11,25 @@ export type RealAppFixtures = {
   enforceUnexpectedSignals: boolean;
 };
 
+const DEFAULT_REAL_API_URL = "http://127.0.0.1:4311";
+const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4312";
+const STABLE_REAL_API_URL = "http://127.0.0.1:4411";
+const STABLE_REAL_BASE_URL = "http://127.0.0.1:4412";
+
+function readRealApiBaseUrl(): string {
+  const explicitApiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "").trim();
+  if (explicitApiBaseUrl.length > 0) {
+    return explicitApiBaseUrl;
+  }
+
+  const realBaseUrl = (process.env["E2E_REAL_BASE_URL"] ?? DEFAULT_REAL_BASE_URL).trim();
+  if (realBaseUrl === STABLE_REAL_BASE_URL) {
+    return STABLE_REAL_API_URL;
+  }
+
+  return DEFAULT_REAL_API_URL;
+}
+
 export const test = base.extend<RealAppFixtures>({
   enforceStateIsolation: [true, { option: true }],
   enforceRuntimeAvailabilityCheck: [true, { option: true }],
@@ -18,7 +37,7 @@ export const test = base.extend<RealAppFixtures>({
   enforceUnexpectedSignals: [true, { option: true }],
   stateGuard: [
     async ({ page, playwright, enforceStateIsolation }, use) => {
-      const apiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
+      const apiBaseUrl = readRealApiBaseUrl();
       const apiToken = (
         process.env["E2E_REAL_API_TOKEN"] ??
         process.env["API_TOKEN"] ??
@@ -63,7 +82,7 @@ export const test = base.extend<RealAppFixtures>({
     testInfo,
   ) => {
     const scenarioId = testInfo.titlePath.join(" :: ");
-    const apiBaseUrl = (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
+    const apiBaseUrl = readRealApiBaseUrl();
     const apiToken = (
       process.env["E2E_REAL_API_TOKEN"] ??
       process.env["API_TOKEN"] ??

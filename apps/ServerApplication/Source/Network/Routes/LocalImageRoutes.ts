@@ -1,7 +1,7 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import * as fileSystemPromises from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, isAbsolute } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import type { ThreadRouteDependencies } from "./ThreadRoutes.js";
 
@@ -27,6 +27,7 @@ const LocalImageRouteErrorByName = {
   unsupportedImageType: "Unsupported image type",
   imageFileTooLarge: "Image file is too large",
   imageFileStatFailed: "Failed to read image file metadata",
+  imageFileReadFailed: "Failed to read image file",
 } as const;
 
 const MIME_TYPE_BY_FILE_EXTENSION = {
@@ -57,6 +58,7 @@ interface LocalImageRouteDependencies {
   pathname: string;
   url: URL;
   jsonResponse: ThreadRouteDependencies["jsonResponse"];
+  openFile?: typeof fileSystemPromises.open;
 }
 
 interface LocalImageQuery {
@@ -133,11 +135,7 @@ export async function handleLocalImageRoutes(
   }
 
   const response = dependencies.res;
-  response.statusCode = LocalImageRouteStatusCodeByName.successOk;
-  response.setHeader("Content-Type", contentType);
-  response.setHeader("Cache-Control", "private, max-age=60");
-  response.setHeader("X-Content-Type-Options", "nosniff");
-  createReadStream(imagePath).pipe(response);
+  await streamImageFile(response, imagePath, contentType, dependencies);
   return true;
 }
 
@@ -158,7 +156,7 @@ async function readImageFileMetadata(
   dependencies: LocalImageRouteDependencies,
 ): Promise<{ size: number } | null> {
   try {
-    const fileMetadata = await stat(imagePath);
+    const fileMetadata = await fileSystemPromises.stat(imagePath);
     if (!fileMetadata.isFile()) {
       dependencies.jsonResponse(
         dependencies.res,
@@ -211,5 +209,74 @@ async function readImageFileMetadata(
       },
     );
     return null;
+  }
+}
+
+async function streamImageFile(
+  response: ServerResponse,
+  imagePath: string,
+  contentType: string,
+  dependencies: LocalImageRouteDependencies,
+): Promise<void> {
+  let fileHandle: fileSystemPromises.FileHandle | null = null;
+
+  try {
+    const openFile = dependencies.openFile ?? fileSystemPromises.open;
+    fileHandle = await openFile(imagePath, "r");
+    response.writeHead(LocalImageRouteStatusCodeByName.successOk, {
+      "Content-Type": contentType,
+      "Cache-Control": "private, max-age=60",
+      "X-Content-Type-Options": "nosniff",
+    });
+    const readStream = fileHandle.createReadStream({ autoClose: false });
+    const closePromise = new Promise<"closed">((resolve) => {
+      response.once("close", () => {
+        readStream.destroy();
+        resolve("closed");
+      });
+    });
+    const pipelinePromise = pipeline(readStream, response);
+    const streamResult = await Promise.race([
+      pipelinePromise.then(() => "completed" as const),
+      closePromise,
+    ]);
+    if (streamResult === "closed") {
+      await pipelinePromise.catch(() => undefined);
+      return;
+    }
+  } catch (error) {
+    if (response.headersSent) {
+      response.destroy();
+      return;
+    }
+
+    const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
+    if (parsedFileSystemError.success) {
+      const errorCode = parsedFileSystemError.data.code;
+      if (errorCode === "ENOENT" || errorCode === "ENOTDIR") {
+        dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorNotFound, {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileNotFound,
+        });
+        return;
+      }
+
+      if (errorCode === "EACCES" || errorCode === "EPERM") {
+        dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorForbidden, {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileAccessDenied,
+        });
+        return;
+      }
+    }
+
+    dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.serverErrorInternal, {
+      ok: false,
+      error: LocalImageRouteErrorByName.imageFileReadFailed,
+    });
+  } finally {
+    if (fileHandle !== null) {
+      await fileHandle.close().catch(() => undefined);
+    }
   }
 }

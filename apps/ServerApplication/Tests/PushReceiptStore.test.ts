@@ -34,7 +34,7 @@ describe("PushReceiptStore", () => {
   });
 
   it("persists and reloads receipts", () => {
-    const createdAt = "2026-02-26T00:00:00.000Z";
+    const createdAt = new Date(Date.now() - 1_000).toISOString();
     const { store, filePath } = createStoreWithTempPath();
     store.load();
     store.add({
@@ -63,7 +63,7 @@ describe("PushReceiptStore", () => {
   });
 
   it("enforces max receipt retention", () => {
-    const baseTimestampMs = Date.parse("2026-02-26T00:00:03.000Z");
+    const baseTimestampMs = Date.now();
     const { store } = createStoreWithTempPath(2);
     store.load();
     store.add({

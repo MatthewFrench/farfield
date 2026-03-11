@@ -60,6 +60,7 @@ export interface ThreadListItemFixture {
   createdAt: number;
   updatedAt: number;
   hasUnreadTurn?: boolean;
+  latestActivityIsUserMessage?: boolean;
   cwd?: string;
   source: "opencode";
   agentId: AgentIdentifier;

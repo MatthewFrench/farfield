@@ -16,14 +16,16 @@ export const ThreadCollectionRouteMethodByName: Readonly<ThreadCollectionRouteMe
   post: "POST",
 };
 
-export type ThreadCollectionRoutePathname = "/api/threads";
+export type ThreadCollectionRoutePathname = "/api/threads" | "/api/threads/runtime-statuses";
 
 export interface ThreadCollectionRoutePathnameMap {
   threads: ThreadCollectionRoutePathname;
+  runtimeStatuses: ThreadCollectionRoutePathname;
 }
 
 export const ThreadCollectionRoutePathnameByName: Readonly<ThreadCollectionRoutePathnameMap> = {
   threads: "/api/threads",
+  runtimeStatuses: "/api/threads/runtime-statuses",
 };
 
 export type ThreadCollectionRouteActionStage = "attempt" | "success" | "error";

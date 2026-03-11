@@ -27,6 +27,7 @@ import { useEventStreamEffects } from "@/Application/StateManagement/UseEventStr
 import { useViewportShellEffects } from "@/Application/StateManagement/UseViewportShellEffects";
 import { useModeAndPendingRequestEffects } from "@/Features/Chat/StateManagement/UseModeAndPendingRequestEffects";
 import { useSelectedThreadLifecycleEffects } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
+import { useThreadRuntimeStatusHydrationEffect } from "@/Features/Threads/StateManagement/UseThreadRuntimeStatusHydrationEffect";
 
 export type { ApplicationRuntimeComposition, UseApplicationRuntimeCompositionInput };
 
@@ -68,6 +69,19 @@ export function useApplicationRuntimeComposition(
       ensureFreshPushSettingsDiagnostics: pushFeatureComposition.ensureFreshPushSettingsDiagnostics,
     }),
   );
+
+  useThreadRuntimeStatusHydrationEffect({
+    ensureApiSessionBootstrapped: input.runtimeRequestHandlers.ensureApiSessionBootstrapped,
+    canHydrateThreadRuntimeStatuses:
+      input.applicationDerivedState.activeAgentCapabilities?.canReadLiveState === true ||
+      input.applicationDerivedState.activeAgentCapabilities?.canSubmitUserInput === true,
+    selectedAgentId: input.applicationShellState.selectedAgentId,
+    threads: input.applicationShellState.threads,
+    threadServerClient: input.applicationOwnerDependencies.threadServerClient,
+    setThreadRuntimeStatusByThreadIdentifier:
+      input.applicationShellState.setThreadRuntimeStatusByThreadIdentifier,
+    handleRuntimeRequestError: input.runtimeRequestHandlers.handleRuntimeRequestError,
+  });
 
   useSelectedThreadLifecycleEffects(
     buildSelectedThreadLifecycleEffectsInput(runtimeCompositionContext),

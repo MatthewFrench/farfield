@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import {
   type CreatePushReceiptBody,
   CreatePushReceiptBodySchema,
@@ -68,19 +69,44 @@ async function streamBinaryFileDownload(
     throw new Error("Requested download path is not a file");
   }
 
-  res.writeHead(200, {
-    "Content-Type": contentType,
-    "Content-Length": fileStats.size,
-    "Content-Disposition": `attachment; filename=\"${downloadFileName}\"`,
-    "Access-Control-Allow-Origin": "*",
-  });
+  const fileHandle = await fs.promises.open(filePath, "r");
 
-  await new Promise<void>((resolve, reject) => {
-    const stream = fs.createReadStream(filePath);
-    stream.once("error", reject);
-    stream.once("end", resolve);
-    stream.pipe(res);
-  });
+  try {
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": fileStats.size,
+      "Content-Disposition": `attachment; filename=\"${downloadFileName}\"`,
+      "Access-Control-Allow-Origin": "*",
+    });
+    await Promise.resolve();
+    if (res.destroyed) {
+      return;
+    }
+
+    const readStream = fileHandle.createReadStream({ autoClose: false });
+    const closePromise = new Promise<"closed">((resolve) => {
+      res.once("close", () => {
+        readStream.destroy();
+        resolve("closed");
+      });
+    });
+    const pipelinePromise = pipeline(readStream, res);
+    const streamResult = await Promise.race([
+      pipelinePromise.then(() => "completed" as const),
+      closePromise,
+    ]);
+    if (streamResult === "closed") {
+      await pipelinePromise.catch(() => undefined);
+      return;
+    }
+  } catch (error) {
+    if (res.destroyed) {
+      return;
+    }
+    throw error;
+  } finally {
+    await fileHandle.close().catch(() => undefined);
+  }
 }
 
 function isPushRoutePrefix(segments: string[]): boolean {

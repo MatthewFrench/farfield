@@ -484,6 +484,83 @@ describe("handlePushRoutes", () => {
     }
   });
 
+  it("treats aborted local CA downloads as request-scoped disconnects", async () => {
+    const temporaryDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "push-routes-local-ca-abort-"),
+    );
+    try {
+      const pushService = new PushService({
+        enabled: false,
+        vapidPublicKey: "",
+        vapidPrivateKey: "",
+        vapidSubject: "mailto:test@example.com",
+      });
+      const pushStore = new PushStore(path.join(temporaryDirectory, "push-state.json"));
+      pushStore.load();
+      const pushReceiptStore = new PushReceiptStore(
+        path.join(temporaryDirectory, "push-receipts.json"),
+        100,
+        86_400_000,
+      );
+      pushReceiptStore.load();
+      const pushSendStore = new PushSendStore(path.join(temporaryDirectory, "push-send.json"));
+      pushSendStore.load();
+      const pushMutationConcurrencyCoordinator = new PushMutationConcurrencyCoordinator();
+      const pushLocalCaSourcePath = path.join(temporaryDirectory, "rootCA.pem");
+      fs.writeFileSync(
+        pushLocalCaSourcePath,
+        "-----BEGIN CERTIFICATE-----\nlocal\n-----END CERTIFICATE-----\n",
+      );
+
+      const { request, response } = createRequestResponsePair();
+      request.method = PushRouteMethodByName.get;
+      const jsonResponseSpy = vi.fn();
+      const writeHeadSpy = vi.spyOn(response, "writeHead");
+      writeHeadSpy.mockImplementation((statusCode, statusMessageOrHeaders, headers) => {
+        const writeHeadResult = ServerResponse.prototype.writeHead.call(
+          response,
+          statusCode,
+          statusMessageOrHeaders as string | number | readonly string[] | undefined,
+          headers,
+        );
+        queueMicrotask(() => {
+          response.destroy();
+        });
+        return writeHeadResult;
+      });
+
+      const handled = await handlePushRoutes({
+        req: request,
+        res: response,
+        pathname: PushRoutePathnameByName.localCaDownload,
+        segments: PushRoutePathnameByName.localCaDownload.split("/").filter(Boolean),
+        pushPrivateModeDefault: true,
+        pushLocalCaSourcePath,
+        pushService,
+        pushStore,
+        pushReceiptStore,
+        pushSendStore,
+        pushMutationConcurrencyCoordinator,
+        pushTestSendTimeoutMs: 5_000,
+        pushTestBodySchema: FarfieldPushTestBodySchema,
+        readJsonBody: async () => ({}),
+        jsonResponse: (_response, statusCode, body) => {
+          jsonResponseSpy(statusCode, body);
+        },
+        buildPushTestPayload: (payload, privateMode) => {
+          return createPushPayload(payload.threadId, payload.turnId, privateMode);
+        },
+        withTimeout: async (promise) => promise,
+      });
+
+      expect(handled).toBe(true);
+      expect(jsonResponseSpy).not.toHaveBeenCalled();
+      expect(response.destroyed).toBe(true);
+    } finally {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("creates and deletes subscriptions through the mutation coordinator", async () => {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "push-routes-subscriptions-"));
     try {

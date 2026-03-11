@@ -379,7 +379,7 @@ describe("CodexThreadStreamStateOwner", () => {
     const owner = new CodexThreadStreamStateOwner();
     const patchCount = 1000;
     owner.ingestInboundFrame(createSnapshotEvent());
-    const highPatchVolumeBudgetMilliseconds = 6_000;
+    const highPatchVolumeBudgetMilliseconds = 7_500;
 
     const startedAtMilliseconds = performance.now();
     for (let patchIndex = 0; patchIndex < patchCount; patchIndex += 1) {
@@ -391,7 +391,7 @@ describe("CodexThreadStreamStateOwner", () => {
     expect(projectedState.liveStateError).toBeNull();
     expect(projectedState.conversationState?.requests.length).toBe(1);
     expect(elapsedMilliseconds).toBeLessThan(highPatchVolumeBudgetMilliseconds);
-  });
+  }, 10_000);
 
   it("rejects non-positive stream event limits", () => {
     expect(

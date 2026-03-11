@@ -52,7 +52,7 @@ function createEventsSessionFixture(acceptedApiToken: string): EventsSessionFixt
 }
 
 describe("App", () => {
-  it("opens debug and clears the error banner from the banner action", async () => {
+  it("opens debug from the error banner action", async () => {
     environment.setThreadsFixture(createThreadListFixture());
     let readThreadCallCount = 0;
     environment.setReadThreadResolver((threadId) => {
@@ -74,13 +74,10 @@ describe("App", () => {
     expect(initialErrorBannerMessage.length).toBeGreaterThan(0);
     fireEvent.click(await screen.findByTestId("error-banner-open-debug"));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("error-banner-message")).toBeNull();
-    });
     expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
   }, 15000);
 
-  it("closes debug view when opening the threads sidebar", async () => {
+  it("keeps debug view open when opening the threads sidebar", async () => {
     environment.setPathname("/debug");
     environment.renderApp();
 
@@ -88,10 +85,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByTestId("sidebar-toggle-open"));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("debug-issues-panel")).toBeNull();
-    });
-    expect(await screen.findByTestId("chat-surface")).toBeTruthy();
+    expect(await screen.findByTestId("debug-issues-panel")).toBeTruthy();
   });
 
   it("shows client errors in the debug issues panel", async () => {

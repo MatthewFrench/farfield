@@ -1,8 +1,9 @@
+import * as fileSystemPromises from "node:fs/promises";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { handleLocalImageRoutes } from "../Source/Network/Routes/LocalImageRoutes.js";
 
@@ -21,6 +22,7 @@ interface RouteTestServer {
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   while (temporaryDirectoryPaths.length > 0) {
     const temporaryDirectoryPath = temporaryDirectoryPaths.pop();
     if (temporaryDirectoryPath === undefined) {
@@ -112,6 +114,35 @@ describe("handleLocalImageRoutes", () => {
       await server.close();
     }
   });
+
+  it("returns a controlled not-found response when the image disappears before streaming opens", async () => {
+    const temporaryDirectoryPath = await createTemporaryDirectory();
+    const imagePath = join(temporaryDirectoryPath, "sample.png");
+    await writeFile(imagePath, Buffer.from(TEST_IMAGE_BASE64, "base64"));
+    const missingFileError = Object.assign(new Error("missing"), {
+      code: "ENOENT",
+    });
+    const openFile = vi.fn<typeof fileSystemPromises.open>().mockRejectedValue(missingFileError);
+
+    const server = await startRouteTestServer({
+      openFile,
+    });
+    try {
+      const response = await fetch(
+        `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent(imagePath)}`,
+      );
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(openFile).toHaveBeenCalledWith(imagePath, "r");
+      expect(responseBody).toMatchObject({
+        ok: false,
+        error: "Image file not found",
+      });
+    } finally {
+      await server.close();
+    }
+  });
 });
 
 async function createTemporaryDirectory(): Promise<string> {
@@ -120,7 +151,9 @@ async function createTemporaryDirectory(): Promise<string> {
   return temporaryDirectoryPath;
 }
 
-async function startRouteTestServer(): Promise<RouteTestServer> {
+async function startRouteTestServer(input?: {
+  openFile?: typeof fileSystemPromises.open;
+}): Promise<RouteTestServer> {
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
     const handled = await handleLocalImageRoutes({
@@ -128,6 +161,7 @@ async function startRouteTestServer(): Promise<RouteTestServer> {
       res: response,
       pathname: requestUrl.pathname,
       url: requestUrl,
+      openFile: input?.openFile,
       jsonResponse: (nextResponse, statusCode, payload) => {
         nextResponse.statusCode = statusCode;
         nextResponse.setHeader("Content-Type", "application/json");

@@ -130,6 +130,7 @@ export interface ApplicationOwnerDependencies<
   debugIssueStateResolver: DebugIssueStateResolver;
   debugIssueDerivationWorkerOwner: DebugIssueDerivationWorkerOwner | null;
   conversationItemFlatteningWorkerOwner: ConversationItemFlatteningWorkerOwner | null;
+  threadServerClient: ThreadServerClient;
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
@@ -156,6 +157,7 @@ interface SelectedThreadRetryConfiguration {
 }
 
 interface ThreadListStateControllerConfiguration {
+  threadServerClient: ThreadServerClient;
   threadQueryCacheTimeToLiveMilliseconds: number;
   threadQueryCacheMaximumEntries: number;
   threadListSnapshotPersistenceStore: ThreadListSnapshotPersistenceStore;
@@ -198,7 +200,7 @@ function createThreadListStateController(
 ): ThreadListStateController {
   // The controller owns cache and presentation state and therefore composes these owners together.
   return new ThreadListStateController({
-    threadServerClient: new ThreadServerClient(),
+    threadServerClient: configuration.threadServerClient,
     threadQueryCache: new ThreadQueryCache(
       configuration.threadQueryCacheTimeToLiveMilliseconds,
       configuration.threadQueryCacheMaximumEntries,
@@ -361,6 +363,7 @@ export function useApplicationOwnerDependencies<
   );
   const debugIssueStateResolver = useStableOwner(() => new DebugIssueStateResolver());
   const debugIssueDerivationWorkerOwner = null;
+  const threadServerClient = useStableOwner(() => new ThreadServerClient());
   const threadMutationServerClient = useStableOwner(() => new ThreadMutationServerClient());
   const threadMutationActionCoordinator = useStableOwner(
     () => new ThreadMutationActionCoordinator(),
@@ -378,12 +381,14 @@ export function useApplicationOwnerDependencies<
   const threadListStateController = useMemo(
     () =>
       createThreadListStateController({
+        threadServerClient,
         threadQueryCacheTimeToLiveMilliseconds,
         threadQueryCacheMaximumEntries,
         threadListSnapshotPersistenceStore,
         threadDisplayNameStateOwner,
       }),
     [
+      threadServerClient,
       threadListSnapshotPersistenceStore,
       threadDisplayNameStateOwner,
       threadQueryCacheMaximumEntries,
@@ -446,6 +451,7 @@ export function useApplicationOwnerDependencies<
     debugIssueStateResolver,
     debugIssueDerivationWorkerOwner,
     conversationItemFlatteningWorkerOwner,
+    threadServerClient,
     threadMutationServerClient,
     threadMutationActionCoordinator,
     threadDisplayNameStateOwner,

@@ -314,6 +314,7 @@ describe("ThreadApi", () => {
           mode: "delta",
           sinceUpdatedAt: 120,
           snapshotUpdatedAt: 124,
+          snapshotVersion: "snapshot-version-1",
         },
       }),
     );
@@ -328,6 +329,7 @@ describe("ThreadApi", () => {
       mode: "delta",
       sinceUpdatedAt: 120,
       snapshotUpdatedAt: 124,
+      snapshotVersion: "snapshot-version-1",
     });
   });
 

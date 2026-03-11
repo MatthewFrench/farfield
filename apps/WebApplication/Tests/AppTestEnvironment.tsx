@@ -243,6 +243,7 @@ function buildSidebarThreadListResponse(fixture: ThreadListFixture, snapshotVers
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
       hasUnreadTurn: thread.hasUnreadTurn ?? null,
+      latestActivityIsUserMessage: thread.latestActivityIsUserMessage ?? false,
       cwd: thread.cwd,
       agentId: thread.agentId,
     })),
