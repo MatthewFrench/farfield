@@ -6,8 +6,9 @@ import {
 import {
   createThreadStreamReductionError,
   normalizeErrorCause,
+  StrictPatchSequenceError,
 } from "./LiveStateErrorContracts.js";
-import { applyStrictPatch } from "./LiveStatePatchApplicationOwner.js";
+import { applyStrictPatchSequence } from "./LiveStatePatchApplicationOwner.js";
 
 const NO_TURN_PARAMS_TEMPLATE_ERROR_MESSAGE = "No turn params template found in conversation state";
 const THREAD_STREAM_CHANGE_TYPE_SNAPSHOT = "snapshot";
@@ -24,29 +25,27 @@ function applyEventPatchSequence(
   sourceConversationState: ThreadConversationState,
   patches: ThreadStreamPatch[],
 ): ThreadConversationState {
-  // Stream reduction keeps strict per-patch validation so failures retain
-  // deterministic event/patch localization metadata for diagnostics.
-  let updatedConversationState = sourceConversationState;
-  for (let patchIndex = 0; patchIndex < patches.length; patchIndex += 1) {
-    const patch = patches[patchIndex];
-    if (!patch) {
-      continue;
+  try {
+    // Strict sequence application keeps deterministic patch localization while
+    // reducing one event to a single full clone and one terminal schema parse.
+    return applyStrictPatchSequence(sourceConversationState, patches);
+  } catch (error) {
+    if (error instanceof StrictPatchSequenceError) {
+      const localizedPatch = patches[error.patchIndex];
+      if (localizedPatch !== undefined) {
+        throw createThreadStreamReductionError(
+          threadId,
+          eventIndex,
+          error.patchIndex,
+          event,
+          localizedPatch,
+          normalizeErrorCause(error.cause ?? error),
+        );
+      }
     }
-    try {
-      updatedConversationState = applyStrictPatch(updatedConversationState, patch);
-    } catch (error) {
-      const normalizedCause = normalizeErrorCause(error);
-      throw createThreadStreamReductionError(
-        threadId,
-        eventIndex,
-        patchIndex,
-        event,
-        patch,
-        normalizedCause,
-      );
-    }
+
+    throw error;
   }
-  return updatedConversationState;
 }
 
 function createEmptyThreadStreamDerivedState(): ThreadStreamDerivedState {
