@@ -8,7 +8,7 @@
 
   @trusted_api {
     path /api/*
-    header Origin https://{{DOMAIN_HOST}}
+    expression {header.Origin} == "https://{{DOMAIN_HOST}}" || ({header.Origin} == "" && ({method} == "GET" || {method} == "HEAD"))
   }
   reverse_proxy @trusted_api 127.0.0.1:4311 {
     header_up X-Farfield-Token {farfield_api_token}
@@ -16,7 +16,7 @@
 
   @untrusted_api {
     path /api/*
-    not header Origin https://{{DOMAIN_HOST}}
+    not expression {header.Origin} == "https://{{DOMAIN_HOST}}" || ({header.Origin} == "" && ({method} == "GET" || {method} == "HEAD"))
   }
   respond @untrusted_api 403
 

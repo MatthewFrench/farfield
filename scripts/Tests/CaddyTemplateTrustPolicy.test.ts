@@ -31,8 +31,8 @@ describe("CaddyTemplateTrustPolicy", () => {
   it("trusts the domain template only for the explicit configured domain origin", () => {
     const template = readTemplate(DomainTemplatePath);
 
-    expect(template).toContain("header Origin https://{{DOMAIN_HOST}}");
+    expect(template).toContain('{header.Origin} == "https://{{DOMAIN_HOST}}"');
+    expect(template).toContain('{header.Origin} == "" && ({method} == "GET" || {method} == "HEAD")');
     expect(template).not.toContain("{http.request.host}");
-    expect(template).not.toContain('{http.request.header.Origin} == ""');
   });
 });

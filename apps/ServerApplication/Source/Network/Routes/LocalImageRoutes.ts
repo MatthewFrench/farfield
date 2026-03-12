@@ -54,6 +54,10 @@ const FileSystemErrorSchema = z
     code: z.string(),
   })
   .passthrough();
+type ParsedFileSystemError = z.SafeParseReturnType<
+  { code: string },
+  z.infer<typeof FileSystemErrorSchema>
+>;
 
 interface LocalImageRouteDependencies {
   req: IncomingMessage;
@@ -63,6 +67,7 @@ interface LocalImageRouteDependencies {
   jsonResponse: ThreadRouteDependencies["jsonResponse"];
   allowedRoots?: readonly string[];
   openFile?: typeof fileSystemPromises.open;
+  readRealPath?: typeof fileSystemPromises.realpath;
 }
 
 interface LocalImageQuery {
@@ -107,7 +112,16 @@ export async function handleLocalImageRoutes(
     );
     return true;
   }
-  if (!isPathWithinAllowedRoots(imagePath, dependencies.allowedRoots)) {
+  const canonicalImagePath = await readCanonicalImagePath(imagePath, dependencies);
+  if (canonicalImagePath === null) {
+    return true;
+  }
+
+  const allowedRootsContainImagePath = await isPathWithinAllowedRoots(
+    canonicalImagePath,
+    dependencies,
+  );
+  if (!allowedRootsContainImagePath) {
     dependencies.jsonResponse(
       dependencies.res,
       LocalImageRouteStatusCodeByName.clientErrorForbidden,
@@ -119,7 +133,7 @@ export async function handleLocalImageRoutes(
     return true;
   }
 
-  const contentType = readImageContentType(imagePath);
+  const contentType = readImageContentType(canonicalImagePath);
   if (contentType === null) {
     dependencies.jsonResponse(
       dependencies.res,
@@ -132,7 +146,7 @@ export async function handleLocalImageRoutes(
     return true;
   }
 
-  const fileMetadata = await readImageFileMetadata(imagePath, dependencies);
+  const fileMetadata = await readImageFileMetadata(canonicalImagePath, dependencies);
   if (fileMetadata === null) {
     return true;
   }
@@ -150,7 +164,7 @@ export async function handleLocalImageRoutes(
   }
 
   const response = dependencies.res;
-  await streamImageFile(response, imagePath, contentType, dependencies);
+  await streamImageFile(response, canonicalImagePath, contentType, dependencies);
   return true;
 }
 
@@ -166,16 +180,78 @@ function readImageContentType(imagePath: string): string | null {
   return MIME_TYPE_BY_FILE_EXTENSION[extension] ?? null;
 }
 
-function isPathWithinAllowedRoots(
+async function readCanonicalImagePath(
   imagePath: string,
-  allowedRoots: readonly string[] | undefined,
-): boolean {
-  const normalizedImagePath = path.resolve(imagePath);
-  const normalizedAllowedRoots = (allowedRoots ?? DEFAULT_ALLOWED_LOCAL_IMAGE_ROOTS).map((root) =>
-    path.resolve(root),
-  );
-  return normalizedAllowedRoots.some((root) => {
-    return normalizedImagePath === root || normalizedImagePath.startsWith(`${root}${path.sep}`);
+  dependencies: LocalImageRouteDependencies,
+): Promise<string | null> {
+  const readRealPath = dependencies.readRealPath ?? fileSystemPromises.realpath;
+  try {
+    return await readRealPath(imagePath);
+  } catch (error) {
+    const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
+    if (isMissingFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(
+        dependencies.res,
+        LocalImageRouteStatusCodeByName.clientErrorNotFound,
+        {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileNotFound,
+        },
+      );
+      return null;
+    }
+    if (isForbiddenFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(
+        dependencies.res,
+        LocalImageRouteStatusCodeByName.clientErrorForbidden,
+        {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileAccessDenied,
+        },
+      );
+      return null;
+    }
+
+    dependencies.jsonResponse(
+      dependencies.res,
+      LocalImageRouteStatusCodeByName.serverErrorInternal,
+      {
+        ok: false,
+        error: LocalImageRouteErrorByName.imageFileStatFailed,
+      },
+    );
+    return null;
+  }
+}
+
+async function isPathWithinAllowedRoots(
+  canonicalImagePath: string,
+  dependencies: LocalImageRouteDependencies,
+): Promise<boolean> {
+  const readRealPath = dependencies.readRealPath ?? fileSystemPromises.realpath;
+  const allowedRootPaths = dependencies.allowedRoots ?? DEFAULT_ALLOWED_LOCAL_IMAGE_ROOTS;
+  const canonicalAllowedRoots: string[] = [];
+
+  for (const allowedRootPath of allowedRootPaths) {
+    try {
+      canonicalAllowedRoots.push(await readRealPath(path.resolve(allowedRootPath)));
+    } catch (error) {
+      const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
+      if (
+        isMissingFileSystemError(parsedFileSystemError) ||
+        isForbiddenFileSystemError(parsedFileSystemError)
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return canonicalAllowedRoots.some((canonicalAllowedRoot) => {
+    return (
+      canonicalImagePath === canonicalAllowedRoot ||
+      canonicalImagePath.startsWith(`${canonicalAllowedRoot}${path.sep}`)
+    );
   });
 }
 
@@ -202,30 +278,27 @@ async function readImageFileMetadata(
     };
   } catch (error) {
     const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
-    if (parsedFileSystemError.success) {
-      const errorCode = parsedFileSystemError.data.code;
-      if (errorCode === "ENOENT" || errorCode === "ENOTDIR") {
-        dependencies.jsonResponse(
-          dependencies.res,
-          LocalImageRouteStatusCodeByName.clientErrorNotFound,
-          {
-            ok: false,
-            error: LocalImageRouteErrorByName.imageFileNotFound,
-          },
-        );
-        return null;
-      }
-      if (errorCode === "EACCES" || errorCode === "EPERM") {
-        dependencies.jsonResponse(
-          dependencies.res,
-          LocalImageRouteStatusCodeByName.clientErrorForbidden,
-          {
-            ok: false,
-            error: LocalImageRouteErrorByName.imageFileAccessDenied,
-          },
-        );
-        return null;
-      }
+    if (isMissingFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(
+        dependencies.res,
+        LocalImageRouteStatusCodeByName.clientErrorNotFound,
+        {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileNotFound,
+        },
+      );
+      return null;
+    }
+    if (isForbiddenFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(
+        dependencies.res,
+        LocalImageRouteStatusCodeByName.clientErrorForbidden,
+        {
+          ok: false,
+          error: LocalImageRouteErrorByName.imageFileAccessDenied,
+        },
+      );
+      return null;
     }
 
     dependencies.jsonResponse(
@@ -279,23 +352,20 @@ async function streamImageFile(
     }
 
     const parsedFileSystemError = FileSystemErrorSchema.safeParse(error);
-    if (parsedFileSystemError.success) {
-      const errorCode = parsedFileSystemError.data.code;
-      if (errorCode === "ENOENT" || errorCode === "ENOTDIR") {
-        dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorNotFound, {
-          ok: false,
-          error: LocalImageRouteErrorByName.imageFileNotFound,
-        });
-        return;
-      }
+    if (isMissingFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorNotFound, {
+        ok: false,
+        error: LocalImageRouteErrorByName.imageFileNotFound,
+      });
+      return;
+    }
 
-      if (errorCode === "EACCES" || errorCode === "EPERM") {
-        dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorForbidden, {
-          ok: false,
-          error: LocalImageRouteErrorByName.imageFileAccessDenied,
-        });
-        return;
-      }
+    if (isForbiddenFileSystemError(parsedFileSystemError)) {
+      dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.clientErrorForbidden, {
+        ok: false,
+        error: LocalImageRouteErrorByName.imageFileAccessDenied,
+      });
+      return;
     }
 
     dependencies.jsonResponse(response, LocalImageRouteStatusCodeByName.serverErrorInternal, {
@@ -307,4 +377,18 @@ async function streamImageFile(
       await fileHandle.close().catch(() => undefined);
     }
   }
+}
+
+function isMissingFileSystemError(parsedFileSystemError: ParsedFileSystemError): boolean {
+  return (
+    parsedFileSystemError.success &&
+    (parsedFileSystemError.data.code === "ENOENT" || parsedFileSystemError.data.code === "ENOTDIR")
+  );
+}
+
+function isForbiddenFileSystemError(parsedFileSystemError: ParsedFileSystemError): boolean {
+  return (
+    parsedFileSystemError.success &&
+    (parsedFileSystemError.data.code === "EACCES" || parsedFileSystemError.data.code === "EPERM")
+  );
 }

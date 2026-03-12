@@ -1,5 +1,5 @@
 import * as fileSystemPromises from "node:fs/promises";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
@@ -98,7 +98,9 @@ describe("handleLocalImageRoutes", () => {
   });
 
   it("returns forbidden when the image path is outside the allowed roots", async () => {
-    const outsideRootPath = path.resolve(path.sep, "outside-root", "sample.png");
+    const outsideRootDirectoryPath = await createTemporaryDirectory();
+    const outsideRootPath = join(outsideRootDirectoryPath, "sample.png");
+    await writeFile(outsideRootPath, Buffer.from(TEST_IMAGE_BASE64, "base64"));
 
     const server = await startRouteTestServer({
       allowedRoots: [path.resolve(process.cwd())],
@@ -106,6 +108,33 @@ describe("handleLocalImageRoutes", () => {
     try {
       const response = await fetch(
         `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent(outsideRootPath)}`,
+      );
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(responseBody).toMatchObject({
+        ok: false,
+        error: "Image path is outside the allowed roots",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects symlink targets that escape the allowed roots", async () => {
+    const allowedRootDirectoryPath = await createTemporaryDirectory();
+    const outsideRootDirectoryPath = await createTemporaryDirectory();
+    const outsideImagePath = join(outsideRootDirectoryPath, "outside.png");
+    const symlinkPath = join(allowedRootDirectoryPath, "link.png");
+    await writeFile(outsideImagePath, Buffer.from(TEST_IMAGE_BASE64, "base64"));
+    await symlink(outsideImagePath, symlinkPath);
+
+    const server = await startRouteTestServer({
+      allowedRoots: [allowedRootDirectoryPath],
+    });
+    try {
+      const response = await fetch(
+        `${server.baseUrl}/api/files/local-image?path=${encodeURIComponent(symlinkPath)}`,
       );
       const responseBody = await response.json();
 
@@ -157,7 +186,7 @@ describe("handleLocalImageRoutes", () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(404);
-      expect(openFile).toHaveBeenCalledWith(imagePath, "r");
+      expect(openFile).toHaveBeenCalledWith(await fileSystemPromises.realpath(imagePath), "r");
       expect(responseBody).toMatchObject({
         ok: false,
         error: "Image file not found",

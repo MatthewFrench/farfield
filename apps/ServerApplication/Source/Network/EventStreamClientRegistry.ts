@@ -21,6 +21,17 @@ const EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME = "close";
 interface EventStreamClientLifecycleBinding {
   request: IncomingMessage;
   closeHandler: () => void;
+  drainHandler: () => void;
+}
+
+interface EventStreamQueuedFrame {
+  kind: "event" | "keepalive";
+  payload: string;
+}
+
+interface EventStreamClientWriteState {
+  isWaitingForDrain: boolean;
+  queuedFrames: EventStreamQueuedFrame[];
 }
 
 export interface EventStreamClientRegistryStatistics {
@@ -36,7 +47,8 @@ export interface EventStreamClientRegistryStatistics {
 
 // Owns server-sent-events client lifecycle registration and teardown for active responses.
 // Listener bindings are tracked per response so every removal path detaches request/response
-// close handlers deterministically, including write-failure cleanup paths.
+// close/drain handlers deterministically while queued frames preserve ordering during
+// backpressure recovery instead of disconnecting healthy slow consumers.
 export class EventStreamClientRegistry {
   private readonly keepaliveIntervalMs: number;
   private readonly clientSet: Set<ServerResponse>;
@@ -44,6 +56,7 @@ export class EventStreamClientRegistry {
     ServerResponse,
     EventStreamClientLifecycleBinding
   >;
+  private readonly clientWriteStateByResponse: Map<ServerResponse, EventStreamClientWriteState>;
   private keepaliveTimer: NodeJS.Timeout | null;
   private lastBroadcastSequence: number;
   private addedClientCount: number;
@@ -64,6 +77,7 @@ export class EventStreamClientRegistry {
       ServerResponse,
       EventStreamClientLifecycleBinding
     >();
+    this.clientWriteStateByResponse = new Map<ServerResponse, EventStreamClientWriteState>();
     this.keepaliveTimer = null;
     this.lastBroadcastSequence = 0;
     this.addedClientCount = 0;
@@ -107,9 +121,11 @@ export class EventStreamClientRegistry {
     initialEvent: FarfieldEventStreamEvent,
   ): void {
     res.writeHead(EVENT_STREAM_RESPONSE_STATUS_CODE_OK, EVENT_STREAM_HEADERS);
-    res.write(EVENT_STREAM_RETRY_DIRECTIVE);
-
     this.bindClientLifecycle(req, res);
+    this.enqueueFrame(res, {
+      kind: "keepalive",
+      payload: EVENT_STREAM_RETRY_DIRECTIVE,
+    });
     this.writeEvent(res, {
       sequence: this.lastBroadcastSequence,
       event: initialEvent,
@@ -143,31 +159,19 @@ export class EventStreamClientRegistry {
   }
 
   private writeEvent(client: ServerResponse, envelope: FarfieldEventStreamEnvelope): void {
-    try {
-      const eventFrame = `id: ${String(envelope.sequence)}\ndata: ${JSON.stringify(envelope)}\n\n`;
-      if (!client.write(eventFrame)) {
-        this.eventWriteFailureCount += 1;
-        this.removeClient(client);
-        client.destroy();
-      }
-    } catch {
-      this.eventWriteFailureCount += 1;
-      this.removeClient(client);
-    }
+    const eventFrame = `id: ${String(envelope.sequence)}\ndata: ${JSON.stringify(envelope)}\n\n`;
+    this.enqueueFrame(client, {
+      kind: "event",
+      payload: eventFrame,
+    });
   }
 
   private writeKeepalive(): void {
     for (const client of this.clientSet) {
-      try {
-        if (!client.write(EVENT_STREAM_KEEPALIVE_FRAME)) {
-          this.keepaliveWriteFailureCount += 1;
-          this.removeClient(client);
-          client.destroy();
-        }
-      } catch {
-        this.keepaliveWriteFailureCount += 1;
-        this.removeClient(client);
-      }
+      this.enqueueFrame(client, {
+        kind: "keepalive",
+        payload: EVENT_STREAM_KEEPALIVE_FRAME,
+      });
     }
   }
 
@@ -177,13 +181,28 @@ export class EventStreamClientRegistry {
     const closeHandler = (): void => {
       this.removeClient(res);
     };
+    const drainHandler = (): void => {
+      const clientWriteState = this.clientWriteStateByResponse.get(res);
+      if (!clientWriteState) {
+        return;
+      }
+
+      clientWriteState.isWaitingForDrain = false;
+      this.flushQueuedFrames(res);
+    };
     req.on(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, closeHandler);
     res.on(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, closeHandler);
+    res.on("drain", drainHandler);
 
     this.clientSet.add(res);
+    this.clientWriteStateByResponse.set(res, {
+      isWaitingForDrain: false,
+      queuedFrames: [],
+    });
     this.clientLifecycleBindingByResponse.set(res, {
       request: req,
       closeHandler,
+      drainHandler,
     });
     this.addedClientCount += 1;
   }
@@ -199,15 +218,62 @@ export class EventStreamClientRegistry {
       lifecycleBinding.closeHandler,
     );
     client.off(EVENT_STREAM_CONNECTION_CLOSE_EVENT_NAME, lifecycleBinding.closeHandler);
+    client.off("drain", lifecycleBinding.drainHandler);
     this.clientLifecycleBindingByResponse.delete(client);
   }
 
   private removeClient(client: ServerResponse): void {
     const removedActiveClient = this.clientSet.delete(client);
+    this.clientWriteStateByResponse.delete(client);
     this.unbindClientLifecycle(client);
     if (!removedActiveClient) {
       return;
     }
     this.removedClientCount += 1;
+  }
+
+  private enqueueFrame(client: ServerResponse, frame: EventStreamQueuedFrame): void {
+    const clientWriteState = this.clientWriteStateByResponse.get(client);
+    if (!clientWriteState) {
+      return;
+    }
+
+    clientWriteState.queuedFrames.push(frame);
+    this.flushQueuedFrames(client);
+  }
+
+  private flushQueuedFrames(client: ServerResponse): void {
+    const clientWriteState = this.clientWriteStateByResponse.get(client);
+    if (!clientWriteState) {
+      return;
+    }
+
+    if (clientWriteState.isWaitingForDrain) {
+      return;
+    }
+
+    while (clientWriteState.queuedFrames.length > 0) {
+      const nextFrame = clientWriteState.queuedFrames[0];
+      if (nextFrame === undefined) {
+        return;
+      }
+      try {
+        const writeAccepted = client.write(nextFrame.payload);
+        clientWriteState.queuedFrames.shift();
+        if (!writeAccepted) {
+          clientWriteState.isWaitingForDrain = true;
+          return;
+        }
+      } catch {
+        if (nextFrame.kind === "event") {
+          this.eventWriteFailureCount += 1;
+        } else {
+          this.keepaliveWriteFailureCount += 1;
+        }
+        this.removeClient(client);
+        client.destroy();
+        return;
+      }
+    }
   }
 }

@@ -107,6 +107,31 @@ describe("StableDevelopmentWebServer", () => {
     expect(healthResponse.status).toBe(200);
     expect(await healthResponse.text()).toBe("ok");
   });
+
+  it("returns a controlled error response when async request handling throws", async () => {
+    const upstreamServer = await startUpstreamServer((_request, response) => {
+      response.statusCode = 200;
+      response.end("ok");
+    });
+    const stableServer = await startStableDevelopmentWebServer(upstreamServer.port);
+    stableServer.setServedBuild({
+      buildDirectoryPath: fs.mkdtempSync(path.join(os.tmpdir(), "farfield-stable-dev-build-")),
+      buildVersion: "build-1",
+    });
+    temporaryDirectoryPaths.push(stableServer.currentBuildDirectoryPath);
+
+    stableServer.serveBuildAsset = async () => {
+      throw new Error("synthetic asset failure");
+    };
+
+    const response = await fetch(`${readStableDevelopmentServerBaseUrl(stableServer)}/index.html`);
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: "Stable web server request failed: Error: synthetic asset failure",
+    });
+  });
 });
 
 async function startStableDevelopmentWebServer(

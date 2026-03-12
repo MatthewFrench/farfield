@@ -281,6 +281,22 @@ function writeProxyFailureResponse(response, error) {
   );
 }
 
+function writeUnhandledRequestErrorResponse(response, error) {
+  if (response.headersSent || response.destroyed) {
+    response.destroy();
+    return;
+  }
+
+  response.statusCode = 500;
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(
+    JSON.stringify({
+      ok: false,
+      error: `Stable web server request failed: ${String(error)}`,
+    }),
+  );
+}
+
 /**
  * Owns the validated web surface for stable development mode, including static asset serving,
  * pending-state pages, and API proxying to the stable API server.
@@ -328,7 +344,9 @@ export class StableDevelopmentWebServer {
     }
 
     this.server = http.createServer((request, response) => {
-      void this.handleRequest(request, response);
+      this.handleRequest(request, response).catch((error) => {
+        writeUnhandledRequestErrorResponse(response, error);
+      });
     });
 
     await new Promise((resolve, reject) => {
