@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background-color: #000;
+      }
+    </style>
+    <script>
+      (() => {
+        const storageKey = "theme";
+        let nextTheme = null;
+
+        try {
+          const storedTheme = window.localStorage.getItem(storageKey);
+          if (storedTheme === "light" || storedTheme === "dark") {
+            nextTheme = storedTheme;
+          }
+        } catch {
+          nextTheme = null;
+        }
+
+        if (nextTheme === null) {
+          nextTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+
+        if (nextTheme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <title>Farfield</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/Source/Main.tsx"></script>
+  </body>
+</html>

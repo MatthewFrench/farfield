@@ -4,6 +4,8 @@ node_modules
 dist
 coverage
 *.tsbuildinfo
+playwright-report/
+test-results/
 
 # Local traces and extracted desktop artifacts
 traces/
@@ -15,3 +17,16 @@ worker.js
 
 # Runtime logs
 *.log
+.runtime/
+apps/ServerApplication/invalid-thread-stream-events.jsonl
+
+# Local environment
+.env.local
+
+# Runtime push state
+apps/ServerApplication/push-state.json
+apps/ServerApplication/apps/ServerApplication/push-state.json
+
+# Generated local/domain Caddy configs
+operations/caddy/Caddyfile.local
+operations/caddy/Caddyfile.domain

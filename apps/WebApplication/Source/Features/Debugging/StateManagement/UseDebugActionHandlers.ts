@@ -1,0 +1,167 @@
+import { type Dispatch, type SetStateAction, useCallback } from "react";
+import type { ErrorBannerDetails } from "@/Features/Debugging/DomainModel/DebugIssueContracts";
+import { type SettingsWorkspaceSection } from "@/Features/Settings/DomainModel/SettingsWorkspaceSectionContracts";
+import {
+  type DebugHistoryDetailResponse,
+  type DebugServerClient,
+} from "../DataAccess/DebugServerClient";
+import { buildDebugErrorIssueIdentifier } from "../DomainModel/DebugIssueIdentifier";
+import type { DebugIssueSeverityFilter } from "../DomainModel/DebugIssueStateResolver";
+import { DEBUG_ISSUE_SEVERITY_FILTER_ALL } from "../DomainModel/DebugIssueStateResolver";
+import { type DebugWorkspaceSection } from "../DomainModel/DebugWorkspaceSectionContracts";
+import { type ReplayHistoryEntryRequestInput } from "../UserInterface/DebugHistoryDetailPanel";
+import { DebugWorkspaceActionCoordinator } from "./DebugWorkspaceActionCoordinator";
+
+const DEBUG_APPLICATION_TAB = "debug";
+const DEBUG_SETTINGS_WORKSPACE_SECTION: SettingsWorkspaceSection = "debug";
+const DEBUG_ISSUES_WORKSPACE_SECTION: DebugWorkspaceSection = "issues";
+const EMPTY_DEBUG_ISSUE_FILTER_QUERY = "";
+
+export interface UseDebugActionHandlersInput {
+  debugWorkspaceActionCoordinator: DebugWorkspaceActionCoordinator;
+  debugServerClient: DebugServerClient;
+  refreshCoreData: () => Promise<void>;
+  traceLabel: string;
+  traceNote: string;
+  errorBannerDetails: ErrorBannerDetails;
+  setActiveTab: Dispatch<SetStateAction<"chat" | "debug">>;
+  setSettingsWorkspaceSection: Dispatch<SetStateAction<SettingsWorkspaceSection>>;
+  setDebugWorkspaceSection: Dispatch<SetStateAction<DebugWorkspaceSection>>;
+  setDebugIssueSeverityFilter: Dispatch<SetStateAction<DebugIssueSeverityFilter>>;
+  setSelectedDebugIssueId: Dispatch<SetStateAction<string>>;
+  setDebugIssueFilterQuery: Dispatch<SetStateAction<string>>;
+  onHistoryDetailLoaded: (historyDetail: DebugHistoryDetailResponse | null) => void;
+}
+
+export interface DebugActionHandlers {
+  loadHistoryDetail: (id: string) => Promise<void>;
+  replayHistoryEntryFromDetail: (input: ReplayHistoryEntryRequestInput) => void;
+  clearDebugIssuesFromPanel: () => void;
+  startTraceFromDebugPanel: () => void;
+  markTraceFromDebugPanel: () => void;
+  stopTraceFromDebugPanel: () => void;
+  openDebugFromErrorBanner: () => void;
+}
+
+function readDebugIssueFilterQueryFromErrorBanner(errorBannerDetails: ErrorBannerDetails): string {
+  if (errorBannerDetails.requestId !== null && errorBannerDetails.requestId.length > 0) {
+    return errorBannerDetails.requestId;
+  }
+  if (errorBannerDetails.actionId !== null && errorBannerDetails.actionId.length > 0) {
+    return errorBannerDetails.actionId;
+  }
+  if (errorBannerDetails.operation.length > 0) {
+    return errorBannerDetails.operation;
+  }
+  return EMPTY_DEBUG_ISSUE_FILTER_QUERY;
+}
+
+export function useDebugActionHandlers(input: UseDebugActionHandlersInput): DebugActionHandlers {
+  const loadHistoryDetail = useCallback(
+    async (id: string) => {
+      await input.debugWorkspaceActionCoordinator.loadHistoryDetail({
+        historyEntryId: id,
+        debugClient: input.debugServerClient,
+        onHistoryDetailLoaded: input.onHistoryDetailLoaded,
+      });
+    },
+    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.onHistoryDetailLoaded],
+  );
+
+  const replayHistoryEntryFromDetail = useCallback(
+    (replayInput: ReplayHistoryEntryRequestInput) => {
+      void input.debugWorkspaceActionCoordinator.replayHistoryEntry({
+        replayRequest: replayInput,
+        debugClient: input.debugServerClient,
+        refreshCoreData: input.refreshCoreData,
+      });
+    },
+    [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData],
+  );
+
+  const clearDebugIssuesFromPanel = useCallback(() => {
+    input.setSelectedDebugIssueId("");
+    void input.debugWorkspaceActionCoordinator.clearClientErrors({
+      debugClient: input.debugServerClient,
+      refreshCoreData: input.refreshCoreData,
+    });
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.setSelectedDebugIssueId,
+  ]);
+
+  const startTraceFromDebugPanel = useCallback(() => {
+    void input.debugWorkspaceActionCoordinator.startTrace({
+      traceLabel: input.traceLabel,
+      debugClient: input.debugServerClient,
+      refreshCoreData: input.refreshCoreData,
+    });
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.traceLabel,
+  ]);
+
+  const markTraceFromDebugPanel = useCallback(() => {
+    void input.debugWorkspaceActionCoordinator.markTrace({
+      traceNote: input.traceNote,
+      debugClient: input.debugServerClient,
+      refreshCoreData: input.refreshCoreData,
+    });
+  }, [
+    input.debugServerClient,
+    input.debugWorkspaceActionCoordinator,
+    input.refreshCoreData,
+    input.traceNote,
+  ]);
+
+  const stopTraceFromDebugPanel = useCallback(() => {
+    void input.debugWorkspaceActionCoordinator.stopTrace({
+      debugClient: input.debugServerClient,
+      refreshCoreData: input.refreshCoreData,
+    });
+  }, [input.debugServerClient, input.debugWorkspaceActionCoordinator, input.refreshCoreData]);
+
+  const openDebugFromErrorBanner = useCallback(() => {
+    input.setActiveTab(DEBUG_APPLICATION_TAB);
+    input.setSettingsWorkspaceSection(DEBUG_SETTINGS_WORKSPACE_SECTION);
+    input.setDebugWorkspaceSection(DEBUG_ISSUES_WORKSPACE_SECTION);
+    input.setDebugIssueSeverityFilter(DEBUG_ISSUE_SEVERITY_FILTER_ALL);
+
+    if (input.errorBannerDetails.errorId !== null && input.errorBannerDetails.errorId.length > 0) {
+      input.setSelectedDebugIssueId(
+        buildDebugErrorIssueIdentifier(input.errorBannerDetails.errorId),
+      );
+      input.setDebugIssueFilterQuery(input.errorBannerDetails.errorId);
+      return;
+    }
+
+    input.setDebugIssueFilterQuery(
+      readDebugIssueFilterQueryFromErrorBanner(input.errorBannerDetails),
+    );
+  }, [
+    input.errorBannerDetails.actionId,
+    input.errorBannerDetails.errorId,
+    input.errorBannerDetails.operation,
+    input.errorBannerDetails.requestId,
+    input.setActiveTab,
+    input.setSettingsWorkspaceSection,
+    input.setDebugIssueFilterQuery,
+    input.setDebugIssueSeverityFilter,
+    input.setDebugWorkspaceSection,
+    input.setSelectedDebugIssueId,
+  ]);
+
+  return {
+    loadHistoryDetail,
+    replayHistoryEntryFromDetail,
+    clearDebugIssuesFromPanel,
+    startTraceFromDebugPanel,
+    markTraceFromDebugPanel,
+    stopTraceFromDebugPanel,
+    openDebugFromErrorBanner,
+  };
+}

@@ -1,0 +1,950 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  createElement,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useState,
+} from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  type ApplicationShellViewProperties,
+  type UseApplicationShellViewPropertiesInput,
+  useApplicationShellViewProperties,
+} from "../Source/Application/StateManagement/UseApplicationShellViewProperties";
+import { ChatScrollStateCoordinator } from "../Source/Features/Chat/StateManagement/ChatScrollStateCoordinator";
+import { type ChatModeToolbarProps } from "../Source/Features/Chat/UserInterface/ChatModeToolbar";
+
+/**
+ * Direct owner-level tests for callback wiring and side effects exposed by
+ * useApplicationShellViewProperties. The goal is to verify stable behavior
+ * without coupling to presentational component rendering details.
+ */
+interface HarnessProperties {
+  input: UseApplicationShellViewPropertiesInput;
+  onProperties: (properties: ApplicationShellViewProperties) => void;
+}
+
+function Harness(properties: HarnessProperties): React.JSX.Element {
+  const viewProperties = useApplicationShellViewProperties(properties.input);
+  properties.onProperties(viewProperties);
+  return createElement("div", {
+    "data-testid": "use-application-shell-view-properties-harness",
+  });
+}
+
+interface ShowOlderMessagesHarnessProperties {
+  input: UseApplicationShellViewPropertiesInput;
+  initialVisibleChatItemLimit: number;
+  onVisibleChatItemLimitChange: (nextVisibleChatItemLimit: number) => void;
+}
+
+function ShowOlderMessagesHarness(
+  properties: ShowOlderMessagesHarnessProperties,
+): React.JSX.Element {
+  const [visibleChatItemLimit, setVisibleChatItemLimit] = useState<number>(
+    properties.initialVisibleChatItemLimit,
+  );
+  const viewProperties = useApplicationShellViewProperties({
+    ...properties.input,
+    setVisibleChatItemLimit,
+  });
+
+  properties.onVisibleChatItemLimitChange(visibleChatItemLimit);
+
+  return createElement("button", {
+    type: "button",
+    "data-testid": "show-older-messages-button",
+    onClick: viewProperties.chatWorkspacePaneProperties.onShowOlderMessages,
+  });
+}
+
+function createStateSetterSpy<ValueType>(): Dispatch<SetStateAction<ValueType>> {
+  return vi.fn();
+}
+
+function createMutableReference<ValueType>(initialValue: ValueType): MutableRefObject<ValueType> {
+  return { current: initialValue };
+}
+
+function createChatModeToolbarPropertiesFixture(): ChatModeToolbarProps {
+  return {
+    canSetCollaborationMode: true,
+    canListCollaborationModes: true,
+    canListModels: true,
+    hasPlanModeOption: true,
+    isPlanModeEnabled: false,
+    selectedThreadId: "thread-001",
+    appDefaultValue: "default",
+    appDefaultModel: "Default Model",
+    appDefaultReasoningEffort: "Medium",
+    selectedModelId: "",
+    selectedReasoningEffort: "",
+    selectedModeKey: "",
+    modelOptionsWithoutAssumedDefault: [],
+    effortOptionsWithoutAssumedDefault: [],
+    isModeSyncing: false,
+    pendingRequestCount: 0,
+    runningTerminalCount: 0,
+    onTogglePlanMode: (): void => {},
+    onModelChange: (): void => {},
+    onReasoningEffortChange: (): void => {},
+  };
+}
+
+function createScrollableElementFixture(
+  scrollHeight: number,
+  scrollTop: number,
+  clientHeight: number,
+): HTMLDivElement {
+  const scrollElement = document.createElement("div");
+  Object.defineProperty(scrollElement, "scrollHeight", {
+    configurable: true,
+    value: scrollHeight,
+  });
+  Object.defineProperty(scrollElement, "clientHeight", {
+    configurable: true,
+    value: clientHeight,
+  });
+  scrollElement.scrollTop = scrollTop;
+  return scrollElement;
+}
+
+function createUseApplicationShellViewPropertiesFixture() {
+  const setMobileSidebarOpenSpy = vi.fn((): void => {});
+  const setDesktopSidebarOpenSpy = vi.fn((): void => {});
+  const setSettingsWorkspaceSectionSpy = vi.fn((): void => {});
+  const enablePushNotificationsFromToolbarSpy = vi.fn(async (): Promise<void> => {});
+  const refreshPushSettingsDiagnosticsSpy = vi.fn(async (): Promise<void> => {});
+  const sendPushTestNotificationFromSettingsSpy = vi.fn(async (): Promise<void> => {});
+  const prepareThreadQueriesForExplicitRefreshSpy = vi.fn(async (): Promise<void> => {});
+  const refreshCoreDataAndSelectedThreadSpy = vi.fn(async (): Promise<void> => {});
+  const setActiveTabSpy = vi.fn((): void => {});
+  const toggleThemeSpy = vi.fn((): void => {});
+  const openDebugFromErrorBannerSpy = vi.fn((): void => {});
+  const setErrorMessageSpy = vi.fn((): void => {});
+  const setSuccessBannerDetailsSpy = vi.fn((): void => {});
+  const setIsChatAtBottomSpy = vi.fn((): void => {});
+  const submitPendingRequestSpy = vi.fn(async (): Promise<void> => {});
+  const skipPendingRequestSpy = vi.fn(async (): Promise<void> => {});
+  const runInterruptSpy = vi.fn(async (): Promise<void> => {});
+  const forkThreadFromMessageSpy = vi.fn(async (): Promise<void> => {});
+  const steerMessageSpy = vi.fn(async (): Promise<void> => {});
+  const submitMessageSpy = vi.fn(async (): Promise<void> => {});
+  const setDebugWorkspaceSectionSpy = vi.fn((): void => {});
+  const setSelectedDebugIssueIdSpy = vi.fn((): void => {});
+  const setDebugIssueSeverityFilterSpy = vi.fn((): void => {});
+  const setDebugIssueFilterQuerySpy = vi.fn((): void => {});
+  const clearDebugIssuesFromDebugPanelSpy = vi.fn((): void => {});
+  const setSelectedHistoryIdSpy = vi.fn((): void => {});
+  const setWaitForReplayResponseSpy = vi.fn((): void => {});
+  const replayHistoryEntryFromDetailSpy = vi.fn((): void => {});
+  const setTraceLabelSpy = vi.fn((): void => {});
+  const setTraceNoteSpy = vi.fn((): void => {});
+  const startTraceFromDebugPanelSpy = vi.fn((): void => {});
+  const markTraceFromDebugPanelSpy = vi.fn((): void => {});
+  const stopTraceFromDebugPanelSpy = vi.fn((): void => {});
+  const refreshCoverageDiagnosticsSpy = vi.fn((): void => {});
+  const startAccountLoginSpy = vi.fn((): void => {});
+  const cancelAccountLoginSpy = vi.fn((): void => {});
+  const logoutAccountSpy = vi.fn((): void => {});
+  const reloadMcpServerConfigSpy = vi.fn((): void => {});
+  const startMcpServerOauthLoginSpy = vi.fn((_serverName: string): void => {});
+  const writeConfigValueSpy = vi.fn(
+    (
+      _keyPath: string,
+      _value: string,
+      _mergeStrategy: "replace" | "upsert",
+      _filePath?: string,
+      _expectedVersion?: string,
+    ): void => {},
+  );
+  const writeConfigBatchSpy = vi.fn(
+    (_edits: string, _filePath?: string, _expectedVersion?: string): void => {},
+  );
+  const readGitDiffToRemoteSpy = vi.fn((_cwd: string): void => {});
+  const searchFuzzyFilesSpy = vi.fn(
+    (_query: string, _roots: string[], _cancellationToken?: string): void => {},
+  );
+  const startFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string, _roots: string[]): void => {});
+  const updateFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string, _query: string): void => {});
+  const stopFuzzyFileSearchSessionSpy = vi.fn((_sessionId: string): void => {});
+  const readFuzzySessionNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readModelReroutedEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readWarningNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readThreadLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readThreadProgressNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readThreadRealtimeNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readTurnLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readItemDeltaNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readItemLifecycleNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readErrorNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const executeCommandSpy = vi.fn(
+    (_command: string[], _timeoutMs?: number, _cwd?: string): void => {},
+  );
+  const uploadFeedbackSpy = vi.fn(
+    (
+      _classification: string,
+      _includeLogs: boolean,
+      _reason?: string,
+      _threadId?: string,
+    ): void => {},
+  );
+  const writeSkillsConfigSpy = vi.fn((_skillPath: string, _enabled: boolean): void => {});
+  const exportRemoteSkillSpy = vi.fn((_hazelnutId: string): void => {});
+  const readThreadStreamEventsSpy = vi.fn(
+    (_threadId: string, _sinceSequence?: number | null): void => {},
+  );
+  const readAccountAndAppNotificationsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readNotificationEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readAuthCompletionEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readServerRequestResolvedEventsSpy = vi.fn((_sinceSequence?: number | null): void => {});
+  const readPendingServerRequestsSpy = vi.fn((): void => {});
+  const detectExternalAgentConfigSpy = vi.fn((_includeHome: boolean, _cwds: string[]): void => {});
+  const importExternalAgentConfigSpy = vi.fn((): void => {});
+  const startThreadRealtimeSpy = vi.fn(
+    (_threadId: string, _prompt: string, _sessionId?: string): void => {},
+  );
+  const appendThreadRealtimeAudioSpy = vi.fn(
+    (
+      _threadId: string,
+      _audio: {
+        data: string;
+        sampleRate: number;
+        numChannels: number;
+        samplesPerChannel: number | null;
+      },
+    ): void => {},
+  );
+  const appendThreadRealtimeTextSpy = vi.fn((_threadId: string, _text: string): void => {});
+  const stopThreadRealtimeSpy = vi.fn((_threadId: string): void => {});
+  const startWindowsSandboxSetupSpy = vi.fn((_mode: "elevated" | "unelevated"): void => {});
+  const setApiSessionTokenDraftSpy = vi.fn((): void => {});
+  const setApiSessionBootstrapErrorSpy = vi.fn((): void => {});
+  const submitApiSessionTokenSpy = vi.fn(async (): Promise<void> => {});
+  const scrollReference = createMutableReference<HTMLDivElement | null>(null);
+  const chatContentReference = createMutableReference<HTMLDivElement | null>(null);
+  const setVisibleChatItemLimitSpy = createStateSetterSpy<number>();
+
+  const input: UseApplicationShellViewPropertiesInput = {
+    health: null,
+    threadSidebarRuntimeSummary: {
+      account: null,
+      rateLimits: null,
+      apps: null,
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: null,
+    },
+    activeTab: "chat",
+    settingsWorkspaceSection: "notifications",
+    desktopSidebarOpen: false,
+    selectedThreadLabel: "Selected Thread",
+    hasSelectedThread: true,
+    activeThreadAgentId: "codex",
+    activeAgentLabel: "Codex",
+    isGenerating: false,
+    pushClientState: {
+      supported: true,
+      serviceWorkerRegistered: true,
+      permission: "granted",
+      subscribed: true,
+    },
+    pushStatus: null,
+    latestPushReceipt: null,
+    latestPushSend: null,
+    pushLocalCertificateAuthorityStatus: null,
+    pushSettingsErrorMessage: "",
+    pushTestResult: null,
+    latestTurnId: null,
+    isEnablingPushNotifications: false,
+    isRefreshingPushSettings: false,
+    isSendingPushTestNotification: false,
+    isBusy: false,
+    theme: "dark",
+    setMobileSidebarOpen: setMobileSidebarOpenSpy,
+    setDesktopSidebarOpen: setDesktopSidebarOpenSpy,
+    setSettingsWorkspaceSection: setSettingsWorkspaceSectionSpy,
+    enablePushNotificationsFromToolbar: enablePushNotificationsFromToolbarSpy,
+    refreshPushSettingsDiagnostics: refreshPushSettingsDiagnosticsSpy,
+    sendPushTestNotificationFromSettings: sendPushTestNotificationFromSettingsSpy,
+    prepareThreadQueriesForExplicitRefresh: prepareThreadQueriesForExplicitRefreshSpy,
+    refreshCoreDataAndSelectedThread: refreshCoreDataAndSelectedThreadSpy,
+    setActiveTab: setActiveTabSpy,
+    toggleTheme: toggleThemeSpy,
+    renderAgentFavicon: vi.fn(() => null),
+    errorMessage: "runtime-error",
+    errorBannerDetails: {
+      operation: "refresh",
+      message: "request failed",
+      actionId: "action-123",
+      requestId: "request-123",
+      errorId: "error-123",
+    },
+    successBannerDetails: null,
+    openDebugFromErrorBanner: openDebugFromErrorBannerSpy,
+    setErrorMessage: setErrorMessageSpy,
+    setSuccessBannerDetails: setSuccessBannerDetailsSpy,
+    liveStateReductionError: null,
+    chatSurfaceState: "ready",
+    interruptedTurnNotice: null,
+    selectedThreadId: "thread-001",
+    isCoreLoading: false,
+    isSelectedThreadLoading: false,
+    availableAgentIds: ["codex"],
+    canCreateNewThreadFromComposer: true,
+    turnCount: 1,
+    scrollRef: scrollReference,
+    chatContentRef: chatContentReference,
+    visibleConversationItems: [],
+    hasHiddenChatItems: false,
+    firstVisibleChatItemIndex: 0,
+    setVisibleChatItemLimit: setVisibleChatItemLimitSpy,
+    conversationItemCount: 100,
+    visibleChatItemsStep: 25,
+    isChatAtBottom: false,
+    chatScrollStateCoordinator: new ChatScrollStateCoordinator(16),
+    setIsChatAtBottom: setIsChatAtBottomSpy,
+    activeRequest: null,
+    canSubmitUserInputForActiveAgent: false,
+    answerDraft: {},
+    handleAnswerChange: vi.fn((): void => {}),
+    submitPendingRequest: submitPendingRequestSpy,
+    skipPendingRequest: skipPendingRequestSpy,
+    selectedAgentLabel: "Codex",
+    runInterrupt: runInterruptSpy,
+    forkThreadFromMessage: forkThreadFromMessageSpy,
+    steerMessage: steerMessageSpy,
+    submitMessage: submitMessageSpy,
+    chatModeToolbarProperties: createChatModeToolbarPropertiesFixture(),
+    debugWorkspaceSection: "issues",
+    setDebugWorkspaceSection: setDebugWorkspaceSectionSpy,
+    debugErrorIssueCount: 0,
+    debugWarningIssueCount: 0,
+    runtimeRequestErrorOperationMetrics: [],
+    filteredDebugIssues: [],
+    selectedDebugIssue: null,
+    selectedDebugIssueId: "",
+    debugIssueSeverityFilter: "all",
+    debugIssueFilterQuery: "",
+    debugErrorSessionId: "",
+    debugErrorSessionLogPath: "",
+    setSelectedDebugIssueId: setSelectedDebugIssueIdSpy,
+    setDebugIssueSeverityFilter: setDebugIssueSeverityFilterSpy,
+    setDebugIssueFilterQuery: setDebugIssueFilterQuerySpy,
+    clearDebugIssuesFromDebugPanel: clearDebugIssuesFromDebugPanelSpy,
+    debugHistoryEntryListItems: [],
+    selectedHistoryId: "",
+    selectedHistoryDetailId: null,
+    historyDetailPayloadText: "",
+    waitForReplayResponse: false,
+    setSelectedHistoryId: setSelectedHistoryIdSpy,
+    setWaitForReplayResponse: setWaitForReplayResponseSpy,
+    replayHistoryEntryFromDetail: replayHistoryEntryFromDetailSpy,
+    streamEventCount: 0,
+    streamEventCards: [],
+    isTraceRecording: false,
+    traceLabel: "",
+    traceNote: "",
+    setTraceLabel: setTraceLabelSpy,
+    setTraceNote: setTraceNoteSpy,
+    startTraceFromDebugPanel: startTraceFromDebugPanelSpy,
+    markTraceFromDebugPanel: markTraceFromDebugPanelSpy,
+    stopTraceFromDebugPanel: stopTraceFromDebugPanelSpy,
+    recentTraceSummaries: [],
+    isLoadingCoverageDiagnostics: false,
+    isRunningCoverageAction: false,
+    coverageDiagnosticsErrorMessage: "",
+    coverageActionErrorMessage: "",
+    coverageDiagnosticsSnapshot: null,
+    pendingAccountLogin: null,
+    lastCommandExecutionResult: null,
+    lastConfigBatchWriteResult: null,
+    lastConfigValueWriteResult: null,
+    lastExternalAgentConfigDetectResult: null,
+    lastExternalAgentConfigImportResult: null,
+    lastThreadRealtimeStartResult: null,
+    lastThreadRealtimeAppendAudioResult: null,
+    lastThreadRealtimeAppendTextResult: null,
+    lastThreadRealtimeStopResult: null,
+    lastWindowsSandboxSetupStartResult: null,
+    lastFeedbackUploadResult: null,
+    lastErrorNotificationsResult: null,
+    lastFuzzyFileSearchResult: null,
+    lastFuzzyFileSearchSessionStartResult: null,
+    lastFuzzyFileSearchSessionUpdateResult: null,
+    lastFuzzyFileSearchSessionStopResult: null,
+    lastFuzzySessionNotificationsResult: null,
+    lastModelReroutedEventsResult: null,
+    lastWarningNotificationsResult: null,
+    lastThreadLifecycleNotificationsResult: null,
+    lastThreadProgressNotificationsResult: null,
+    lastThreadRealtimeNotificationsResult: null,
+    lastTurnLifecycleNotificationsResult: null,
+    lastItemDeltaNotificationsResult: null,
+    lastItemLifecycleNotificationsResult: null,
+    lastGitDiffToRemoteResult: null,
+    lastThreadStreamEventsResult: null,
+    lastAccountAndAppNotificationsResult: null,
+    lastNotificationEventsResult: null,
+    lastAuthCompletionEventsResult: null,
+    lastPendingServerRequestsResult: null,
+    lastServerRequestResolvedEventsResult: null,
+    refreshCoverageDiagnostics: refreshCoverageDiagnosticsSpy,
+    startAccountLogin: startAccountLoginSpy,
+    cancelAccountLogin: cancelAccountLoginSpy,
+    logoutAccount: logoutAccountSpy,
+    reloadMcpServerConfig: reloadMcpServerConfigSpy,
+    startMcpServerOauthLogin: startMcpServerOauthLoginSpy,
+    writeConfigValue: writeConfigValueSpy,
+    writeConfigBatch: writeConfigBatchSpy,
+    readGitDiffToRemote: readGitDiffToRemoteSpy,
+    searchFuzzyFiles: searchFuzzyFilesSpy,
+    startFuzzyFileSearchSession: startFuzzyFileSearchSessionSpy,
+    updateFuzzyFileSearchSession: updateFuzzyFileSearchSessionSpy,
+    stopFuzzyFileSearchSession: stopFuzzyFileSearchSessionSpy,
+    readFuzzySessionNotifications: readFuzzySessionNotificationsSpy,
+    readModelReroutedEvents: readModelReroutedEventsSpy,
+    readWarningNotifications: readWarningNotificationsSpy,
+    readThreadLifecycleNotifications: readThreadLifecycleNotificationsSpy,
+    readThreadProgressNotifications: readThreadProgressNotificationsSpy,
+    readThreadRealtimeNotifications: readThreadRealtimeNotificationsSpy,
+    readTurnLifecycleNotifications: readTurnLifecycleNotificationsSpy,
+    readItemDeltaNotifications: readItemDeltaNotificationsSpy,
+    readItemLifecycleNotifications: readItemLifecycleNotificationsSpy,
+    readErrorNotifications: readErrorNotificationsSpy,
+    executeCommand: executeCommandSpy,
+    uploadFeedback: uploadFeedbackSpy,
+    writeSkillsConfig: writeSkillsConfigSpy,
+    exportRemoteSkill: exportRemoteSkillSpy,
+    readThreadStreamEvents: readThreadStreamEventsSpy,
+    readAccountAndAppNotifications: readAccountAndAppNotificationsSpy,
+    readNotificationEvents: readNotificationEventsSpy,
+    readAuthCompletionEvents: readAuthCompletionEventsSpy,
+    readServerRequestResolvedEvents: readServerRequestResolvedEventsSpy,
+    readPendingServerRequests: readPendingServerRequestsSpy,
+    detectExternalAgentConfig: detectExternalAgentConfigSpy,
+    importExternalAgentConfig: importExternalAgentConfigSpy,
+    startThreadRealtime: startThreadRealtimeSpy,
+    appendThreadRealtimeAudio: appendThreadRealtimeAudioSpy,
+    appendThreadRealtimeText: appendThreadRealtimeTextSpy,
+    stopThreadRealtime: stopThreadRealtimeSpy,
+    startWindowsSandboxSetup: startWindowsSandboxSetupSpy,
+    apiSessionTokenDraft: "",
+    setApiSessionTokenDraft: setApiSessionTokenDraftSpy,
+    apiSessionBootstrapError: "invalid-token",
+    setApiSessionBootstrapError: setApiSessionBootstrapErrorSpy,
+    submitApiSessionToken: submitApiSessionTokenSpy,
+    isApiSessionBootstrapPending: false,
+  };
+
+  return {
+    input,
+    scrollReference,
+    setMobileSidebarOpenSpy,
+    setDesktopSidebarOpenSpy,
+    setSettingsWorkspaceSectionSpy,
+    enablePushNotificationsFromToolbarSpy,
+    refreshPushSettingsDiagnosticsSpy,
+    sendPushTestNotificationFromSettingsSpy,
+    prepareThreadQueriesForExplicitRefreshSpy,
+    refreshCoreDataAndSelectedThreadSpy,
+    setActiveTabSpy,
+    toggleThemeSpy,
+    openDebugFromErrorBannerSpy,
+    setErrorMessageSpy,
+    setIsChatAtBottomSpy,
+    forkThreadFromMessageSpy,
+    setApiSessionTokenDraftSpy,
+    setApiSessionBootstrapErrorSpy,
+    uploadFeedbackSpy,
+  };
+}
+
+function renderViewProperties(
+  input: UseApplicationShellViewPropertiesInput,
+): ApplicationShellViewProperties {
+  const capturedProperties: { current: ApplicationShellViewProperties | null } = {
+    current: null,
+  };
+
+  render(
+    createElement(Harness, {
+      input,
+      onProperties: (properties) => {
+        capturedProperties.current = properties;
+      },
+    }),
+  );
+
+  if (!capturedProperties.current) {
+    throw new Error("Expected application shell view properties to be captured.");
+  }
+
+  return capturedProperties.current;
+}
+
+function renderViewPropertiesHarness(input: UseApplicationShellViewPropertiesInput): {
+  rerender: (nextInput: UseApplicationShellViewPropertiesInput) => void;
+  readLatestProperties: () => ApplicationShellViewProperties;
+} {
+  const capturedProperties: { current: ApplicationShellViewProperties | null } = {
+    current: null,
+  };
+
+  const renderResult = render(
+    createElement(Harness, {
+      input,
+      onProperties: (properties) => {
+        capturedProperties.current = properties;
+      },
+    }),
+  );
+
+  return {
+    rerender: (nextInput) => {
+      renderResult.rerender(
+        createElement(Harness, {
+          input: nextInput,
+          onProperties: (properties) => {
+            capturedProperties.current = properties;
+          },
+        }),
+      );
+    },
+    readLatestProperties: () => {
+      if (!capturedProperties.current) {
+        throw new Error("Expected application shell view properties to be captured.");
+      }
+
+      return capturedProperties.current;
+    },
+  };
+}
+
+function renderShowOlderMessagesHarness(
+  input: UseApplicationShellViewPropertiesInput,
+  initialVisibleChatItemLimit: number,
+): {
+  clickShowOlderMessages: () => void;
+  getLatestVisibleChatItemLimit: () => number;
+} {
+  const visibleChatItemLimitValues: number[] = [];
+
+  render(
+    createElement(ShowOlderMessagesHarness, {
+      input,
+      initialVisibleChatItemLimit,
+      onVisibleChatItemLimitChange: (nextVisibleChatItemLimit) => {
+        visibleChatItemLimitValues.push(nextVisibleChatItemLimit);
+      },
+    }),
+  );
+
+  return {
+    clickShowOlderMessages: () => {
+      fireEvent.click(screen.getByTestId("show-older-messages-button"));
+    },
+    getLatestVisibleChatItemLimit: () => {
+      const latestVisibleChatItemLimit = visibleChatItemLimitValues.at(-1);
+      if (latestVisibleChatItemLimit === undefined) {
+        throw new Error("Expected visible chat item limit to be captured.");
+      }
+
+      return latestVisibleChatItemLimit;
+    },
+  };
+}
+
+describe("useApplicationShellViewProperties", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("wires header and settings actions to the expected owner callbacks", async () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+    const headerProperties = viewProperties.applicationHeaderBarProperties;
+    const settingsProperties = viewProperties.settingsWorkspacePaneProperties;
+
+    headerProperties.onOpenMobileSidebar();
+    expect(fixture.setMobileSidebarOpenSpy).toHaveBeenCalledWith(true);
+    expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
+
+    headerProperties.onOpenDesktopSidebar();
+    expect(fixture.setDesktopSidebarOpenSpy).toHaveBeenCalledWith(true);
+    expect(fixture.setActiveTabSpy).not.toHaveBeenCalled();
+
+    void settingsProperties.onRefreshData();
+    expect(fixture.prepareThreadQueriesForExplicitRefreshSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(fixture.refreshCoreDataAndSelectedThreadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    settingsProperties.onToggleTheme();
+    expect(fixture.toggleThemeSpy).toHaveBeenCalledTimes(1);
+
+    headerProperties.onToggleSettingsTab();
+    expect(fixture.setActiveTabSpy).toHaveBeenLastCalledWith("debug");
+  });
+
+  it("exposes thread-sidebar runtime summary from shell state without remapping", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: {
+        mode: "chatgpt",
+        planType: "pro",
+        email: "dev@example.com",
+        requiresOpenaiAuth: false,
+        refreshedAtMilliseconds: 1_700_000_000_100,
+      },
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: null,
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: {
+        appCount: 3,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: null,
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.threadSidebarRuntimeSummary).toEqual({
+      account: {
+        mode: "chatgpt",
+        planType: "pro",
+        email: "dev@example.com",
+        requiresOpenaiAuth: false,
+        refreshedAtMilliseconds: 1_700_000_000_100,
+      },
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: null,
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: {
+        appCount: 3,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: null,
+    });
+  });
+
+  it("maps rate-limit summary into chat toolbar runtime usage lines", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: {
+        limitId: "codex",
+        planType: "pro",
+        usedPercent: 42,
+        primaryWindow: {
+          usedPercent: 42,
+          windowDurationMinutes: 300,
+        },
+        secondaryWindow: {
+          usedPercent: 12,
+          windowDurationMinutes: 10_080,
+        },
+        refreshedAtMilliseconds: 1_700_000_000_000,
+      },
+      apps: null,
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: null,
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(
+      viewProperties.chatWorkspacePaneProperties.chatModeToolbarProperties.runtimeUsageSummaryLines,
+    ).toEqual([
+      {
+        label: "5h",
+        leftPercent: 58,
+      },
+      {
+        label: "Weekly",
+        leftPercent: 88,
+      },
+    ]);
+  });
+
+  it("maps runtime warning summary into header properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: null,
+      apps: null,
+      progress: null,
+      warning: {
+        method: "configWarning",
+        severity: "warning",
+        summary: "Config file has an unknown key",
+        threadId: null,
+        isRetrying: false,
+        sequence: 18,
+        receivedAtMilliseconds: 1_700_000_000_700,
+        refreshedAtMilliseconds: 1_700_000_000_800,
+      },
+      tokenUsage: null,
+      modelReroute: null,
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.applicationHeaderBarProperties.runtimeWarningSummary).toEqual({
+      method: "configWarning",
+      severity: "warning",
+      summary: "Config file has an unknown key",
+      threadId: null,
+      isRetrying: false,
+      sequence: 18,
+      receivedAtMilliseconds: 1_700_000_000_700,
+      refreshedAtMilliseconds: 1_700_000_000_800,
+    });
+  });
+
+  it("maps runtime model-reroute summary into header properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.threadSidebarRuntimeSummary = {
+      account: null,
+      rateLimits: null,
+      apps: null,
+      progress: null,
+      warning: null,
+      tokenUsage: null,
+      modelReroute: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        fromModel: "gpt-5",
+        toModel: "gpt-5-safe",
+        reason: "highRiskCyberActivity",
+        sequence: 17,
+        receivedAtMilliseconds: 1_700_000_000_000,
+        refreshedAtMilliseconds: 1_700_000_000_500,
+      },
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.applicationHeaderBarProperties.runtimeModelRerouteSummary).toEqual({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      fromModel: "gpt-5",
+      toModel: "gpt-5-safe",
+      reason: "highRiskCyberActivity",
+      sequence: 17,
+      receivedAtMilliseconds: 1_700_000_000_000,
+      refreshedAtMilliseconds: 1_700_000_000_500,
+    });
+  });
+
+  it("passes interrupted-turn notice through to chat workspace properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.interruptedTurnNotice = {
+      title: "Turn Interrupted",
+      message:
+        "This turn ended before the agent produced a response. Send another message to retry.",
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.chatWorkspacePaneProperties.interruptedTurnNotice).toEqual({
+      title: "Turn Interrupted",
+      message:
+        "This turn ended before the agent produced a response. Send another message to retry.",
+    });
+  });
+
+  it("binds message fork actions to the selected thread identifier", async () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    const onForkFromMessage = viewProperties.chatWorkspacePaneProperties.onForkFromMessage;
+    if (onForkFromMessage === undefined) {
+      throw new Error("Expected chat workspace pane fork handler");
+    }
+
+    await onForkFromMessage("message-22");
+
+    expect(fixture.forkThreadFromMessageSpy).toHaveBeenCalledWith("thread-001", "message-22");
+  });
+
+  it("toggles settings tab back to chat when settings tab is already active", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.activeTab = "debug";
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.applicationHeaderBarProperties.onToggleSettingsTab();
+
+    expect(fixture.setActiveTabSpy).toHaveBeenCalledWith("chat");
+  });
+
+  it("clears the debug banner error when opening debug from the banner", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.debugStatusBannersProperties.onOpenDebugFromErrorBanner();
+
+    expect(fixture.openDebugFromErrorBannerSpy).toHaveBeenCalledTimes(1);
+    expect(fixture.setErrorMessageSpy).toHaveBeenCalledWith("");
+  });
+
+  it("clears the debug banner error when dismissing the banner", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.debugStatusBannersProperties.onDismissErrorBanner();
+
+    expect(fixture.setErrorMessageSpy).toHaveBeenCalledWith("");
+  });
+
+  it("pins chat scroll to the bottom and marks chat as at-bottom when jump-to-bottom is requested", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const scrollElement = createScrollableElementFixture(420, 40, 200);
+    fixture.scrollReference.current = scrollElement;
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.chatWorkspacePaneProperties.onJumpToBottom();
+
+    expect(scrollElement.scrollTop).toBe(420);
+    expect(fixture.setIsChatAtBottomSpy).toHaveBeenCalledWith(true);
+  });
+
+  it("does not mark chat as at-bottom when jump-to-bottom has no scroll element", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.chatWorkspacePaneProperties.onJumpToBottom();
+
+    expect(fixture.setIsChatAtBottomSpy).not.toHaveBeenCalled();
+  });
+
+  it("increases the visible chat item limit by step and caps at the total conversation item count", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.conversationItemCount = 100;
+    fixture.input.visibleChatItemsStep = 25;
+
+    const harness = renderShowOlderMessagesHarness(fixture.input, 50);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(75);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(100);
+
+    harness.clickShowOlderMessages();
+    expect(harness.getLatestVisibleChatItemLimit()).toBe(100);
+  });
+
+  it("clears api session bootstrap error after token draft changes when an error is currently shown", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.apiSessionBootstrapOverlayProperties.onApiTokenDraftChange("next-token");
+
+    expect(fixture.setApiSessionTokenDraftSpy).toHaveBeenCalledWith("next-token");
+    expect(fixture.setApiSessionBootstrapErrorSpy).toHaveBeenCalledWith("");
+  });
+
+  it("keeps api session bootstrap error untouched after token draft changes when there is no active error", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.apiSessionBootstrapError = "";
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.apiSessionBootstrapOverlayProperties.onApiTokenDraftChange("next-token");
+
+    expect(fixture.setApiSessionTokenDraftSpy).toHaveBeenCalledWith("next-token");
+    expect(fixture.setApiSessionBootstrapErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it("preserves chat and header property identity when only debug workspace input changes", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const harness = renderViewPropertiesHarness(fixture.input);
+
+    const initialProperties = harness.readLatestProperties();
+    harness.rerender({
+      ...fixture.input,
+      debugIssueFilterQuery: "request-id:abc123",
+    });
+    const nextProperties = harness.readLatestProperties();
+
+    expect(nextProperties.applicationHeaderBarProperties).toBe(
+      initialProperties.applicationHeaderBarProperties,
+    );
+    expect(nextProperties.chatWorkspacePaneProperties).toBe(
+      initialProperties.chatWorkspacePaneProperties,
+    );
+    expect(nextProperties.settingsWorkspacePaneProperties).not.toBe(
+      initialProperties.settingsWorkspacePaneProperties,
+    );
+  });
+
+  it("preserves non-bootstrap property identity when only api bootstrap input changes", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const harness = renderViewPropertiesHarness(fixture.input);
+
+    const initialProperties = harness.readLatestProperties();
+    harness.rerender({
+      ...fixture.input,
+      apiSessionTokenDraft: "token-v2",
+    });
+    const nextProperties = harness.readLatestProperties();
+
+    expect(nextProperties.applicationHeaderBarProperties).toBe(
+      initialProperties.applicationHeaderBarProperties,
+    );
+    expect(nextProperties.chatWorkspacePaneProperties).toBe(
+      initialProperties.chatWorkspacePaneProperties,
+    );
+    expect(nextProperties.settingsWorkspacePaneProperties).toBe(
+      initialProperties.settingsWorkspacePaneProperties,
+    );
+    expect(nextProperties.apiSessionBootstrapOverlayProperties).not.toBe(
+      initialProperties.apiSessionBootstrapOverlayProperties,
+    );
+  });
+
+  it("wires coverage feedback upload action through debug workspace pane properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    viewProperties.settingsWorkspacePaneProperties.debugWorkspacePaneProperties.onUploadFeedback(
+      "quality",
+      true,
+      "Coverage validation path",
+      "thread-002",
+    );
+
+    expect(fixture.uploadFeedbackSpy).toHaveBeenCalledWith(
+      "quality",
+      true,
+      "Coverage validation path",
+      "thread-002",
+    );
+  });
+});

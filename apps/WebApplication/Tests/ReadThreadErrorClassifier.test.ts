@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import {
+  isThreadNotLoadedReadError,
+  isThreadStillMaterializingReadError,
+  isTransientReadThreadError,
+} from "../Source/Features/Chat/DomainModel/ReadThreadErrorClassifier";
+
+describe("ReadThreadErrorClassifier", () => {
+  it("identifies transient read-thread errors", () => {
+    expect(isTransientReadThreadError("failed to load rollout abc is empty")).toBe(true);
+    expect(isTransientReadThreadError("thread not loaded in app-server")).toBe(true);
+    expect(
+      isTransientReadThreadError(
+        "Request failed for /api/threads/thread-404?includeTurns=true status=404",
+      ),
+    ).toBe(false);
+    expect(
+      isTransientReadThreadError(
+        "app-server error -32600: thread abc is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    ).toBe(true);
+    expect(
+      isTransientReadThreadError(
+        "Request failed for /api/threads/thread-500?includeTurns=false status=503 Service Unavailable",
+      ),
+    ).toBe(true);
+    expect(isTransientReadThreadError("conversation not found")).toBe(true);
+    expect(isTransientReadThreadError("permission denied")).toBe(false);
+  });
+
+  it("identifies thread-not-loaded errors specifically", () => {
+    expect(isThreadNotLoadedReadError("thread not loaded in app-server")).toBe(true);
+    expect(
+      isThreadNotLoadedReadError(
+        "Request failed for /api/threads/thread-404?includeTurns=true status=404",
+      ),
+    ).toBe(true);
+    expect(isThreadNotLoadedReadError("conversation not found")).toBe(false);
+  });
+
+  it("identifies still-materializing empty-thread reads specifically", () => {
+    expect(
+      isThreadStillMaterializingReadError(
+        "app-server error -32600: thread abc is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    ).toBe(true);
+    expect(isThreadStillMaterializingReadError("thread not loaded in app-server")).toBe(false);
+  });
+});

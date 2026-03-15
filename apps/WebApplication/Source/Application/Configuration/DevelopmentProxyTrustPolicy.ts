@@ -1,0 +1,108 @@
+import { z } from "zod";
+
+/**
+ * Owns trusted-origin decisions for Vite dev-proxy API token injection.
+ * Only explicitly configured browser origins may receive injected API auth, while originless
+ * requests remain loopback-only so command-line traffic does not inherit protected access.
+ */
+const HTTP_PROTOCOL = "http:";
+const HTTPS_PROTOCOL = "https:";
+const DEFAULT_DEVELOPMENT_PROXY_PORT = 4312;
+const LOOPBACK_REMOTE_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+const LOOPBACK_ORIGIN_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
+export interface DevelopmentProxyTrustDecisionInput {
+  apiToken: string;
+  originHeader: string | undefined;
+  hostHeader: string | undefined;
+  remoteAddress: string | undefined;
+  trustedOrigins: ReadonlySet<string>;
+}
+
+function normalizeOrigin(origin: string): string {
+  const parsed = new URL(origin);
+  if (parsed.protocol !== HTTP_PROTOCOL && parsed.protocol !== HTTPS_PROTOCOL) {
+    throw new Error(`Unsupported origin protocol in VITE_DEV_PROXY_TRUSTED_ORIGINS: ${origin}`);
+  }
+  return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+}
+
+function normalizeOriginHeader(origin: string): string | null {
+  try {
+    return normalizeOrigin(origin);
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackTrustedOrigin(origin: string): boolean {
+  const parsedOrigin = new URL(origin);
+  return LOOPBACK_ORIGIN_HOSTNAMES.has(parsedOrigin.hostname);
+}
+
+function buildDefaultTrustedDevelopmentProxyOriginValues(port: number): string[] {
+  return [
+    `http://localhost:${String(port)}`,
+    `http://127.0.0.1:${String(port)}`,
+    `http://[::1]:${String(port)}`,
+  ];
+}
+
+export function parseTrustedDevelopmentProxyOrigins(
+  rawOrigins: string | undefined,
+  port = DEFAULT_DEVELOPMENT_PROXY_PORT,
+): ReadonlySet<string> {
+  if (!rawOrigins || rawOrigins.trim().length === 0) {
+    return new Set(
+      buildDefaultTrustedDevelopmentProxyOriginValues(port).map((origin) =>
+        normalizeOrigin(origin),
+      ),
+    );
+  }
+
+  const parsedOrigins = rawOrigins
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .map((value) => normalizeOrigin(value));
+
+  if (parsedOrigins.length === 0) {
+    throw new Error("VITE_DEV_PROXY_TRUSTED_ORIGINS must contain at least one origin when set");
+  }
+  return new Set(parsedOrigins);
+}
+
+export function shouldInjectApiTokenForDevelopmentProxy(
+  input: DevelopmentProxyTrustDecisionInput,
+): boolean {
+  if (input.apiToken.trim().length === 0) {
+    return false;
+  }
+
+  if (typeof input.originHeader !== "string") {
+    return LOOPBACK_REMOTE_ADDRESSES.has(input.remoteAddress ?? "");
+  }
+
+  const normalizedOrigin = normalizeOriginHeader(input.originHeader);
+  if (normalizedOrigin === null) {
+    return false;
+  }
+
+  if (input.trustedOrigins.has(normalizedOrigin)) {
+    if (
+      isLoopbackTrustedOrigin(normalizedOrigin) &&
+      !LOOPBACK_REMOTE_ADDRESSES.has(input.remoteAddress ?? "")
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+const DevelopmentProxyTrustedOriginSchema = z.string().trim().min(1);
+export const DEFAULT_TRUSTED_DEVELOPMENT_PROXY_ORIGINS = new Set(
+  buildDefaultTrustedDevelopmentProxyOriginValues(DEFAULT_DEVELOPMENT_PROXY_PORT).map((origin) =>
+    DevelopmentProxyTrustedOriginSchema.parse(normalizeOrigin(origin)),
+  ),
+);

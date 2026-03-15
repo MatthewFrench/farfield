@@ -1,0 +1,27 @@
+{
+  "name": "@farfield/api",
+  "description": "Strict Codex app-server and desktop IPC adapter.",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/Index.d.ts",
+      "farfield-source": "./Source/Index.ts",
+      "default": "./dist/Index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint Source Tests --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "bun run lint && bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@farfield/protocol": "workspace:*",
+    "zod": "^3.24.1"
+  }
+}

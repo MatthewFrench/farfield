@@ -1,0 +1,1088 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityApi", () => ({
+  getHealth: vi.fn(),
+  listApps: vi.fn(),
+  listAgents: vi.fn(),
+  listExperimentalFeatures: vi.fn(),
+  listMcpServers: vi.fn(),
+  listSkills: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityAccountApi", () => ({
+  cancelAccountLogin: vi.fn(),
+  getAccount: vi.fn(),
+  getAccountRateLimits: vi.fn(),
+  logoutAccount: vi.fn(),
+  startAccountLogin: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCatalogApi", () => ({
+  listCollaborationModes: vi.fn(),
+  listModels: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityConfigurationApi", () => ({
+  getConfigRequirements: vi.fn(),
+  getConfigDefaults: vi.fn(),
+  reloadMcpServerConfig: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi", () => ({
+  readAccountAuthStatus: vi.fn(),
+  readAccountUserInfo: vi.fn(),
+  readGitDiffToRemote: vi.fn(),
+  executeCommand: vi.fn(),
+  exportRemoteSkill: vi.fn(),
+  listRemoteSkills: vi.fn(),
+  startMcpServerOauthLogin: vi.fn(),
+  uploadFeedback: vi.fn(),
+  writeConfigBatch: vi.fn(),
+  writeConfigValue: vi.fn(),
+  writeSkillsConfig: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi", () => ({
+  searchFuzzyFiles: vi.fn(),
+  startFuzzyFileSearchSession: vi.fn(),
+  updateFuzzyFileSearchSession: vi.fn(),
+  stopFuzzyFileSearchSession: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi", () => ({
+  startThreadRealtime: vi.fn(),
+  appendThreadRealtimeAudio: vi.fn(),
+  appendThreadRealtimeText: vi.fn(),
+  stopThreadRealtime: vi.fn(),
+}));
+
+vi.mock("../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSandboxApi", () => ({
+  startWindowsSandboxSetup: vi.fn(),
+}));
+
+vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadStreamEventsApi",
+  () => ({
+    readThreadStreamEvents: vi.fn(),
+  }),
+);
+
+vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageNotificationEventsApi",
+  () => ({
+    readNotificationEvents: vi.fn(),
+  }),
+);
+
+vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoveragePendingServerRequestsApi",
+  () => ({
+    readPendingServerRequests: vi.fn(),
+  }),
+);
+
+vi.mock(
+  "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi",
+  () => ({
+    detectExternalAgentConfig: vi.fn(),
+    importExternalAgentConfig: vi.fn(),
+  }),
+);
+
+import {
+  cancelAccountLogin,
+  getAccount,
+  getAccountRateLimits,
+  logoutAccount,
+  startAccountLogin,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityAccountApi";
+import {
+  getHealth,
+  listAgents,
+  listApps,
+  listExperimentalFeatures,
+  listMcpServers,
+  listSkills,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityApi";
+import {
+  listCollaborationModes,
+  listModels,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCatalogApi";
+import {
+  getConfigDefaults,
+  getConfigRequirements,
+  reloadMcpServerConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityConfigurationApi";
+import {
+  detectExternalAgentConfig,
+  importExternalAgentConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageExternalAgentConfigApi";
+import {
+  searchFuzzyFiles,
+  startFuzzyFileSearchSession,
+  stopFuzzyFileSearchSession,
+  updateFuzzyFileSearchSession,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageFuzzyFileSearchApi";
+import {
+  executeCommand,
+  exportRemoteSkill,
+  listRemoteSkills,
+  readAccountAuthStatus,
+  readAccountUserInfo,
+  readGitDiffToRemote,
+  startMcpServerOauthLogin,
+  uploadFeedback,
+  writeConfigBatch,
+  writeConfigValue,
+  writeSkillsConfig,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageMutationApi";
+import { readNotificationEvents } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageNotificationEventsApi";
+import { readPendingServerRequests } from "../Source/Features/Capabilities/DataAccess/CapabilityCoveragePendingServerRequestsApi";
+import {
+  appendThreadRealtimeAudio,
+  appendThreadRealtimeText,
+  startThreadRealtime,
+  stopThreadRealtime,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadRealtimeApi";
+import { readThreadStreamEvents } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageThreadStreamEventsApi";
+import { startWindowsSandboxSetup } from "../Source/Features/Capabilities/DataAccess/CapabilityCoverageWindowsSandboxApi";
+import {
+  type CapabilityAccountAuthStatusResponse,
+  type CapabilityAccountLoginCancelResponse,
+  type CapabilityAccountLoginStartResponse,
+  type CapabilityAccountRateLimitsResponse,
+  type CapabilityAccountResponse,
+  type CapabilityAccountUserInfoResponse,
+  type CapabilityAgentsResponse,
+  type CapabilityAppsResponse,
+  type CapabilityCollaborationModesResponse,
+  type CapabilityCommandExecutionResponse,
+  type CapabilityConfigBatchWriteResponse,
+  type CapabilityConfigDefaultsResponse,
+  type CapabilityConfigRequirementsResponse,
+  type CapabilityConfigValueWriteResponse,
+  type CapabilityExperimentalFeaturesResponse,
+  type CapabilityExternalAgentConfigDetectResponse,
+  type CapabilityExternalAgentConfigImportResponse,
+  type CapabilityFeedbackUploadResponse,
+  type CapabilityFuzzyFileSearchResponse,
+  type CapabilityFuzzyFileSearchSessionStartResponse,
+  type CapabilityFuzzyFileSearchSessionStopResponse,
+  type CapabilityFuzzyFileSearchSessionUpdateResponse,
+  type CapabilityGitDiffToRemoteResponse,
+  type CapabilityHealthResponse,
+  type CapabilityMcpServerOauthLoginResponse,
+  type CapabilityMcpServersResponse,
+  type CapabilityModelsResponse,
+  type CapabilityMutationSuccessResponse,
+  type CapabilityNotificationEventsResponse,
+  type CapabilityPendingServerRequestsResponse,
+  type CapabilityRemoteSkillExportResponse,
+  type CapabilityRemoteSkillsListResponse,
+  CapabilityServerClient,
+  type CapabilitySkillsConfigWriteResponse,
+  type CapabilitySkillsResponse,
+  type CapabilityThreadRealtimeAppendAudioResponse,
+  type CapabilityThreadRealtimeAppendTextResponse,
+  type CapabilityThreadRealtimeStartResponse,
+  type CapabilityThreadRealtimeStopResponse,
+  type CapabilityThreadStreamEventsResponse,
+  type CapabilityWindowsSandboxSetupStartResponse,
+} from "../Source/Features/Capabilities/DataAccess/CapabilityServerClient";
+
+const HEALTH_RESPONSE: CapabilityHealthResponse = {
+  ok: true,
+  state: {
+    appReady: true,
+    ipcConnected: true,
+    ipcInitialized: true,
+    lastError: null,
+    historyCount: 0,
+    threadOwnerCount: 0,
+  },
+};
+
+const AGENTS_RESPONSE: CapabilityAgentsResponse = {
+  ok: true,
+  agents: [
+    {
+      id: "codex",
+      label: "Codex",
+      enabled: true,
+      connected: true,
+      capabilities: {
+        canListModels: true,
+        canListCollaborationModes: true,
+        canReadConfigRequirements: true,
+        canListExperimentalFeatures: true,
+        canListMcpServerStatuses: true,
+        canListApps: true,
+        canListSkills: true,
+        canReadAccount: true,
+        canReadAccountRateLimits: true,
+        canSearchFuzzyFiles: true,
+        canExecuteCommand: true,
+        canStartAccountLogin: true,
+        canCancelAccountLogin: true,
+        canLogoutAccount: true,
+        canReloadMcpServerConfig: true,
+        canStartMcpServerOauthLogin: true,
+        canWriteConfigValue: true,
+        canWriteSkillsConfig: true,
+        canDetectExternalAgentConfig: true,
+        canImportExternalAgentConfig: true,
+        canStartThreadRealtime: true,
+        canAppendThreadRealtimeAudio: true,
+        canAppendThreadRealtimeText: true,
+        canStopThreadRealtime: true,
+        canStartWindowsSandboxSetup: true,
+        canSetCollaborationMode: true,
+        canSubmitUserInput: true,
+        canReadLiveState: true,
+        canReadStreamEvents: true,
+        canReadNotificationEvents: true,
+      },
+      projectDirectories: ["/tmp/project"],
+    },
+  ],
+  defaultAgentId: "codex",
+};
+
+const COLLABORATION_MODES_RESPONSE: CapabilityCollaborationModesResponse = {
+  data: [
+    {
+      name: "Balanced",
+      mode: "default",
+      model: "gpt-5",
+      reasoning_effort: "medium",
+    },
+  ],
+};
+
+const MODELS_RESPONSE: CapabilityModelsResponse = {
+  data: [
+    {
+      id: "gpt-5",
+      model: "gpt-5",
+      displayName: "GPT-5",
+      description: "General model",
+      hidden: false,
+      isDefault: true,
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: [
+        {
+          reasoningEffort: "medium",
+          description: "Balanced reasoning",
+        },
+      ],
+      inputModalities: ["text", "image"],
+      supportsPersonality: false,
+    },
+  ],
+  nextCursor: null,
+};
+
+const CONFIG_DEFAULTS_RESPONSE: CapabilityConfigDefaultsResponse = {
+  ok: true,
+  agentId: "codex",
+  model: "gpt-5",
+  reasoningEffort: "medium",
+};
+
+const CONFIG_REQUIREMENTS_RESPONSE: CapabilityConfigRequirementsResponse = {
+  ok: true,
+  requirements: {
+    allowedApprovalPolicies: ["on-request"],
+    allowedSandboxModes: null,
+    allowedWebSearchModes: null,
+    enforceResidency: "us",
+    network: null,
+  },
+};
+
+const ACCOUNT_RESPONSE: CapabilityAccountResponse = {
+  ok: true,
+  account: {
+    type: "chatgpt",
+    email: "dev@example.com",
+    planType: "pro",
+  },
+  requiresOpenaiAuth: false,
+};
+
+const ACCOUNT_RATE_LIMITS_RESPONSE: CapabilityAccountRateLimitsResponse = {
+  ok: true,
+  rateLimits: {
+    credits: null,
+    limitId: "codex",
+    limitName: "Codex",
+    planType: "pro",
+    primary: {
+      resetsAt: 1_700_000_000,
+      usedPercent: 42,
+      windowDurationMins: 60,
+    },
+    secondary: null,
+  },
+  rateLimitsByLimitId: null,
+};
+
+const ACCOUNT_LOGIN_START_RESPONSE: CapabilityAccountLoginStartResponse = {
+  ok: true,
+  type: "chatgpt",
+  loginId: "login-1",
+  authUrl: "https://example.com/oauth/start",
+};
+
+const ACCOUNT_LOGIN_CANCEL_RESPONSE: CapabilityAccountLoginCancelResponse = {
+  ok: true,
+  status: "canceled",
+};
+
+const MUTATION_SUCCESS_RESPONSE: CapabilityMutationSuccessResponse = {
+  ok: true,
+};
+
+const MCP_SERVER_OAUTH_LOGIN_RESPONSE: CapabilityMcpServerOauthLoginResponse = {
+  ok: true,
+  authorizationUrl: "https://example.com/oauth/mcp/github",
+};
+
+const COMMAND_EXECUTION_RESPONSE: CapabilityCommandExecutionResponse = {
+  ok: true,
+  exitCode: 0,
+  stdout: "/tmp/project\n",
+  stderr: "",
+};
+
+const GIT_DIFF_TO_REMOTE_RESPONSE: CapabilityGitDiffToRemoteResponse = {
+  ok: true,
+  sha: "abc123def456",
+  diff: "diff --git a/file.ts b/file.ts",
+};
+
+const FUZZY_FILE_SEARCH_RESPONSE: CapabilityFuzzyFileSearchResponse = {
+  ok: true,
+  files: [
+    {
+      root: "/tmp/project",
+      path: "apps/WebApplication/Source/Main.tsx",
+      fileName: "Main.tsx",
+      score: 0.94,
+      indices: [0, 1, 2],
+    },
+  ],
+};
+
+const FUZZY_FILE_SEARCH_SESSION_START_RESPONSE: CapabilityFuzzyFileSearchSessionStartResponse = {
+  ok: true,
+};
+
+const FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE: CapabilityFuzzyFileSearchSessionUpdateResponse = {
+  ok: true,
+};
+
+const FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE: CapabilityFuzzyFileSearchSessionStopResponse = {
+  ok: true,
+};
+
+const ACCOUNT_AUTH_STATUS_RESPONSE: CapabilityAccountAuthStatusResponse = {
+  ok: true,
+  authMethod: "chatgpt",
+  authToken: null,
+  requiresOpenaiAuth: true,
+};
+
+const ACCOUNT_USER_INFO_RESPONSE: CapabilityAccountUserInfoResponse = {
+  ok: true,
+  allegedUserEmail: "dev@example.com",
+};
+
+const FEEDBACK_UPLOAD_RESPONSE: CapabilityFeedbackUploadResponse = {
+  ok: true,
+  threadId: "thread-feedback-1",
+};
+
+const SKILLS_CONFIG_WRITE_RESPONSE: CapabilitySkillsConfigWriteResponse = {
+  ok: true,
+  effectiveEnabled: false,
+};
+
+const CONFIG_VALUE_WRITE_RESPONSE: CapabilityConfigValueWriteResponse = {
+  ok: true,
+  status: "ok",
+  version: "v3",
+  filePath: "/tmp/project/.codex/config.toml",
+  overriddenMetadata: null,
+};
+
+const CONFIG_BATCH_WRITE_RESPONSE: CapabilityConfigBatchWriteResponse = {
+  ok: true,
+  status: "okOverridden",
+  version: "v4",
+  filePath: "/tmp/project/.codex/config.toml",
+  overriddenMetadata: {
+    message: "Workspace overrides one key from user-level configuration.",
+    overridingLayer: "workspace",
+    effectiveValue: {
+      enabled: true,
+    },
+  },
+};
+
+const REMOTE_SKILLS_LIST_RESPONSE: CapabilityRemoteSkillsListResponse = {
+  ok: true,
+  data: [
+    {
+      id: "remote-skill-1",
+      name: "Repository checks",
+      description: "Run repository checks before review",
+    },
+  ],
+};
+
+const REMOTE_SKILL_EXPORT_RESPONSE: CapabilityRemoteSkillExportResponse = {
+  ok: true,
+  id: "remote-skill-1",
+  path: "/tmp/project/.codex/skills/repository-checks/SKILL.md",
+};
+
+const EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE: CapabilityExternalAgentConfigDetectResponse = {
+  ok: true,
+  items: [
+    {
+      itemType: "AGENTS_MD",
+      description: "Migrate AGENTS.md from ~/.claude",
+      cwd: null,
+    },
+    {
+      itemType: "CONFIG",
+      description: "Import repository config",
+      cwd: "/tmp/project",
+    },
+  ],
+};
+
+const EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE: CapabilityExternalAgentConfigImportResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_START_RESPONSE: CapabilityThreadRealtimeStartResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_APPEND_AUDIO_RESPONSE: CapabilityThreadRealtimeAppendAudioResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_APPEND_TEXT_RESPONSE: CapabilityThreadRealtimeAppendTextResponse = {
+  ok: true,
+};
+
+const THREAD_REALTIME_STOP_RESPONSE: CapabilityThreadRealtimeStopResponse = {
+  ok: true,
+};
+
+const WINDOWS_SANDBOX_SETUP_START_RESPONSE: CapabilityWindowsSandboxSetupStartResponse = {
+  ok: true,
+  started: true,
+};
+
+const THREAD_STREAM_EVENTS_RESPONSE: CapabilityThreadStreamEventsResponse = {
+  ok: true,
+  threadId: "thread-1",
+  ownerClientId: "app-server",
+  events: [
+    {
+      type: "broadcast",
+      method: "turn/started",
+      sourceClientId: "app-server",
+      version: 1,
+      params: {
+        sequence: 21,
+        receivedAtMilliseconds: 1_700_000_000_000,
+        threadId: "thread-1",
+        payload: {
+          threadId: "thread-1",
+        },
+      },
+    },
+  ],
+  nextSequence: 22,
+  firstAvailableSequence: 0,
+  resetRequired: false,
+};
+
+const NOTIFICATION_EVENTS_RESPONSE: CapabilityNotificationEventsResponse = {
+  ok: true,
+  events: [
+    {
+      sequence: 7,
+      method: "turn/started",
+      params: {
+        threadId: "thread-1",
+      },
+      receivedAtMilliseconds: 1_700_000_000_100,
+    },
+  ],
+  nextSequence: 8,
+  firstAvailableSequence: 1,
+  resetRequired: false,
+};
+
+const PENDING_SERVER_REQUESTS_RESPONSE: CapabilityPendingServerRequestsResponse = {
+  ok: true,
+  requests: [
+    {
+      requestId: 19,
+      method: "item/tool/requestUserInput",
+      params: {
+        question: "Select deployment target",
+      },
+      receivedAtMilliseconds: 1_700_000_000_150,
+    },
+  ],
+};
+
+const EXPERIMENTAL_FEATURES_RESPONSE: CapabilityExperimentalFeaturesResponse = {
+  ok: true,
+  data: [
+    {
+      name: "advanced-diff-view",
+      stage: "beta",
+      displayName: "Advanced Diff View",
+      description: "Detailed diff review controls",
+      announcement: null,
+      enabled: true,
+      defaultEnabled: false,
+    },
+  ],
+  nextCursor: null,
+};
+
+const MCP_SERVERS_RESPONSE: CapabilityMcpServersResponse = {
+  ok: true,
+  data: [
+    {
+      name: "github",
+      authStatus: "authenticated",
+      toolCount: 4,
+      resourceCount: 2,
+      resourceTemplateCount: 1,
+    },
+  ],
+  nextCursor: null,
+};
+
+const APPS_RESPONSE: CapabilityAppsResponse = {
+  ok: true,
+  data: [
+    {
+      id: "app-github",
+      name: "GitHub",
+      description: "GitHub connector",
+      logoUrl: null,
+      logoUrlDark: null,
+      installUrl: null,
+      isAccessible: true,
+      isEnabled: true,
+    },
+  ],
+  nextCursor: null,
+};
+
+const SKILLS_RESPONSE: CapabilitySkillsResponse = {
+  ok: true,
+  data: [
+    {
+      cwd: "/tmp/project",
+      skills: [
+        {
+          name: "checks",
+          description: "Run repository checks",
+          shortDescription: "Checks",
+          path: "/tmp/project/.codex/skills/checks/SKILL.md",
+          scope: "repo",
+          enabled: true,
+        },
+      ],
+      errors: [],
+    },
+  ],
+};
+
+describe("CapabilityServerClient", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getHealth).mockResolvedValue(HEALTH_RESPONSE);
+    vi.mocked(listAgents).mockResolvedValue(AGENTS_RESPONSE);
+    vi.mocked(listCollaborationModes).mockResolvedValue(COLLABORATION_MODES_RESPONSE);
+    vi.mocked(listModels).mockResolvedValue(MODELS_RESPONSE);
+    vi.mocked(getConfigDefaults).mockResolvedValue(CONFIG_DEFAULTS_RESPONSE);
+    vi.mocked(getConfigRequirements).mockResolvedValue(CONFIG_REQUIREMENTS_RESPONSE);
+    vi.mocked(getAccount).mockResolvedValue(ACCOUNT_RESPONSE);
+    vi.mocked(getAccountRateLimits).mockResolvedValue(ACCOUNT_RATE_LIMITS_RESPONSE);
+    vi.mocked(startAccountLogin).mockResolvedValue(ACCOUNT_LOGIN_START_RESPONSE);
+    vi.mocked(cancelAccountLogin).mockResolvedValue(ACCOUNT_LOGIN_CANCEL_RESPONSE);
+    vi.mocked(logoutAccount).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
+    vi.mocked(reloadMcpServerConfig).mockResolvedValue(MUTATION_SUCCESS_RESPONSE);
+    vi.mocked(startMcpServerOauthLogin).mockResolvedValue(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    vi.mocked(executeCommand).mockResolvedValue(COMMAND_EXECUTION_RESPONSE);
+    vi.mocked(readGitDiffToRemote).mockResolvedValue(GIT_DIFF_TO_REMOTE_RESPONSE);
+    vi.mocked(searchFuzzyFiles).mockResolvedValue(FUZZY_FILE_SEARCH_RESPONSE);
+    vi.mocked(startFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_START_RESPONSE,
+    );
+    vi.mocked(updateFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE,
+    );
+    vi.mocked(stopFuzzyFileSearchSession).mockResolvedValue(
+      FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE,
+    );
+    vi.mocked(readAccountAuthStatus).mockResolvedValue(ACCOUNT_AUTH_STATUS_RESPONSE);
+    vi.mocked(readAccountUserInfo).mockResolvedValue(ACCOUNT_USER_INFO_RESPONSE);
+    vi.mocked(uploadFeedback).mockResolvedValue(FEEDBACK_UPLOAD_RESPONSE);
+    vi.mocked(writeConfigBatch).mockResolvedValue(CONFIG_BATCH_WRITE_RESPONSE);
+    vi.mocked(writeConfigValue).mockResolvedValue(CONFIG_VALUE_WRITE_RESPONSE);
+    vi.mocked(writeSkillsConfig).mockResolvedValue(SKILLS_CONFIG_WRITE_RESPONSE);
+    vi.mocked(listRemoteSkills).mockResolvedValue(REMOTE_SKILLS_LIST_RESPONSE);
+    vi.mocked(exportRemoteSkill).mockResolvedValue(REMOTE_SKILL_EXPORT_RESPONSE);
+    vi.mocked(detectExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
+    vi.mocked(importExternalAgentConfig).mockResolvedValue(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
+    vi.mocked(startThreadRealtime).mockResolvedValue(THREAD_REALTIME_START_RESPONSE);
+    vi.mocked(appendThreadRealtimeAudio).mockResolvedValue(THREAD_REALTIME_APPEND_AUDIO_RESPONSE);
+    vi.mocked(appendThreadRealtimeText).mockResolvedValue(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
+    vi.mocked(stopThreadRealtime).mockResolvedValue(THREAD_REALTIME_STOP_RESPONSE);
+    vi.mocked(startWindowsSandboxSetup).mockResolvedValue(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
+    vi.mocked(readThreadStreamEvents).mockResolvedValue(THREAD_STREAM_EVENTS_RESPONSE);
+    vi.mocked(readNotificationEvents).mockResolvedValue(NOTIFICATION_EVENTS_RESPONSE);
+    vi.mocked(readPendingServerRequests).mockResolvedValue(PENDING_SERVER_REQUESTS_RESPONSE);
+    vi.mocked(listExperimentalFeatures).mockResolvedValue(EXPERIMENTAL_FEATURES_RESPONSE);
+    vi.mocked(listMcpServers).mockResolvedValue(MCP_SERVERS_RESPONSE);
+    vi.mocked(listApps).mockResolvedValue(APPS_RESPONSE);
+    vi.mocked(listSkills).mockResolvedValue(SKILLS_RESPONSE);
+  });
+
+  it("delegates reads to CapabilityApi with typed contracts", async () => {
+    const capabilityServerClient = new CapabilityServerClient();
+    const healthOptions = {
+      actionId: "action-health",
+      actionName: "read-health",
+    };
+    const agentOptions = {
+      actionId: "action-agents",
+      actionName: "list-agents",
+    };
+    const collaborationModeOptions = {
+      actionId: "action-collaboration-modes",
+      actionName: "list-collaboration-modes",
+    };
+    const modelOptions = {
+      actionId: "action-models",
+      actionName: "list-models",
+    };
+    const configDefaultsOptions = {
+      agentId: "codex" as const,
+      actionId: "action-config-defaults",
+      actionName: "read-config-defaults",
+    };
+    const configRequirementsOptions = {
+      actionId: "action-config-requirements",
+      actionName: "read-config-requirements",
+    };
+    const accountOptions = {
+      actionId: "action-account",
+      actionName: "read-account",
+      refreshToken: true,
+    };
+    const accountRateLimitsOptions = {
+      actionId: "action-account-rate-limits",
+      actionName: "read-account-rate-limits",
+    };
+    const accountLoginStartOptions = {
+      actionId: "action-account-login-start",
+      actionName: "start-account-login",
+    };
+    const accountLoginCancelOptions = {
+      actionId: "action-account-login-cancel",
+      actionName: "cancel-account-login",
+      loginId: "login-1",
+    };
+    const accountLogoutOptions = {
+      actionId: "action-account-logout",
+      actionName: "logout-account",
+    };
+    const reloadMcpServerConfigOptions = {
+      actionId: "action-reload-mcp-server-config",
+      actionName: "reload-mcp-server-config",
+    };
+    const mcpServerOauthLoginOptions = {
+      actionId: "action-mcp-oauth-login",
+      actionName: "start-mcp-oauth-login",
+      name: "github",
+      scopes: ["read:org", "repo"],
+      timeoutSeconds: 180,
+    };
+    const commandExecutionOptions = {
+      actionId: "action-command-execution",
+      actionName: "execute-command",
+      command: ["pwd"],
+      timeoutMs: 1200,
+      cwd: "/tmp/project",
+    };
+    const gitDiffToRemoteOptions = {
+      actionId: "action-git-diff-to-remote",
+      actionName: "read-git-diff-to-remote",
+      cwd: "/tmp/project",
+    };
+    const fuzzyFileSearchOptions = {
+      actionId: "action-fuzzy-file-search",
+      actionName: "search-fuzzy-files",
+      query: "main",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+      cancellationToken: "token-1",
+    };
+    const fuzzyFileSearchSessionStartOptions = {
+      actionId: "action-fuzzy-file-search-session-start",
+      actionName: "start-fuzzy-file-search-session",
+      sessionId: "session-1",
+      roots: ["/tmp/project", "/tmp/project/packages"],
+    };
+    const fuzzyFileSearchSessionUpdateOptions = {
+      actionId: "action-fuzzy-file-search-session-update",
+      actionName: "update-fuzzy-file-search-session",
+      sessionId: "session-1",
+      query: "main",
+    };
+    const fuzzyFileSearchSessionStopOptions = {
+      actionId: "action-fuzzy-file-search-session-stop",
+      actionName: "stop-fuzzy-file-search-session",
+      sessionId: "session-1",
+    };
+    const accountAuthStatusOptions = {
+      actionId: "action-account-auth-status",
+      actionName: "read-account-auth-status",
+      includeToken: false,
+      refreshToken: true,
+    };
+    const accountUserInfoOptions = {
+      actionId: "action-account-user-info",
+      actionName: "read-account-user-info",
+    };
+    const feedbackUploadOptions = {
+      actionId: "action-feedback-upload",
+      actionName: "upload-feedback",
+      classification: "quality",
+      includeLogs: true,
+      reason: "Missing edge-case handling in response body.",
+      threadId: "thread-1",
+    };
+    const skillsConfigWriteOptions = {
+      actionId: "action-skills-config-write",
+      actionName: "write-skills-config",
+      path: "/tmp/project/.codex/skills/checks/SKILL.md",
+      enabled: false,
+    };
+    const configValueWriteOptions = {
+      actionId: "action-config-value-write",
+      actionName: "write-config-value",
+      keyPath: "integrations.github",
+      value: {
+        enabled: true,
+      },
+      mergeStrategy: "upsert" as const,
+      filePath: "/tmp/project/.codex/config.toml",
+      expectedVersion: "v2",
+    };
+    const configBatchWriteOptions = {
+      actionId: "action-config-batch-write",
+      actionName: "write-config-batch",
+      edits: [
+        {
+          keyPath: "integrations.github.enabled",
+          value: true,
+          mergeStrategy: "replace" as const,
+        },
+        {
+          keyPath: "integrations.github.scopes",
+          value: ["repo"],
+          mergeStrategy: "upsert" as const,
+        },
+      ],
+      filePath: "/tmp/project/.codex/config.toml",
+      expectedVersion: "v3",
+    };
+    const listRemoteSkillsOptions = {
+      actionId: "action-remote-skills-list",
+      actionName: "list-remote-skills",
+      hazelnutScope: "personal" as const,
+      productSurface: "codex" as const,
+      enabled: true,
+    };
+    const exportRemoteSkillOptions = {
+      actionId: "action-remote-skill-export",
+      actionName: "export-remote-skill",
+      hazelnutId: "remote-skill-1",
+    };
+    const externalAgentConfigDetectOptions = {
+      actionId: "action-external-agent-config-detect",
+      actionName: "detect-external-agent-config",
+      includeHome: true,
+      cwds: ["/tmp/project", "/tmp/project/packages"],
+    };
+    const externalAgentConfigImportOptions = {
+      actionId: "action-external-agent-config-import",
+      actionName: "import-external-agent-config",
+      migrationItems: [
+        {
+          itemType: "AGENTS_MD" as const,
+          description: "Migrate AGENTS.md from ~/.claude",
+          cwd: null,
+        },
+        {
+          itemType: "CONFIG" as const,
+          description: "Import repository config",
+          cwd: "/tmp/project",
+        },
+      ],
+    };
+    const threadRealtimeStartOptions = {
+      actionId: "action-thread-realtime-start",
+      actionName: "thread-realtime-start",
+      threadId: "thread-1",
+      prompt: "Summarize repository status.",
+      sessionId: "session-1",
+    };
+    const threadRealtimeAppendAudioOptions = {
+      actionId: "action-thread-realtime-append-audio",
+      actionName: "thread-realtime-append-audio",
+      threadId: "thread-1",
+      audio: {
+        data: "base64-audio-chunk",
+        sampleRate: 16000,
+        numChannels: 1,
+        samplesPerChannel: 640,
+      },
+    };
+    const threadRealtimeAppendTextOptions = {
+      actionId: "action-thread-realtime-append-text",
+      actionName: "thread-realtime-append-text",
+      threadId: "thread-1",
+      text: "Continue with implementation details.",
+    };
+    const threadRealtimeStopOptions = {
+      actionId: "action-thread-realtime-stop",
+      actionName: "thread-realtime-stop",
+      threadId: "thread-1",
+    };
+    const windowsSandboxSetupStartOptions = {
+      actionId: "action-windows-sandbox-setup-start",
+      actionName: "windows-sandbox-setup-start",
+      mode: "elevated" as const,
+    };
+    const threadStreamEventsOptions = {
+      actionId: "action-thread-stream-events",
+      actionName: "thread-stream-events",
+      threadId: "thread-1",
+      limit: 20,
+      sinceSequence: 15,
+    };
+    const notificationEventsOptions = {
+      actionId: "action-notification-events",
+      actionName: "notification-events",
+      limit: 25,
+      sinceSequence: 5,
+    };
+    const pendingServerRequestsOptions = {
+      actionId: "action-pending-server-requests",
+      actionName: "pending-server-requests",
+    };
+    const experimentalFeatureOptions = {
+      actionId: "action-experimental-features",
+      actionName: "list-experimental-features",
+      limit: 20,
+    };
+    const mcpServerOptions = {
+      actionId: "action-mcp-servers",
+      actionName: "list-mcp-servers",
+    };
+    const appOptions = {
+      actionId: "action-apps",
+      actionName: "list-apps",
+      forceRefetch: true,
+      threadId: "thread-1",
+    };
+    const skillOptions = {
+      actionId: "action-skills",
+      actionName: "list-skills",
+      forceReload: true,
+    };
+
+    const healthResponse = await capabilityServerClient.readHealthStatus(healthOptions);
+    const agentsResponse = await capabilityServerClient.listAgents(agentOptions);
+    const collaborationModesResponse =
+      await capabilityServerClient.listCollaborationModes(collaborationModeOptions);
+    const modelsResponse = await capabilityServerClient.listModels(modelOptions);
+    const configDefaultsResponse =
+      await capabilityServerClient.readConfigDefaults(configDefaultsOptions);
+    const configRequirementsResponse =
+      await capabilityServerClient.readConfigRequirements(configRequirementsOptions);
+    const accountResponse = await capabilityServerClient.readAccount(accountOptions);
+    const accountRateLimitsResponse =
+      await capabilityServerClient.readAccountRateLimits(accountRateLimitsOptions);
+    const accountLoginStartResponse =
+      await capabilityServerClient.startAccountLogin(accountLoginStartOptions);
+    const accountLoginCancelResponse =
+      await capabilityServerClient.cancelAccountLogin(accountLoginCancelOptions);
+    const accountLogoutResponse = await capabilityServerClient.logoutAccount(accountLogoutOptions);
+    const reloadMcpServerConfigResponse = await capabilityServerClient.reloadMcpServerConfig(
+      reloadMcpServerConfigOptions,
+    );
+    const mcpServerOauthLoginResponse = await capabilityServerClient.startMcpServerOauthLogin(
+      mcpServerOauthLoginOptions,
+    );
+    const commandExecutionResponse =
+      await capabilityServerClient.executeCommand(commandExecutionOptions);
+    const gitDiffToRemoteResponse =
+      await capabilityServerClient.readGitDiffToRemote(gitDiffToRemoteOptions);
+    const fuzzyFileSearchResponse =
+      await capabilityServerClient.searchFuzzyFiles(fuzzyFileSearchOptions);
+    const fuzzyFileSearchSessionStartResponse =
+      await capabilityServerClient.startFuzzyFileSearchSession(fuzzyFileSearchSessionStartOptions);
+    const fuzzyFileSearchSessionUpdateResponse =
+      await capabilityServerClient.updateFuzzyFileSearchSession(
+        fuzzyFileSearchSessionUpdateOptions,
+      );
+    const fuzzyFileSearchSessionStopResponse =
+      await capabilityServerClient.stopFuzzyFileSearchSession(fuzzyFileSearchSessionStopOptions);
+    const accountAuthStatusResponse =
+      await capabilityServerClient.readAuthStatus(accountAuthStatusOptions);
+    const accountUserInfoResponse =
+      await capabilityServerClient.readUserInfo(accountUserInfoOptions);
+    const feedbackUploadResponse =
+      await capabilityServerClient.uploadFeedback(feedbackUploadOptions);
+    const configBatchWriteResponse =
+      await capabilityServerClient.writeConfigBatch(configBatchWriteOptions);
+    const configValueWriteResponse =
+      await capabilityServerClient.writeConfigValue(configValueWriteOptions);
+    const skillsConfigWriteResponse =
+      await capabilityServerClient.writeSkillsConfig(skillsConfigWriteOptions);
+    const remoteSkillsListResponse =
+      await capabilityServerClient.listRemoteSkills(listRemoteSkillsOptions);
+    const remoteSkillExportResponse =
+      await capabilityServerClient.exportRemoteSkill(exportRemoteSkillOptions);
+    const externalAgentConfigDetectResponse =
+      await capabilityServerClient.detectExternalAgentConfig(externalAgentConfigDetectOptions);
+    const externalAgentConfigImportResponse =
+      await capabilityServerClient.importExternalAgentConfig(externalAgentConfigImportOptions);
+    const threadRealtimeStartResponse = await capabilityServerClient.startThreadRealtime(
+      threadRealtimeStartOptions,
+    );
+    const threadRealtimeAppendAudioResponse =
+      await capabilityServerClient.appendThreadRealtimeAudio(threadRealtimeAppendAudioOptions);
+    const threadRealtimeAppendTextResponse = await capabilityServerClient.appendThreadRealtimeText(
+      threadRealtimeAppendTextOptions,
+    );
+    const threadRealtimeStopResponse =
+      await capabilityServerClient.stopThreadRealtime(threadRealtimeStopOptions);
+    const windowsSandboxSetupStartResponse = await capabilityServerClient.startWindowsSandboxSetup(
+      windowsSandboxSetupStartOptions,
+    );
+    const threadStreamEventsResponse =
+      await capabilityServerClient.readThreadStreamEvents(threadStreamEventsOptions);
+    const notificationEventsResponse =
+      await capabilityServerClient.readNotificationEvents(notificationEventsOptions);
+    const pendingServerRequestsResponse = await capabilityServerClient.readPendingServerRequests(
+      pendingServerRequestsOptions,
+    );
+    const experimentalFeaturesResponse = await capabilityServerClient.listExperimentalFeatures(
+      experimentalFeatureOptions,
+    );
+    const mcpServersResponse = await capabilityServerClient.listMcpServers(mcpServerOptions);
+    const appsResponse = await capabilityServerClient.listApps(appOptions);
+    const skillsResponse = await capabilityServerClient.listSkills(skillOptions);
+
+    expect(getHealth).toHaveBeenCalledWith(healthOptions);
+    expect(listAgents).toHaveBeenCalledWith(agentOptions);
+    expect(listCollaborationModes).toHaveBeenCalledWith(collaborationModeOptions);
+    expect(listModels).toHaveBeenCalledWith(modelOptions);
+    expect(getConfigDefaults).toHaveBeenCalledWith(configDefaultsOptions);
+    expect(getConfigRequirements).toHaveBeenCalledWith(configRequirementsOptions);
+    expect(getAccount).toHaveBeenCalledWith(accountOptions);
+    expect(getAccountRateLimits).toHaveBeenCalledWith(accountRateLimitsOptions);
+    expect(startAccountLogin).toHaveBeenCalledWith(accountLoginStartOptions);
+    expect(cancelAccountLogin).toHaveBeenCalledWith(accountLoginCancelOptions);
+    expect(logoutAccount).toHaveBeenCalledWith(accountLogoutOptions);
+    expect(reloadMcpServerConfig).toHaveBeenCalledWith(reloadMcpServerConfigOptions);
+    expect(startMcpServerOauthLogin).toHaveBeenCalledWith(mcpServerOauthLoginOptions);
+    expect(executeCommand).toHaveBeenCalledWith(commandExecutionOptions);
+    expect(readGitDiffToRemote).toHaveBeenCalledWith(gitDiffToRemoteOptions);
+    expect(searchFuzzyFiles).toHaveBeenCalledWith(fuzzyFileSearchOptions);
+    expect(startFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionStartOptions);
+    expect(updateFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionUpdateOptions);
+    expect(stopFuzzyFileSearchSession).toHaveBeenCalledWith(fuzzyFileSearchSessionStopOptions);
+    expect(readAccountAuthStatus).toHaveBeenCalledWith(accountAuthStatusOptions);
+    expect(readAccountUserInfo).toHaveBeenCalledWith(accountUserInfoOptions);
+    expect(uploadFeedback).toHaveBeenCalledWith(feedbackUploadOptions);
+    expect(writeConfigBatch).toHaveBeenCalledWith(configBatchWriteOptions);
+    expect(writeConfigValue).toHaveBeenCalledWith(configValueWriteOptions);
+    expect(writeSkillsConfig).toHaveBeenCalledWith(skillsConfigWriteOptions);
+    expect(listRemoteSkills).toHaveBeenCalledWith(listRemoteSkillsOptions);
+    expect(exportRemoteSkill).toHaveBeenCalledWith(exportRemoteSkillOptions);
+    expect(detectExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigDetectOptions);
+    expect(importExternalAgentConfig).toHaveBeenCalledWith(externalAgentConfigImportOptions);
+    expect(startThreadRealtime).toHaveBeenCalledWith(threadRealtimeStartOptions);
+    expect(appendThreadRealtimeAudio).toHaveBeenCalledWith(threadRealtimeAppendAudioOptions);
+    expect(appendThreadRealtimeText).toHaveBeenCalledWith(threadRealtimeAppendTextOptions);
+    expect(stopThreadRealtime).toHaveBeenCalledWith(threadRealtimeStopOptions);
+    expect(startWindowsSandboxSetup).toHaveBeenCalledWith(windowsSandboxSetupStartOptions);
+    expect(readThreadStreamEvents).toHaveBeenCalledWith(threadStreamEventsOptions);
+    expect(readNotificationEvents).toHaveBeenCalledWith(notificationEventsOptions);
+    expect(readPendingServerRequests).toHaveBeenCalledWith(pendingServerRequestsOptions);
+    expect(listExperimentalFeatures).toHaveBeenCalledWith(experimentalFeatureOptions);
+    expect(listMcpServers).toHaveBeenCalledWith(mcpServerOptions);
+    expect(listApps).toHaveBeenCalledWith(appOptions);
+    expect(listSkills).toHaveBeenCalledWith(skillOptions);
+    expect(healthResponse).toEqual(HEALTH_RESPONSE);
+    expect(agentsResponse).toEqual(AGENTS_RESPONSE);
+    expect(collaborationModesResponse).toEqual(COLLABORATION_MODES_RESPONSE);
+    expect(modelsResponse).toEqual(MODELS_RESPONSE);
+    expect(configDefaultsResponse).toEqual(CONFIG_DEFAULTS_RESPONSE);
+    expect(configRequirementsResponse).toEqual(CONFIG_REQUIREMENTS_RESPONSE);
+    expect(accountResponse).toEqual(ACCOUNT_RESPONSE);
+    expect(accountRateLimitsResponse).toEqual(ACCOUNT_RATE_LIMITS_RESPONSE);
+    expect(accountLoginStartResponse).toEqual(ACCOUNT_LOGIN_START_RESPONSE);
+    expect(accountLoginCancelResponse).toEqual(ACCOUNT_LOGIN_CANCEL_RESPONSE);
+    expect(accountLogoutResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
+    expect(reloadMcpServerConfigResponse).toEqual(MUTATION_SUCCESS_RESPONSE);
+    expect(mcpServerOauthLoginResponse).toEqual(MCP_SERVER_OAUTH_LOGIN_RESPONSE);
+    expect(commandExecutionResponse).toEqual(COMMAND_EXECUTION_RESPONSE);
+    expect(gitDiffToRemoteResponse).toEqual(GIT_DIFF_TO_REMOTE_RESPONSE);
+    expect(fuzzyFileSearchResponse).toEqual(FUZZY_FILE_SEARCH_RESPONSE);
+    expect(fuzzyFileSearchSessionStartResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_START_RESPONSE);
+    expect(fuzzyFileSearchSessionUpdateResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_UPDATE_RESPONSE);
+    expect(fuzzyFileSearchSessionStopResponse).toEqual(FUZZY_FILE_SEARCH_SESSION_STOP_RESPONSE);
+    expect(accountAuthStatusResponse).toEqual(ACCOUNT_AUTH_STATUS_RESPONSE);
+    expect(accountUserInfoResponse).toEqual(ACCOUNT_USER_INFO_RESPONSE);
+    expect(feedbackUploadResponse).toEqual(FEEDBACK_UPLOAD_RESPONSE);
+    expect(configBatchWriteResponse).toEqual(CONFIG_BATCH_WRITE_RESPONSE);
+    expect(configValueWriteResponse).toEqual(CONFIG_VALUE_WRITE_RESPONSE);
+    expect(skillsConfigWriteResponse).toEqual(SKILLS_CONFIG_WRITE_RESPONSE);
+    expect(remoteSkillsListResponse).toEqual(REMOTE_SKILLS_LIST_RESPONSE);
+    expect(remoteSkillExportResponse).toEqual(REMOTE_SKILL_EXPORT_RESPONSE);
+    expect(externalAgentConfigDetectResponse).toEqual(EXTERNAL_AGENT_CONFIG_DETECT_RESPONSE);
+    expect(externalAgentConfigImportResponse).toEqual(EXTERNAL_AGENT_CONFIG_IMPORT_RESPONSE);
+    expect(threadRealtimeStartResponse).toEqual(THREAD_REALTIME_START_RESPONSE);
+    expect(threadRealtimeAppendAudioResponse).toEqual(THREAD_REALTIME_APPEND_AUDIO_RESPONSE);
+    expect(threadRealtimeAppendTextResponse).toEqual(THREAD_REALTIME_APPEND_TEXT_RESPONSE);
+    expect(threadRealtimeStopResponse).toEqual(THREAD_REALTIME_STOP_RESPONSE);
+    expect(windowsSandboxSetupStartResponse).toEqual(WINDOWS_SANDBOX_SETUP_START_RESPONSE);
+    expect(threadStreamEventsResponse).toEqual(THREAD_STREAM_EVENTS_RESPONSE);
+    expect(notificationEventsResponse).toEqual(NOTIFICATION_EVENTS_RESPONSE);
+    expect(pendingServerRequestsResponse).toEqual(PENDING_SERVER_REQUESTS_RESPONSE);
+    expect(experimentalFeaturesResponse).toEqual(EXPERIMENTAL_FEATURES_RESPONSE);
+    expect(mcpServersResponse).toEqual(MCP_SERVERS_RESPONSE);
+    expect(appsResponse).toEqual(APPS_RESPONSE);
+    expect(skillsResponse).toEqual(SKILLS_RESPONSE);
+  });
+});

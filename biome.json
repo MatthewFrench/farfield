@@ -1,0 +1,528 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": { "ignoreUnknown": true },
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "space",
+		"indentWidth": 2,
+		"lineWidth": 100
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": false,
+			"complexity": {
+				"noAdjacentSpacesInRegex": "error",
+				"noBannedTypes": "error",
+				"noExtraBooleanCast": "error",
+				"noUselessCatch": "error",
+				"noUselessEscapeInRegex": "error",
+				"noUselessThisAlias": "error",
+				"noUselessTypeConstraint": "error"
+			},
+			"correctness": {
+				"noConstAssign": "error",
+				"noConstantCondition": "error",
+				"noEmptyCharacterClassInRegex": "error",
+				"noEmptyPattern": "error",
+				"noGlobalObjectCalls": "error",
+				"noInvalidBuiltinInstantiation": "error",
+				"noInvalidConstructorSuper": "error",
+				"noNonoctalDecimalEscape": "error",
+				"noPrecisionLoss": "error",
+				"noSelfAssign": "error",
+				"noSetterReturn": "error",
+				"noSwitchDeclarations": "error",
+				"noUndeclaredVariables": "error",
+				"noUnreachable": "error",
+				"noUnreachableSuper": "error",
+				"noUnsafeFinally": "error",
+				"noUnsafeOptionalChaining": "error",
+				"noUnusedLabels": "error",
+				"noUnusedPrivateClassMembers": "error",
+				"noUnusedVariables": "error",
+				"useIsNan": "error",
+				"useValidForDirection": "error",
+				"useValidTypeof": "error",
+				"useYield": "error"
+			},
+			"nursery": { "noDuplicateEnumValues": "error" },
+			"style": {
+				"noCommonJs": "error",
+				"noNamespace": "error",
+				"useArrayLiterals": "error",
+				"useAsConstAssertion": "error"
+			},
+			"suspicious": {
+				"noAssignInExpressions": "error",
+				"noAsyncPromiseExecutor": "error",
+				"noCatchAssign": "error",
+				"noClassAssign": "error",
+				"noCompareNegZero": "error",
+				"noConstantBinaryExpressions": "error",
+				"noControlCharactersInRegex": "error",
+				"noDebugger": "error",
+				"noDuplicateCase": "error",
+				"noDuplicateClassMembers": "error",
+				"noDuplicateElseIf": "error",
+				"noDuplicateObjectKeys": "error",
+				"noDuplicateParameters": "error",
+				"noEmptyBlockStatements": "error",
+				"noExplicitAny": "error",
+				"noExtraNonNullAssertion": "error",
+				"noFallthroughSwitchClause": "error",
+				"noFunctionAssign": "error",
+				"noGlobalAssign": "error",
+				"noImportAssign": "error",
+				"noIrregularWhitespace": "error",
+				"noMisleadingCharacterClass": "error",
+				"noMisleadingInstantiator": "error",
+				"noNonNullAssertedOptionalChain": "error",
+				"noPrototypeBuiltins": "error",
+				"noRedeclare": "error",
+				"noShadowRestrictedNames": "error",
+				"noSparseArray": "error",
+				"noTsIgnore": "error",
+				"noUnsafeDeclarationMerging": "error",
+				"noUnsafeNegation": "error",
+				"noUnusedExpressions": "error",
+				"noUselessRegexBackrefs": "error",
+				"noWith": "error",
+				"useGetterReturn": "error",
+				"useNamespaceKeyword": "error"
+			}
+		},
+		"includes": [
+			"**",
+			"!**/dist/**",
+			"!**/coverage/**",
+			"!**/node_modules/**",
+			"!**/.runtime/**",
+			"!**/test-results/**",
+			"!**/playwright-report/**",
+			"!**/*.d.ts",
+			"!traces/**",
+			"!public/**"
+		]
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"jsxQuoteStyle": "double",
+			"quoteProperties": "asNeeded",
+			"trailingCommas": "all",
+			"semicolons": "always",
+			"arrowParentheses": "always",
+			"bracketSpacing": true
+		},
+		"globals": []
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+			"linter": {
+				"rules": {
+					"complexity": { "noArguments": "error" },
+					"correctness": {
+						"noConstAssign": "off",
+						"noGlobalObjectCalls": "off",
+						"noInvalidBuiltinInstantiation": "off",
+						"noInvalidConstructorSuper": "off",
+						"noSetterReturn": "off",
+						"noUndeclaredVariables": "off",
+						"noUnreachable": "off",
+						"noUnreachableSuper": "off"
+					},
+					"nursery": { "useSpread": "error" },
+					"style": { "useConst": "error" },
+					"suspicious": {
+						"noClassAssign": "off",
+						"noDuplicateClassMembers": "off",
+						"noDuplicateObjectKeys": "off",
+						"noDuplicateParameters": "off",
+						"noFunctionAssign": "off",
+						"noImportAssign": "off",
+						"noRedeclare": "off",
+						"noUnsafeNegation": "off",
+						"noVar": "error",
+						"noWith": "off",
+						"useGetterReturn": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+			"javascript": { "globals": ["exports"] },
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noBannedTypes": "off",
+						"noUselessEscapeInRegex": "off"
+					},
+					"correctness": { "noUnusedVariables": "error" },
+					"style": {
+						"noNonNullAssertion": "error",
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									}
+								]
+							}
+						},
+						"noRestrictedTypes": {
+							"level": "error",
+							"options": {
+								"types": {
+									"unknown": "Do not use unknown. Parse untrusted data at boundaries and use explicit contracts.",
+									"Parameters": "Do not use Parameters<>. Declare explicit contract types.",
+									"ReturnType": "Do not use ReturnType<>. Declare explicit contract types.",
+									"ConstructorParameters": "Do not use ConstructorParameters<>. Declare explicit contract types.",
+									"InstanceType": "Do not use InstanceType<>. Declare explicit contract types."
+								}
+							}
+						}
+					},
+					"suspicious": {
+						"noControlCharactersInRegex": "off",
+						"noExplicitAny": "error"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/ServerApplication/Source/**/*.ts",
+				"apps/WebApplication/Source/**/*.ts",
+				"apps/WebApplication/Source/**/*.tsx",
+				"packages/CodexInterfaceAdapter/Source/**/*.ts",
+				"packages/CodexProtocol/Source/**/*.ts",
+				"packages/OpenCodeInterfaceAdapter/Source/**/*.ts",
+				"!packages/CodexProtocol/Source/Generated/**/*.ts",
+				"!packages/CodexProtocol/vendor/**/*.ts"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": {
+							"level": "error",
+							"options": {
+								"maxLines": 300,
+								"skipBlankLines": true,
+								"skipIifes": true
+							}
+						}
+					},
+					"nursery": {
+						"noExcessiveLinesPerFile": {
+							"level": "error",
+							"options": {
+								"maxLines": 600,
+								"skipBlankLines": true
+							}
+						}
+					},
+					"style": {
+						"noParameterAssign": {
+							"level": "error",
+							"options": { "propertyAssignment": "deny" }
+						}
+					},
+					"suspicious": { "noImportCycles": "error" }
+				}
+			}
+		},
+		{
+			"includes": ["apps/ServerApplication/Source/Network/Routes/**/*.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["**/Application/**"],
+										"message": "Network route modules must not import application composition or state owners."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/ServerApplication/Source/Network/**/*.ts",
+				"!apps/ServerApplication/Source/Network/Routes/**/*.ts"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["**/Application/**"],
+										"message": "Network modules must depend on explicit network contracts instead of application owners."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/ServerApplication/Source/Modules/**/*.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["**/Network/Routes/**"],
+										"message": "Server module owners must not import route modules."
+									},
+									{
+										"group": ["**/Network/RequestSchemas/**"],
+										"message": "Server module owners must not import request-schema ingress modules."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/ServerApplication/Source/**/*.ts",
+				"apps/WebApplication/Source/**/*.ts",
+				"apps/WebApplication/Source/**/*.tsx",
+				"apps/WebApplication/Tests/**/*.ts",
+				"apps/WebApplication/Tests/**/*.tsx",
+				"packages/CodexInterfaceAdapter/Source/**/*.ts",
+				"packages/CodexProtocol/Source/**/*.ts",
+				"packages/OpenCodeInterfaceAdapter/Source/**/*.ts",
+				"!packages/CodexProtocol/Source/Generated/**/*.ts"
+			],
+			"javascript": { "globals": [] },
+			"linter": {
+				"rules": { "nursery": { "noUnnecessaryConditions": "error" } }
+			}
+		},
+		{
+			"includes": [
+				"apps/WebApplication/Source/Application/**/*.ts",
+				"apps/WebApplication/Source/Application/**/*.tsx",
+				"apps/WebApplication/Source/Features/**/*.ts",
+				"apps/WebApplication/Source/Features/**/*.tsx",
+				"apps/WebApplication/Source/Components/**/*.ts",
+				"apps/WebApplication/Source/Components/**/*.tsx",
+				"!apps/WebApplication/Source/Application/DataAccess/**/*.ts",
+				"!apps/WebApplication/Source/Application/DataAccess/**/*.tsx",
+				"!apps/WebApplication/Source/Features/**/DataAccess/**/*.ts",
+				"!apps/WebApplication/Source/Features/**/DataAccess/**/*.tsx",
+				"!apps/WebApplication/Source/Shared/Transport/**/*.ts",
+				"!apps/WebApplication/Source/Shared/Transport/**/*.tsx"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["@/Shared/Transport", "@/Shared/Transport/*"],
+										"message": "Only data-access boundary modules may import shared transport request utilities."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/WebApplication/Source/Application/UserInterface/**/*.ts",
+				"apps/WebApplication/Source/Application/UserInterface/**/*.tsx",
+				"apps/WebApplication/Source/Features/**/UserInterface/**/*.ts",
+				"apps/WebApplication/Source/Features/**/UserInterface/**/*.tsx",
+				"apps/WebApplication/Source/Components/**/*.ts",
+				"apps/WebApplication/Source/Components/**/*.tsx"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["@/Shared/Transport", "@/Shared/Transport/*"],
+										"message": "Only data-access boundary modules may import shared transport request utilities."
+									},
+									{
+										"group": ["@/Features/*/DataAccess/*"],
+										"message": "User-interface modules must consume owner/state APIs instead of feature data-access modules."
+									},
+									{
+										"group": ["@/Application/DataAccess/*"],
+										"message": "User-interface modules must consume owner/state APIs instead of application data-access modules."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/WebApplication/Source/Features/**/DomainModel/**/*.ts",
+				"apps/WebApplication/Source/Features/**/DomainModel/**/*.tsx"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["@/Features/*/DataAccess/*"],
+										"message": "Domain-model modules must not depend on feature data-access modules."
+									},
+									{
+										"group": ["@/Application/DataAccess/*"],
+										"message": "Domain-model modules must not depend on application data-access modules."
+									},
+									{
+										"group": ["@/Application/StateManagement/*"],
+										"message": "Domain-model modules must not depend on application state owners."
+									},
+									{
+										"group": ["@/Features/*/StateManagement/*"],
+										"message": "Domain-model modules must not depend on feature state owners."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/ServerApplication/Source/Agents/**/*.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["**/Index", "**/Index.ts", "**/Index.tsx"],
+										"message": "Import concrete internal modules directly instead of internal Index barrels."
+									},
+									{
+										"group": ["**/Network/**"],
+										"message": "Agent owners must not depend on server network ingress or route modules."
+									},
+									{
+										"group": ["**/Application/**"],
+										"message": "Agent owners must not depend on server application bootstrap/composition modules."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/WebApplication/Source/Shared/Contracts/**/*.ts",
+				"apps/WebApplication/Source/Application/Configuration/**/*.ts",
+				"apps/ServerApplication/Source/Application/Configuration/**/*.ts",
+				"packages/CodexProtocol/Source/Contracts/**/*.ts"
+			],
+			"linter": { "rules": {} }
+		},
+		{
+			"includes": [
+				"apps/WebApplication/Source/**/*.ts",
+				"apps/WebApplication/Source/**/*.tsx",
+				"apps/WebApplication/Tests/**/*.ts",
+				"apps/WebApplication/Tests/**/*.tsx",
+				"apps/WebApplication/vite.config.ts"
+			],
+			"javascript": { "globals": ["exports"] },
+			"linter": {
+				"rules": {
+					"correctness": {
+						"useExhaustiveDependencies": "off",
+						"useHookAtTopLevel": "error"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"**/*.test.ts",
+				"**/*.test.tsx",
+				"**/Tests/**/*.ts",
+				"**/Tests/**/*.tsx"
+			],
+			"javascript": { "globals": ["exports"] },
+			"linter": {
+				"rules": { "suspicious": { "noEmptyBlockStatements": "off" } }
+			}
+		}
+	],
+	"assist": {
+		"enabled": true,
+		"actions": { "source": { "organizeImports": "on" } }
+	}
+}

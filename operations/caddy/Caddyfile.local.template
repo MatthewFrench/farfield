@@ -1,0 +1,42 @@
+{{SITE_ADDRESS}} {
+  tls internal
+
+  map "{env.API_TOKEN}" {farfield_api_token} {
+    default "{env.API_TOKEN}"
+    "" "{env.PUSH_API_TOKEN}"
+  }
+
+  @trusted_api {
+    path /api/*
+    header Origin {{SITE_ADDRESS}}
+  }
+  reverse_proxy @trusted_api 127.0.0.1:4311 {
+    header_up X-Farfield-Token {farfield_api_token}
+  }
+
+  @untrusted_api {
+    path /api/*
+    not header Origin {{SITE_ADDRESS}}
+  }
+  respond @untrusted_api 403
+
+  @trusted_events {
+    path /events
+    header Origin {{SITE_ADDRESS}}
+  }
+  reverse_proxy @trusted_events 127.0.0.1:4311 {
+    header_up X-Farfield-Token {farfield_api_token}
+    flush_interval -1
+  }
+
+  @untrusted_events {
+    path /events
+    not header Origin {{SITE_ADDRESS}}
+  }
+  respond @untrusted_events 403
+
+  @healthz path /healthz
+  reverse_proxy @healthz 127.0.0.1:4311
+
+  reverse_proxy 127.0.0.1:4312
+}

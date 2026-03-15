@@ -1,0 +1,141 @@
+import type { JsonValue } from "@farfield/protocol";
+import type { AppServerNotificationIdentity } from "./AppServerNotificationIdentityContract.js";
+
+export interface AppServerNotificationEvent {
+  sequence: number;
+  method: string;
+  params: JsonValue | null;
+  threadId: string | null;
+  turnId: string | null;
+  receivedAtMilliseconds: number;
+}
+
+export interface AppServerReadNotificationEventsInput {
+  limit: number;
+  sinceSequence: number | null;
+}
+
+export interface AppServerReadNotificationEventsResult {
+  events: AppServerNotificationEvent[];
+  nextSequence: number;
+  firstAvailableSequence: number;
+  resetRequired: boolean;
+}
+
+interface AppServerNotificationBufferOwnerOptions {
+  maximumEventCount: number;
+  maximumRetainedBytes: number;
+}
+
+const INITIAL_NOTIFICATION_SEQUENCE = 0;
+const RESET_CURSOR_SEQUENCE_OFFSET = 1;
+
+/**
+ * Owns bounded in-memory retention for app-server notification events.
+ * The owner enforces both event-count and byte budgets so long-lived adapter sessions
+ * cannot retain unbounded notification payloads in memory. The transport provides the
+ * raw line size estimate so this owner never has to reserialize large notification params.
+ */
+export class AppServerNotificationBufferOwner {
+  private readonly maximumEventCount: number;
+  private readonly maximumRetainedBytes: number;
+  private readonly events: AppServerNotificationEvent[] = [];
+  private readonly retainedBytesBySequence = new Map<number, number>();
+  private nextSequence = INITIAL_NOTIFICATION_SEQUENCE;
+  private totalRetainedBytes = 0;
+
+  public constructor(options: AppServerNotificationBufferOwnerOptions) {
+    if (!Number.isInteger(options.maximumEventCount) || options.maximumEventCount <= 0) {
+      throw new Error(
+        "AppServerNotificationBufferOwner requires positive integer maximumEventCount",
+      );
+    }
+    if (!Number.isInteger(options.maximumRetainedBytes) || options.maximumRetainedBytes <= 0) {
+      throw new Error(
+        "AppServerNotificationBufferOwner requires positive integer maximumRetainedBytes",
+      );
+    }
+    this.maximumEventCount = options.maximumEventCount;
+    this.maximumRetainedBytes = options.maximumRetainedBytes;
+  }
+
+  public reset(): void {
+    this.events.length = 0;
+    this.retainedBytesBySequence.clear();
+    this.nextSequence = INITIAL_NOTIFICATION_SEQUENCE;
+    this.totalRetainedBytes = 0;
+  }
+
+  public append(
+    method: string,
+    params: JsonValue | null,
+    identity: AppServerNotificationIdentity,
+    receivedAtMilliseconds: number,
+    retainedByteEstimate: number,
+  ): void {
+    if (!Number.isInteger(retainedByteEstimate) || retainedByteEstimate <= 0) {
+      throw new Error(
+        "AppServerNotificationBufferOwner requires positive integer retainedByteEstimate",
+      );
+    }
+    const event: AppServerNotificationEvent = {
+      sequence: this.nextSequence,
+      method,
+      params,
+      threadId: identity.threadId,
+      turnId: identity.turnId,
+      receivedAtMilliseconds,
+    };
+    this.nextSequence += 1;
+
+    this.events.push(event);
+    this.retainedBytesBySequence.set(event.sequence, retainedByteEstimate);
+    this.totalRetainedBytes += retainedByteEstimate;
+    this.evictUntilWithinBounds();
+  }
+
+  public read(input: AppServerReadNotificationEventsInput): AppServerReadNotificationEventsResult {
+    const nextSequence = this.nextSequence;
+    const firstEvent = this.events[0];
+    const firstAvailableSequence = firstEvent ? firstEvent.sequence : nextSequence;
+
+    let resetRequired = false;
+    if (input.sinceSequence !== null) {
+      resetRequired =
+        input.sinceSequence < firstAvailableSequence - RESET_CURSOR_SEQUENCE_OFFSET ||
+        input.sinceSequence >= nextSequence;
+    }
+
+    const sinceSequence = input.sinceSequence;
+    let selectedEvents: AppServerNotificationEvent[];
+    if (resetRequired || sinceSequence === null) {
+      selectedEvents = this.events.slice(-input.limit);
+    } else {
+      selectedEvents = this.events.filter((event) => event.sequence > sinceSequence);
+    }
+
+    return {
+      events: selectedEvents,
+      nextSequence,
+      firstAvailableSequence,
+      resetRequired,
+    };
+  }
+
+  private evictUntilWithinBounds(): void {
+    while (
+      this.events.length > this.maximumEventCount ||
+      this.totalRetainedBytes > this.maximumRetainedBytes
+    ) {
+      const oldestEvent = this.events.shift();
+      if (oldestEvent === undefined) {
+        return;
+      }
+      const retainedBytes = this.retainedBytesBySequence.get(oldestEvent.sequence);
+      if (retainedBytes !== undefined) {
+        this.totalRetainedBytes -= retainedBytes;
+        this.retainedBytesBySequence.delete(oldestEvent.sequence);
+      }
+    }
+  }
+}

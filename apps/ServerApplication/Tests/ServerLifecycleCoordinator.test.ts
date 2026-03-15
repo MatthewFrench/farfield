@@ -1,0 +1,205 @@
+import { EventEmitter } from "node:events";
+import fs from "node:fs";
+import type { Server } from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { AgentRegistry } from "../Source/Agents/Registry.js";
+import type { AgentAdapter, AgentCapabilities, AgentId } from "../Source/Agents/Types.js";
+import { ServerLifecycleCoordinator } from "../Source/Application/Bootstrap/ServerLifecycleCoordinator.js";
+import { ActivityHistoryService } from "../Source/Modules/Activity/ActivityHistoryService.js";
+import { ClientErrorStore } from "../Source/Modules/Debugging/ClientErrorStore.js";
+import { NtfyNotifier } from "../Source/Modules/PushNotifications/NtfyNotifier.js";
+import { PushReceiptStore } from "../Source/Modules/PushNotifications/PushReceiptStore.js";
+import { PushService } from "../Source/Modules/PushNotifications/PushService.js";
+import { PushStore } from "../Source/Modules/PushNotifications/PushStore.js";
+import { EventStreamClientRegistry } from "../Source/Network/EventStreamClientRegistry.js";
+import { PushDispatchConcurrencyCoordinator } from "../Source/Network/PushDispatchConcurrencyCoordinator.js";
+
+const temporaryDirectoryPaths: string[] = [];
+
+function createTemporaryDirectory(): string {
+  const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "farfield-lifecycle-"));
+  temporaryDirectoryPaths.push(temporaryDirectoryPath);
+  return temporaryDirectoryPath;
+}
+
+class InMemoryLifecycleServer extends EventEmitter {
+  public listenCallCount: number;
+  public closeCallCount: number;
+
+  public constructor() {
+    super();
+    this.listenCallCount = 0;
+    this.closeCallCount = 0;
+  }
+
+  public listen(_port: number, _host: string, callback: () => void): this {
+    this.listenCallCount += 1;
+    callback();
+    return this;
+  }
+
+  public close(callback: () => void): this {
+    this.closeCallCount += 1;
+    callback();
+    return this;
+  }
+}
+
+const defaultCapabilities: AgentCapabilities = {
+  canListModels: false,
+  canListCollaborationModes: false,
+  canSetCollaborationMode: false,
+  canSubmitUserInput: false,
+  canReadLiveState: false,
+  canReadStreamEvents: false,
+
+  canReadNotificationEvents: false,
+};
+
+function createAdapter(
+  id: AgentId,
+  counters: { startCount: number; stopCount: number },
+): AgentAdapter {
+  return {
+    id,
+    label: id,
+    capabilities: defaultCapabilities,
+    async start(): Promise<void> {
+      counters.startCount += 1;
+    },
+    async stop(): Promise<void> {
+      counters.stopCount += 1;
+    },
+    isEnabled(): boolean {
+      return true;
+    },
+    isConnected(): boolean {
+      return true;
+    },
+    async listThreads(): Promise<never> {
+      throw new Error("not used");
+    },
+    async createThread(): Promise<never> {
+      throw new Error("not used");
+    },
+    async readThread(): Promise<never> {
+      throw new Error("not used");
+    },
+    async sendMessage(): Promise<void> {
+      throw new Error("not used");
+    },
+    async interrupt(): Promise<void> {
+      throw new Error("not used");
+    },
+  };
+}
+
+afterEach(() => {
+  for (const temporaryDirectoryPath of temporaryDirectoryPaths.splice(0)) {
+    if (fs.existsSync(temporaryDirectoryPath)) {
+      fs.rmSync(temporaryDirectoryPath, { recursive: true, force: true });
+    }
+  }
+});
+
+describe("ServerLifecycleCoordinator", () => {
+  it("starts and stops server + adapters with owned lifecycle flow", async () => {
+    const temporaryDirectoryPath = createTemporaryDirectory();
+    const inMemoryServer = new InMemoryLifecycleServer();
+    const server = inMemoryServer as Server;
+
+    const adapterCounters = { startCount: 0, stopCount: 0 };
+    const registry = new AgentRegistry([createAdapter("codex", adapterCounters)]);
+
+    const eventStreamClientRegistry = new EventStreamClientRegistry(1_000);
+    const activityHistoryService = new ActivityHistoryService({
+      historyLimit: 50,
+      eventStreamClientRegistry,
+    });
+    const pushDispatchConcurrencyCoordinator = new PushDispatchConcurrencyCoordinator(
+      50,
+      () => false,
+      async () => {},
+    );
+
+    const pushStore = new PushStore(path.join(temporaryDirectoryPath, "push-state.json"));
+    pushStore.load();
+    const pushReceiptStore = new PushReceiptStore(
+      path.join(temporaryDirectoryPath, "push-receipts.json"),
+      50,
+      86_400_000,
+    );
+    pushReceiptStore.load();
+    const pushService = new PushService({
+      enabled: false,
+      vapidPublicKey: "",
+      vapidPrivateKey: "",
+      vapidSubject: "",
+    });
+    const clientErrorStore = new ClientErrorStore(
+      path.join(temporaryDirectoryPath, "client-errors.ndjson"),
+      "session-test",
+      100,
+    );
+    const ntfyNotifier = new NtfyNotifier({
+      enabled: false,
+      topic: null,
+      baseUrl: "https://ntfy.sh",
+      bearerToken: null,
+      priority: "3",
+    });
+
+    const lifecycleMessages: string[] = [];
+    const coordinator = new ServerLifecycleCoordinator({
+      server,
+      host: "127.0.0.1",
+      port: 0,
+      appExecutablePath: "codex",
+      socketPath: "/tmp/test.sock",
+      configuredAgentIds: ["codex"],
+      pushEnabledConfigured: false,
+      apiAuthRequired: false,
+      pushStatePath: path.join(temporaryDirectoryPath, "push-state.json"),
+      pushStatePathSource: "env",
+      pushReceiptsPath: path.join(temporaryDirectoryPath, "push-receipts.json"),
+      pushSendsPath: path.join(temporaryDirectoryPath, "push-sends.json"),
+      pushReceiptsMaxCount: 50,
+      pushReceiptsMaxAgeDays: 1,
+      clientErrorMaxEntries: 100,
+      pushService,
+      pushStore,
+      pushReceiptStore,
+      clientErrorStore,
+      ntfyNotifier,
+      registry,
+      activityHistoryService,
+      pushDispatchConcurrencyCoordinator,
+      eventStreamClientRegistry,
+      readOpenCodeAdapter: () => null,
+      ensureTraceDirectory: () => {
+        const traceDirectoryPath = path.join(temporaryDirectoryPath, "traces");
+        if (!fs.existsSync(traceDirectoryPath)) {
+          fs.mkdirSync(traceDirectoryPath, { recursive: true });
+        }
+      },
+      pushSystem: (message) => {
+        lifecycleMessages.push(message);
+      },
+      broadcastRuntimeState: () => {},
+    });
+
+    expect(coordinator.isShuttingDown()).toBe(false);
+    await coordinator.start();
+    expect(inMemoryServer.listenCallCount).toBe(1);
+    expect(adapterCounters.startCount).toBe(1);
+    expect(lifecycleMessages).toContain("Starting Farfield monitor server");
+    expect(lifecycleMessages).toContain("Monitor server ready");
+
+    await coordinator.shutdown();
+    expect(coordinator.isShuttingDown()).toBe(true);
+    expect(inMemoryServer.closeCallCount).toBe(1);
+    expect(adapterCounters.stopCount).toBe(1);
+  });
+});

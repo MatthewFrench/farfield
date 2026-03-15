@@ -1,0 +1,242 @@
+{
+  "description": "Sanitized app-server thread-stream-state-changed payloads covering all known conversation request method variants and structured error info.",
+  "events": [
+    {
+      "type": "broadcast",
+      "method": "thread-stream-state-changed",
+      "sourceClientId": "client-compatibility",
+      "version": 4,
+      "params": {
+        "conversationId": "thread-compatibility",
+        "type": "thread-stream-state-changed",
+        "version": 4,
+        "change": {
+          "type": "snapshot",
+          "conversationState": {
+            "id": "thread-compatibility",
+            "turns": [
+              {
+                "id": "turn-1",
+                "status": "failed",
+                "items": [
+                  {
+                    "id": "error-1",
+                    "type": "error",
+                    "message": "stream disconnected",
+                    "errorInfo": {
+                      "responseStreamDisconnected": {
+                        "httpStatusCode": 503
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "requests": [
+              {
+                "method": "item/commandExecution/requestApproval",
+                "id": 9,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-command-9",
+                  "command": "echo hello",
+                  "cwd": "/workspace"
+                }
+              },
+              {
+                "method": "item/fileChange/requestApproval",
+                "id": 10,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-file-10",
+                  "reason": "apply requested update"
+                }
+              },
+              {
+                "method": "item/tool/requestUserInput",
+                "id": 11,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "itemId": "item-1",
+                  "questions": [
+                    {
+                      "id": "question-1",
+                      "header": "Scope",
+                      "question": "Proceed?",
+                      "options": [
+                        {
+                          "label": "Yes",
+                          "description": "Continue"
+                        }
+                      ],
+                      "isOther": false,
+                      "isSecret": false
+                    }
+                  ]
+                }
+              },
+              {
+                "method": "item/tool/call",
+                "id": 12,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-1",
+                  "callId": "call-tool-12",
+                  "tool": "search",
+                  "arguments": {}
+                }
+              },
+              {
+                "method": "account/chatgptAuthTokens/refresh",
+                "id": 13,
+                "params": {
+                  "reason": "unauthorized"
+                }
+              },
+              {
+                "method": "applyPatchApproval",
+                "id": 14,
+                "params": {
+                  "callId": "call-14"
+                }
+              },
+              {
+                "method": "execCommandApproval",
+                "id": 15,
+                "params": {
+                  "callId": "call-15"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "broadcast",
+      "method": "thread-stream-state-changed",
+      "sourceClientId": "client-compatibility",
+      "version": 4,
+      "params": {
+        "conversationId": "thread-compatibility",
+        "type": "thread-stream-state-changed",
+        "version": 4,
+        "change": {
+          "type": "patches",
+          "patches": [
+            {
+              "op": "add",
+              "path": ["requests", 0],
+              "value": {
+                "method": "item/commandExecution/requestApproval",
+                "id": 21,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "itemId": "item-command-21",
+                  "command": "echo patched",
+                  "cwd": "/workspace"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 1],
+              "value": {
+                "method": "item/fileChange/requestApproval",
+                "id": 22,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "itemId": "item-file-22",
+                  "reason": "apply patch update"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 2],
+              "value": {
+                "method": "item/tool/requestUserInput",
+                "id": 23,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "itemId": "item-2",
+                  "questions": [
+                    {
+                      "id": "question-2",
+                      "header": "Decision",
+                      "question": "Continue?",
+                      "options": [
+                        {
+                          "label": "Continue",
+                          "description": "Keep processing"
+                        }
+                      ],
+                      "isOther": false,
+                      "isSecret": false
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 3],
+              "value": {
+                "method": "item/tool/call",
+                "id": 24,
+                "params": {
+                  "threadId": "thread-compatibility",
+                  "turnId": "turn-2",
+                  "callId": "call-tool-24",
+                  "tool": "fetch",
+                  "arguments": {
+                    "query": "latest"
+                  }
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 4],
+              "value": {
+                "method": "account/chatgptAuthTokens/refresh",
+                "id": 25,
+                "params": {
+                  "reason": "unauthorized"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 5],
+              "value": {
+                "method": "applyPatchApproval",
+                "id": 26,
+                "params": {
+                  "callId": "call-26"
+                }
+              }
+            },
+            {
+              "op": "add",
+              "path": ["requests", 6],
+              "value": {
+                "method": "execCommandApproval",
+                "id": 27,
+                "params": {
+                  "callId": "call-27"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

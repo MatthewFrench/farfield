@@ -1,0 +1,80 @@
+name: iOS Setup Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  setup-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate lockfile governance
+        run: bun run validate:lockfiles:governance
+
+      - name: Run setup wizard non-interactive
+        run: bun run setup:ios-push
+
+      - name: Run domain setup non-interactive
+        run: bun run setup:domain-https
+
+      - name: Validate generated env file
+        run: |
+          test -f .env.local
+          grep -nE "^PUSH_ENABLED=true$" .env.local
+          grep -nE "^PUSH_VAPID_PUBLIC_KEY=.+" .env.local
+          grep -nE "^PUSH_VAPID_PRIVATE_KEY=.+" .env.local
+          grep -nE "^PUSH_VAPID_SUBJECT=.+" .env.local
+          grep -nE "^API_TOKEN=.+" .env.local
+          grep -nE "^PUSH_DOCTOR_TOKEN=.+" .env.local
+
+      - name: Rotate API token
+        run: |
+          old_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
+          bun run rotate:api-token
+          new_token="$(grep '^API_TOKEN=' .env.local | cut -d'=' -f2-)"
+          doctor_token="$(grep '^PUSH_DOCTOR_TOKEN=' .env.local | cut -d'=' -f2-)"
+          test -n "$old_token"
+          test -n "$new_token"
+          test "$old_token" != "$new_token"
+          test "$new_token" = "$doctor_token"
+
+      - name: Validate script syntax
+        run: |
+          node --check scripts/tooling/with-env.mjs
+          node --check scripts/setup/setup-ios-push.mjs
+          node --check scripts/setup/setup-domain-https.mjs
+          node --check scripts/operations/rotate-api-token.mjs
+          node --check scripts/setup/ios-trust-local-ca.mjs
+          node --check scripts/development/caddy-local.mjs
+          node --check scripts/operations/push-doctor.mjs
+
+      - name: Validate Caddy templates and generated configs
+        run: |
+          grep -nE "\\{\\{SITE_ADDRESS\\}\\}" operations/caddy/Caddyfile.local.template
+          grep -nE "\\{\\{DOMAIN_HOST\\}\\}" operations/caddy/Caddyfile.domain.template
+          grep -nE "^https://.+\\{$" operations/caddy/Caddyfile.local
+          grep -nE "header_up X-Farfield-Token \\{farfield_api_token\\}" operations/caddy/Caddyfile.local
+          grep -nE "^[-*.A-Za-z0-9]+(:[0-9]+)? \\{$" operations/caddy/Caddyfile.domain
+          grep -nE "header_up X-Farfield-Token \\{farfield_api_token\\}" operations/caddy/Caddyfile.domain
+
+      - name: Verify env autoload helper
+        run: node scripts/tooling/with-env.mjs "node -e \"if (!process.env.API_TOKEN) { process.exit(1); }\""
