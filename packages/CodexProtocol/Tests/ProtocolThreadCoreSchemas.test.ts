@@ -294,6 +294,99 @@ describe("codex-protocol thread core schemas", () => {
     expect(parsed.turns[0]?.items[0]?.type).toBe("userInputResponse");
   });
 
+  it("parses structured input parts in turn params and user messages", () => {
+    const parsed = parseThreadStreamStateChangedBroadcast({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "client-123",
+      version: 4,
+      params: {
+        conversationId: "thread-123",
+        type: "thread-stream-state-changed",
+        version: 4,
+        change: {
+          type: "snapshot",
+          conversationState: {
+            id: "thread-123",
+            turns: [
+              {
+                params: {
+                  threadId: "thread-123",
+                  input: [
+                    {
+                      type: "text",
+                      text: "Investigate this thread",
+                      text_elements: [],
+                    },
+                    {
+                      type: "localImage",
+                      path: "/tmp/thread-screenshot.png",
+                    },
+                    {
+                      type: "skill",
+                      name: "openai-docs",
+                      path: "/Users/matthewfrench/.codex/skills/.system/openai-docs/SKILL.md",
+                    },
+                    {
+                      type: "mention",
+                      name: "workspace",
+                      path: "app://workspace",
+                    },
+                  ],
+                  attachments: [],
+                },
+                status: "completed",
+                items: [
+                  {
+                    id: "item-1",
+                    type: "userMessage",
+                    content: [
+                      {
+                        type: "text",
+                        text: "Please inspect these inputs",
+                        text_elements: [],
+                      },
+                      {
+                        type: "localImage",
+                        path: "/tmp/thread-screenshot.png",
+                      },
+                      {
+                        type: "skill",
+                        name: "openai-docs",
+                        path: "/Users/matthewfrench/.codex/skills/.system/openai-docs/SKILL.md",
+                      },
+                      {
+                        type: "mention",
+                        name: "workspace",
+                        path: "app://workspace",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            requests: [],
+          },
+        },
+      },
+    });
+
+    expect(parsed.params.change.type).toBe("snapshot");
+    if (parsed.params.change.type !== "snapshot") {
+      throw new Error("Expected snapshot change");
+    }
+    expect(parsed.params.change.conversationState.turns[0]?.params?.input[1]?.type).toBe(
+      "localImage",
+    );
+    const parsedUserMessage = parsed.params.change.conversationState.turns[0]?.items[0];
+    expect(parsedUserMessage?.type).toBe("userMessage");
+    if (parsedUserMessage?.type !== "userMessage") {
+      throw new Error("Expected user message item");
+    }
+    expect(parsedUserMessage.content[2]?.type).toBe("skill");
+    expect(parsedUserMessage.content[3]?.type).toBe("mention");
+  });
+
   it("parses userInputResponse item when completed is omitted", () => {
     const parsed = parseThreadConversationState({
       id: "thread-123",
@@ -489,6 +582,37 @@ describe("codex-protocol thread core schemas", () => {
     });
 
     expect(parsed.turns[0]?.items[0]?.type).toBe("commandExecution");
+  });
+
+  it("parses thread conversation state with dynamic tool call item", () => {
+    const parsed = parseThreadConversationState({
+      id: "thread-123",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              id: "dynamic-tool-call-1",
+              type: "dynamicToolCall",
+              tool: "read_thread_terminal",
+              arguments: {},
+              status: "completed",
+              contentItems: [
+                {
+                  type: "inputText",
+                  text: "terminal output",
+                },
+              ],
+              success: true,
+              durationMs: 42,
+            },
+          ],
+        },
+      ],
+      requests: [],
+    });
+
+    expect(parsed.turns[0]?.items[0]?.type).toBe("dynamicToolCall");
   });
 
   it("parses command action with null path and query", () => {

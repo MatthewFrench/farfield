@@ -88,6 +88,39 @@ describe("ConversationItem", () => {
     expect(panel.className).toContain("my-1");
   });
 
+  it("renders dynamic tool call items and treats them as tool blocks for spacing", () => {
+    renderConversationItem({
+      item: {
+        id: "dynamic-tool-call-1",
+        type: "dynamicToolCall",
+        tool: "read_thread_terminal",
+        arguments: {},
+        status: "completed",
+        contentItems: [
+          {
+            type: "inputText",
+            text: "cwd: /workspace",
+          },
+        ],
+        success: true,
+        durationMs: 12,
+      },
+      previousItemType: "commandExecution",
+      nextItemType: "fileChange",
+    });
+
+    expect(screen.getByText("Dynamic tool")).toBeDefined();
+    expect(screen.getByText("read_thread_terminal (completed)")).toBeDefined();
+    expect(screen.getByText("cwd: /workspace")).toBeDefined();
+
+    const panel = screen.getByText("Dynamic tool").parentElement;
+    if (panel === null) {
+      throw new Error("Expected dynamic tool panel container to exist");
+    }
+
+    expect(panel.className).toContain("my-1");
+  });
+
   it("applies leading spacing when the next item is a tool block", () => {
     renderConversationItem({
       item: {

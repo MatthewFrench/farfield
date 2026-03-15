@@ -92,20 +92,35 @@ export const FarfieldHistoryEntrySchema = z
 
 export type FarfieldHistoryEntry = z.infer<typeof FarfieldHistoryEntrySchema>;
 
-export const FarfieldThreadLiveStateSnapshotSchema = z
+const FarfieldThreadLiveStateErrorSchema = z
+  .object({
+    kind: z.literal("reductionFailed"),
+    message: z.string().min(1),
+    eventIndex: z.number().int().nonnegative().nullable(),
+    patchIndex: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+
+const FarfieldNullableThreadConversationStateSchema: z.ZodUnion<
+  [typeof ThreadConversationStateSchema, z.ZodNull]
+> = z.union([ThreadConversationStateSchema, z.null()]);
+
+export const FarfieldThreadLiveStateSnapshotSchema: z.ZodObject<
+  {
+    ok: z.ZodLiteral<typeof FarfieldProtocolStatusValue.Success>;
+    threadId: z.ZodString;
+    ownerClientId: z.ZodNullable<z.ZodString>;
+    conversationState: typeof FarfieldNullableThreadConversationStateSchema;
+    liveStateError: z.ZodNullable<typeof FarfieldThreadLiveStateErrorSchema>;
+  },
+  "strict"
+> = z
   .object({
     ok: z.literal(FarfieldProtocolStatusValue.Success),
     threadId: z.string().min(1),
     ownerClientId: z.string().nullable(),
-    conversationState: z.union([ThreadConversationStateSchema, z.null()]),
-    liveStateError: z
-      .object({
-        kind: z.literal("reductionFailed"),
-        message: z.string().min(1),
-        eventIndex: z.number().int().nonnegative().nullable(),
-        patchIndex: z.number().int().nonnegative().nullable(),
-      })
-      .nullable(),
+    conversationState: FarfieldNullableThreadConversationStateSchema,
+    liveStateError: FarfieldThreadLiveStateErrorSchema.nullable(),
   })
   .strict();
 

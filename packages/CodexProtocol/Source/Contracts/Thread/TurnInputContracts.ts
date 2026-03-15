@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { JsonValueSchema, NonEmptyStringSchema, NullableStringSchema } from "../../Common.js";
 import { CollaborationModeSchema } from "./CollaborationModeContracts.js";
+import { StructuredInputPartSchema } from "./StructuredInputPartContracts.js";
 
 const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
 const OptionalNullableCollaborationModeSchema = z
@@ -8,27 +9,10 @@ const OptionalNullableCollaborationModeSchema = z
   .optional();
 const SandboxPolicySchema = z.object({ type: NonEmptyStringSchema }).passthrough();
 
-export const InputTextPartSchema = z
-  .object({
-    type: z.literal("text"),
-    text: z.string(),
-    text_elements: z.array(JsonValueSchema).optional(),
-  })
-  .passthrough();
-
-export const InputImagePartSchema = z
-  .object({
-    type: z.literal("image"),
-    url: z.string(),
-  })
-  .passthrough();
-
-export const InputPartSchema = z.union([InputTextPartSchema, InputImagePartSchema]);
-
 export const TurnStartParamsSchema = z
   .object({
     threadId: NonEmptyStringSchema,
-    input: z.array(InputPartSchema),
+    input: z.array(StructuredInputPartSchema),
     cwd: NonEmptyStringSchema.optional(),
     model: NullableStringSchema.optional(),
     effort: NullableStringSchema.optional(),

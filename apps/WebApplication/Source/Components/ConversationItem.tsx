@@ -24,6 +24,7 @@ const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
   "fileChange",
   "webSearch",
   "mcpToolCall",
+  "dynamicToolCall",
   "collabAgentToolCall",
   "collabToolCall",
 ];
@@ -46,6 +47,7 @@ const USER_INPUT_RESPONSE_LABEL = "Response";
 const CONTEXT_COMPACTED_NOTICE = "Context compacted";
 const WEB_SEARCH_TOOL_TITLE = "Web search";
 const MCP_TOOL_TITLE = "MCP tool";
+const DYNAMIC_TOOL_TITLE = "Dynamic tool";
 const COLLAB_TOOL_TITLE = "Collab tool";
 const VIEWED_IMAGE_PREFIX = "Viewed image:";
 const ENTERED_REVIEW_MODE_PREFIX = "Entered review mode:";
@@ -150,6 +152,27 @@ function formatReceiverThreadIds(receiverThreadIds: readonly string[]): string {
 
 function readToolPanelClassName(toolSpacing: string): string {
   return `${toolSpacing} ${TOOL_PANEL_CLASS}`;
+}
+
+function readDynamicToolContentPreview(
+  contentItems: Extract<TurnItem, { type: "dynamicToolCall" }>["contentItems"],
+): string | null {
+  const previewLines = contentItems
+    .map((contentItem) => {
+      switch (contentItem.type) {
+        case "inputText":
+          return contentItem.text;
+        case "inputImage":
+          return contentItem.imageUrl;
+      }
+    })
+    .filter((line) => line.length > 0);
+
+  if (previewLines.length === 0) {
+    return null;
+  }
+
+  return previewLines.join(LINE_BREAK);
 }
 
 function renderSectionPanel(title: string, content: string) {
@@ -309,6 +332,32 @@ function ConversationItemComponent({
               {RESULT_PARTS_LABEL} {item.result.content.length}
             </div>
           )}
+          <div className={TOOL_PANEL_ARGUMENTS_TEXT_CLASS}>{argumentsText}</div>
+        </div>
+      );
+    }
+
+    case "dynamicToolCall": {
+      const argumentsText = JSON.stringify(item.arguments);
+      const contentPreview = readDynamicToolContentPreview(item.contentItems);
+      return (
+        <div className={readToolPanelClassName(toolSpacing)}>
+          <div className={TOOL_PANEL_TITLE_CLASS}>{DYNAMIC_TOOL_TITLE}</div>
+          <div className={TOOL_PANEL_SECONDARY_TEXT_CLASS}>
+            {item.tool} ({item.status})
+          </div>
+          {item.durationMs != null && (
+            <div className={TOOL_PANEL_DURATION_TEXT_CLASS}>
+              {item.durationMs}
+              {MILLISECOND_SUFFIX}
+            </div>
+          )}
+          {contentPreview !== null && (
+            <div className={TOOL_PANEL_PRIMARY_TEXT_CLASS}>{contentPreview}</div>
+          )}
+          <div className={TOOL_PANEL_METADATA_TEXT_CLASS}>
+            {RESULT_PARTS_LABEL} {item.contentItems.length}
+          </div>
           <div className={TOOL_PANEL_ARGUMENTS_TEXT_CLASS}>{argumentsText}</div>
         </div>
       );

@@ -107,6 +107,36 @@ describe("ConversationItemFlattener", () => {
     expect(flattened.map((item) => item.key)).toEqual(["context-compaction"]);
   });
 
+  it("keeps dynamic tool call items renderable", () => {
+    const flattener = new ConversationItemFlattener();
+    const turns: ConversationTurn[] = [
+      createTurn({
+        status: "completed",
+        items: [
+          {
+            id: "dynamic-tool-call-1",
+            type: "dynamicToolCall",
+            tool: "read_thread_terminal",
+            arguments: {},
+            status: "completed",
+            contentItems: [
+              {
+                type: "inputText",
+                text: "cwd: /workspace",
+              },
+            ],
+            success: true,
+            durationMs: 21,
+          },
+        ],
+      }),
+    ];
+
+    const flattened = flattener.flattenConversationItems(turns, false);
+
+    expect(flattened.map((item) => item.key)).toEqual(["dynamic-tool-call-1"]);
+  });
+
   it("does not flag completed turns as in-progress when generation flag is true", () => {
     const flattener = new ConversationItemFlattener();
     const turns: ConversationTurn[] = [

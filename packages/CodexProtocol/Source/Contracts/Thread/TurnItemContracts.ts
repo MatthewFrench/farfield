@@ -5,16 +5,12 @@ import {
   NonNegativeIntSchema,
   NullableStringSchema,
 } from "../../Common.js";
+import { StructuredInputPartSchema } from "./StructuredInputPartContracts.js";
 
 const OptionalNullableStringSchema = NullableStringSchema.optional();
 const OptionalNullableJsonValueSchema = z.union([JsonValueSchema, z.null()]).optional();
 const OptionalNullableIntegerSchema = z.union([z.number().int(), z.null()]).optional();
 const OptionalNullableNonNegativeIntSchema = z.union([NonNegativeIntSchema, z.null()]).optional();
-
-const UserMessagePartTypeValues = {
-  text: "text",
-  image: "image",
-} as const;
 
 const TurnItemTypeValues = {
   userMessage: "userMessage",
@@ -32,6 +28,7 @@ const TurnItemTypeValues = {
   webSearch: "webSearch",
   modelChanged: "modelChanged",
   mcpToolCall: "mcpToolCall",
+  dynamicToolCall: "dynamicToolCall",
   collabAgentToolCall: "collabAgentToolCall",
   collabToolCall: "collabToolCall",
   imageView: "imageView",
@@ -57,25 +54,7 @@ const CollabAgentStatusValues = [
   "notFound",
 ] as const;
 
-export const UserMessageContentPartSchema = z
-  .object({
-    type: z.literal(UserMessagePartTypeValues.text),
-    text: z.string(),
-    text_elements: z.array(JsonValueSchema).optional(),
-  })
-  .passthrough();
-
-export const UserMessageImageContentPartSchema = z
-  .object({
-    type: z.literal(UserMessagePartTypeValues.image),
-    url: z.string(),
-  })
-  .passthrough();
-
-export const UserMessagePartSchema = z.union([
-  UserMessageContentPartSchema,
-  UserMessageImageContentPartSchema,
-]);
+export const UserMessagePartSchema = StructuredInputPartSchema;
 
 export const UserMessageItemSchema = z
   .object({
@@ -291,6 +270,34 @@ export const McpToolCallItemSchema = z
   })
   .passthrough();
 
+export const DynamicToolCallContentItemSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("inputText"),
+      text: z.string(),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("inputImage"),
+      imageUrl: z.string(),
+    })
+    .passthrough(),
+]);
+
+export const DynamicToolCallItemSchema = z
+  .object({
+    type: z.literal(TurnItemTypeValues.dynamicToolCall),
+    id: NonEmptyStringSchema,
+    tool: z.string(),
+    arguments: JsonValueSchema,
+    status: NonEmptyStringSchema,
+    contentItems: z.array(DynamicToolCallContentItemSchema),
+    success: z.boolean(),
+    durationMs: OptionalNullableNonNegativeIntSchema,
+  })
+  .passthrough();
+
 export const CollabAgentToolSchema = z.enum(CollabAgentToolValues);
 
 export const CollabAgentStatusSchema = z.enum(CollabAgentStatusValues);
@@ -363,6 +370,7 @@ type TurnItemVariantSchemaTuple = [
   typeof ContextCompactionItemSchema,
   typeof WebSearchItemSchema,
   typeof McpToolCallItemSchema,
+  typeof DynamicToolCallItemSchema,
   typeof CollabAgentToolCallItemSchema,
   typeof CollabToolCallItemSchema,
   typeof ImageViewItemSchema,
@@ -386,6 +394,7 @@ const TurnItemVariantSchemas: TurnItemVariantSchemaTuple = [
   ContextCompactionItemSchema,
   WebSearchItemSchema,
   McpToolCallItemSchema,
+  DynamicToolCallItemSchema,
   CollabAgentToolCallItemSchema,
   CollabToolCallItemSchema,
   ImageViewItemSchema,

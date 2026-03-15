@@ -2,13 +2,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { type IpcFrame, JsonValueSchema, ProtocolValidationError } from "@farfield/protocol";
 import { logger } from "../../Shared/Logging/Logger.js";
-import { extractThreadIdFromCodexIpcFrame } from "./CodexThreadStreamFrameDescriptionContracts.js";
+import {
+  describeCodexIpcFrame,
+  extractThreadIdFromCodexIpcFrame,
+} from "./CodexThreadStreamFrameDescriptionContracts.js";
 
 interface InvalidThreadStreamEventDetail {
   threadId: string | null;
   error: string;
   issues?: string[];
   rawPayload: IpcFrame;
+  loggedAt: string;
+}
+
+interface InvalidThreadStreamEventLogSummary {
+  threadId: string | null;
+  method: string;
+  error: string;
+  issues?: string[];
+  rawPayloadByteCount: number;
   loggedAt: string;
 }
 
@@ -29,7 +41,10 @@ export class CodexInvalidThreadStreamEventLogOwner {
 
   public recordInvalidThreadStreamEvent<ErrorType>(frame: IpcFrame, error: ErrorType): void {
     const invalidEventDetail = this.createInvalidStreamEventDetail(frame, error);
-    logger.warn(invalidEventDetail, INVALID_THREAD_STREAM_EVENT_DETAIL_LOG_NAME);
+    logger.warn(
+      this.createInvalidStreamEventLogSummary(invalidEventDetail),
+      INVALID_THREAD_STREAM_EVENT_DETAIL_LOG_NAME,
+    );
     this.writeInvalidStreamEventDetail(invalidEventDetail);
   }
 
@@ -76,6 +91,19 @@ export class CodexInvalidThreadStreamEventLogOwner {
       ...(error instanceof ProtocolValidationError ? { issues: error.issues } : {}),
       rawPayload: frame,
       loggedAt: new Date().toISOString(),
+    };
+  }
+
+  private createInvalidStreamEventLogSummary(
+    detail: InvalidThreadStreamEventDetail,
+  ): InvalidThreadStreamEventLogSummary {
+    return {
+      threadId: detail.threadId,
+      method: describeCodexIpcFrame(detail.rawPayload).method,
+      error: detail.error,
+      ...(detail.issues ? { issues: detail.issues } : {}),
+      rawPayloadByteCount: Buffer.byteLength(JSON.stringify(detail.rawPayload), "utf8"),
+      loggedAt: detail.loggedAt,
     };
   }
 }

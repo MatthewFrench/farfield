@@ -46,6 +46,7 @@ const ConversationTurnItemTypeSchema = z.enum([
   "webSearch",
   "modelChanged",
   "mcpToolCall",
+  "dynamicToolCall",
   "collabAgentToolCall",
   "collabToolCall",
   "imageView",
