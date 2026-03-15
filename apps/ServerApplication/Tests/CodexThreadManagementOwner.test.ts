@@ -228,6 +228,7 @@ class TestAppServerClient extends AppServerClient {
   private readonly writeSkillsConfigResult: WriteSkillsConfigResult;
   private readonly readConfigResult: AppServerConfigReadResponse;
   private readonly readThreadErrorQueue: Error[] = [];
+  private readonly resumeThreadErrorQueue: Error[] = [];
 
   public constructor(input?: {
     listThreadsResult?: AppServerListThreadsResponse;
@@ -471,6 +472,10 @@ class TestAppServerClient extends AppServerClient {
       threadId,
       ...(options !== undefined ? { options } : {}),
     });
+    const queuedError = this.resumeThreadErrorQueue.shift();
+    if (queuedError !== undefined) {
+      throw queuedError;
+    }
     return this.readThreadResult;
   }
 
@@ -730,6 +735,10 @@ class TestAppServerClient extends AppServerClient {
   public queueReadThreadError(error: Error): void {
     this.readThreadErrorQueue.push(error);
   }
+
+  public queueResumeThreadError(error: Error): void {
+    this.resumeThreadErrorQueue.push(error);
+  }
 }
 
 function createOwner(
@@ -738,6 +747,7 @@ function createOwner(
   options?: {
     isConversationNotFoundError?: <ErrorType>(error: ErrorType) => boolean;
     isThreadNotLoadedError?: (error: Error) => boolean;
+    waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
   },
 ): CodexThreadManagementOwner {
   return new CodexThreadManagementOwner({
@@ -749,6 +759,7 @@ function createOwner(
     isConversationNotFoundError:
       options?.isConversationNotFoundError ?? (<ErrorType>(_error: ErrorType): boolean => false),
     isThreadNotLoadedError: options?.isThreadNotLoadedError ?? ((_error: Error): boolean => false),
+    waitForMilliseconds: options?.waitForMilliseconds,
   });
 }
 
@@ -1017,6 +1028,14 @@ describe("CodexThreadManagementOwner", () => {
 
     const result = await owner.createThread({ cwd: "/tmp/workspace" });
 
+    expect(appClient.resumeThreadCalls).toEqual([
+      {
+        threadId: "thread-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+    ]);
     expect(result).toEqual({
       threadId: "thread-1",
       thread: START_THREAD_RESPONSE.thread,
@@ -1027,6 +1046,55 @@ describe("CodexThreadManagementOwner", () => {
       sandbox: "workspace-write",
       reasoningEffort: "medium",
     });
+  });
+
+  it("does not fail createThread when rollout warmup remains temporarily unavailable", async () => {
+    const appClient = new TestAppServerClient();
+    const waitDurations: number[] = [];
+    const threadNotLoadedError = new Error("no rollout found for thread id thread-1");
+    appClient.queueResumeThreadError(threadNotLoadedError);
+    appClient.queueResumeThreadError(threadNotLoadedError);
+    appClient.queueResumeThreadError(threadNotLoadedError);
+    appClient.queueResumeThreadError(threadNotLoadedError);
+    const owner = createOwner(appClient, undefined, {
+      isThreadNotLoadedError: (error: Error): boolean => {
+        return error === threadNotLoadedError;
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+
+    const result = await owner.createThread({ cwd: "/tmp/workspace" });
+
+    expect(waitDurations).toEqual([150, 300, 600]);
+    expect(appClient.resumeThreadCalls).toEqual([
+      {
+        threadId: "thread-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+      {
+        threadId: "thread-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+      {
+        threadId: "thread-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+      {
+        threadId: "thread-1",
+        options: {
+          persistExtendedHistory: true,
+        },
+      },
+    ]);
+    expect(result.threadId).toBe("thread-1");
   });
 
   it("resumes and retries readThread when codex reports conversation not found", async () => {
@@ -1045,10 +1113,6 @@ describe("CodexThreadManagementOwner", () => {
     });
 
     expect(appClient.readThreadCalls).toEqual([
-      {
-        threadId: "thread-read-1",
-        includeTurns: true,
-      },
       {
         threadId: "thread-read-1",
         includeTurns: true,
@@ -1125,6 +1189,96 @@ describe("CodexThreadManagementOwner", () => {
       },
     ]);
     expect(appClient.resumeThreadCalls).toEqual([]);
+  });
+
+  it("retries includeTurns readThread calls while codex is still materializing the thread", async () => {
+    const appClient = new TestAppServerClient();
+    const waitDurations: number[] = [];
+    appClient.queueReadThreadError(
+      new Error(
+        "app-server error -32600: thread thread-read-4 is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    );
+    appClient.queueReadThreadError(
+      new Error(
+        "app-server error -32600: thread thread-read-4 is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    );
+    const owner = createOwner(appClient, undefined, {
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+
+    const result = await owner.readThread({
+      threadId: "thread-read-4",
+      includeTurns: true,
+    });
+
+    expect(appClient.readThreadCalls).toEqual([
+      {
+        threadId: "thread-read-4",
+        includeTurns: true,
+      },
+      {
+        threadId: "thread-read-4",
+        includeTurns: true,
+      },
+      {
+        threadId: "thread-read-4",
+        includeTurns: true,
+      },
+    ]);
+    expect(waitDurations).toEqual([250, 500]);
+    expect(appClient.resumeThreadCalls).toEqual([]);
+    expect(result).toEqual({
+      thread: READ_THREAD_RESPONSE.thread,
+    });
+  });
+
+  it("retries no-turn readThread calls while codex is still materializing the thread", async () => {
+    const appClient = new TestAppServerClient();
+    const waitDurations: number[] = [];
+    appClient.queueReadThreadError(
+      new Error(
+        "app-server error -32600: thread thread-read-5 is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    );
+    appClient.queueReadThreadError(
+      new Error(
+        "app-server error -32600: thread thread-read-5 is not materialized yet; includeTurns is unavailable before first user message",
+      ),
+    );
+    const owner = createOwner(appClient, undefined, {
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+
+    const result = await owner.readThread({
+      threadId: "thread-read-5",
+      includeTurns: false,
+    });
+
+    expect(appClient.readThreadCalls).toEqual([
+      {
+        threadId: "thread-read-5",
+        includeTurns: false,
+      },
+      {
+        threadId: "thread-read-5",
+        includeTurns: false,
+      },
+      {
+        threadId: "thread-read-5",
+        includeTurns: false,
+      },
+    ]);
+    expect(waitDurations).toEqual([250, 500]);
+    expect(appClient.resumeThreadCalls).toEqual([]);
+    expect(result).toEqual({
+      thread: READ_THREAD_RESPONSE.thread,
+    });
   });
 
   it("forks a thread with extended-history persistence and maps create-thread metadata", async () => {

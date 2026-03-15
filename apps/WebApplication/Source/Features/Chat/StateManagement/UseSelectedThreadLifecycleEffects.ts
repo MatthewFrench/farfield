@@ -7,6 +7,7 @@ import {
   useRef,
 } from "react";
 import { isThreadNotLoadedReadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { isRequestCanceledError } from "@/Shared/Errors/RequestCanceledError";
 import type {
@@ -26,6 +27,7 @@ export interface UseSelectedThreadLifecycleEffectsInput {
   loadSelectedThreadRef: MutableRefObject<
     ((threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>) | null
   >;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   applyCachedSelectedThreadSnapshot: (threadId: string) => boolean;
   selectedThreadRefreshConcurrencyCoordinator: SelectedThreadRefreshConcurrencyCoordinator;
   setLiveState: Dispatch<SetStateAction<ChatLiveStateResponse | null>>;
@@ -148,7 +150,12 @@ export function useSelectedThreadLifecycleEffects(
       return;
     }
 
-    void loadSelectedThreadFunction(selectedThreadIdentifier)
+    const selectedThreadLoadOptions: LoadSelectedThreadOptions | undefined =
+      input.pendingThreadMaterializationCoordinator.isPending(selectedThreadIdentifier)
+        ? { includeTurns: false }
+        : undefined;
+
+    void loadSelectedThreadFunction(selectedThreadIdentifier, selectedThreadLoadOptions)
       .catch((error) => {
         if (input.selectedThreadLoadTokenRef.current !== loadToken) {
           return;
@@ -185,6 +192,7 @@ export function useSelectedThreadLifecycleEffects(
     input.setErrorMessage,
     input.selectedThreadIdRef,
     input.selectedThreadLoadTokenRef,
+    input.pendingThreadMaterializationCoordinator,
     input.selectedThreadRefreshConcurrencyCoordinator,
     input.setIsSelectedThreadLoading,
     input.setLiveState,

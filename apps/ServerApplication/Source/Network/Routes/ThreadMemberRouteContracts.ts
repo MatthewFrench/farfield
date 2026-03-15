@@ -19,6 +19,7 @@ export const ThreadMemberRouteSegmentByName = {
   unarchive: "unarchive",
   unsubscribe: "unsubscribe",
   fork: "fork",
+  forkMessage: "fork-message",
   name: "name",
   rollback: "rollback",
   compact: "compact",
@@ -45,6 +46,7 @@ export const ThreadMemberMutationActionByName = {
   threadUnarchive: "thread-unarchive",
   threadUnsubscribe: "thread-unsubscribe",
   threadFork: "thread-fork",
+  threadForkFromMessage: "thread-fork-from-message",
   threadSetName: "thread-set-name",
   threadRollback: "thread-rollback",
   threadCompactStart: "thread-compact-start",
@@ -63,6 +65,7 @@ const ThreadMemberSubresourceRouteSegmentSchema = z.enum([
   ThreadMemberRouteSegmentByName.unarchive,
   ThreadMemberRouteSegmentByName.unsubscribe,
   ThreadMemberRouteSegmentByName.fork,
+  ThreadMemberRouteSegmentByName.forkMessage,
   ThreadMemberRouteSegmentByName.name,
   ThreadMemberRouteSegmentByName.rollback,
   ThreadMemberRouteSegmentByName.compact,
@@ -81,6 +84,7 @@ type ThreadMemberSubresourceRouteSegment =
   | typeof ThreadMemberRouteSegmentByName.unarchive
   | typeof ThreadMemberRouteSegmentByName.unsubscribe
   | typeof ThreadMemberRouteSegmentByName.fork
+  | typeof ThreadMemberRouteSegmentByName.forkMessage
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.rollback
   | typeof ThreadMemberRouteSegmentByName.compact

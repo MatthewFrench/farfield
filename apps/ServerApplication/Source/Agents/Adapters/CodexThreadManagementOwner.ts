@@ -166,8 +166,14 @@ import {
 } from "./CodexThreadManagementCapabilityMutationOptions.js";
 
 const CREATE_THREAD_REQUIRES_WORKING_DIRECTORY_ERROR = "Codex thread creation requires cwd";
+const CREATE_THREAD_WARMUP_MAXIMUM_ATTEMPTS = 4;
+const CREATE_THREAD_WARMUP_BASE_DELAY_MILLISECONDS = 150;
+const CREATE_THREAD_WARMUP_MAXIMUM_DELAY_MILLISECONDS = 1_000;
 const FORK_WITH_EXTENDED_HISTORY = true;
 const READ_THREAD_RESUME_WITH_EXTENDED_HISTORY = true;
+const READ_THREAD_MATERIALIZATION_RETRY_MAXIMUM_ATTEMPTS = 8;
+const READ_THREAD_MATERIALIZATION_RETRY_BASE_DELAY_MILLISECONDS = 250;
+const READ_THREAD_MATERIALIZATION_RETRY_MAXIMUM_DELAY_MILLISECONDS = 4_000;
 const READ_CONFIG_DEFAULTS_OPTIONS = {
   includeLayers: false,
 };
@@ -322,6 +328,23 @@ function buildReadConfigRequirementsOptions(
   return {};
 }
 
+async function waitForMilliseconds(durationMilliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMilliseconds);
+  });
+}
+
+function computeReadThreadRetryDelayMilliseconds(currentDelayMilliseconds: number): number {
+  return Math.min(
+    currentDelayMilliseconds * 2,
+    READ_THREAD_MATERIALIZATION_RETRY_MAXIMUM_DELAY_MILLISECONDS,
+  );
+}
+
+function computeCreateThreadWarmupDelayMilliseconds(currentDelayMilliseconds: number): number {
+  return Math.min(currentDelayMilliseconds * 2, CREATE_THREAD_WARMUP_MAXIMUM_DELAY_MILLISECONDS);
+}
+
 function buildReadAccountOptions(input?: AgentReadAccountInput): ReadAccountOptions {
   return {
     ...(input?.refreshToken !== undefined ? { refreshToken: input.refreshToken } : {}),
@@ -467,6 +490,7 @@ export interface CodexThreadManagementOwnerOptions {
   readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
   isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
   isThreadNotLoadedError: (error: Error) => boolean;
+  waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
 }
 
 /**
@@ -482,6 +506,7 @@ export class CodexThreadManagementOwner {
   private readonly readProjectedHasUnreadTurnSignal: ReadProjectedHasUnreadTurnSignal;
   private readonly isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
   private readonly isThreadNotLoadedError: (error: Error) => boolean;
+  private readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
 
   public constructor(options: CodexThreadManagementOwnerOptions) {
     this.appClient = options.appClient;
@@ -490,6 +515,7 @@ export class CodexThreadManagementOwner {
     this.readProjectedHasUnreadTurnSignal = options.readProjectedHasUnreadTurnSignal;
     this.isConversationNotFoundError = options.isConversationNotFoundError;
     this.isThreadNotLoadedError = options.isThreadNotLoadedError;
+    this.waitForMilliseconds = options.waitForMilliseconds ?? waitForMilliseconds;
   }
 
   public async listThreads(input: AgentListThreadsInput): Promise<AgentListThreadsResult> {
@@ -508,36 +534,112 @@ export class CodexThreadManagementOwner {
     const result = await this.runAppServerCall(() =>
       this.appClient.startThread(buildStartThreadOptions(input, workingDirectory)),
     );
+    await this.warmCreatedThreadBestEffort(result.thread.id);
 
     return mapCreateThreadResult(result);
   }
 
   public async readThread(input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
     this.ensureCodexAvailable();
-    try {
-      const result = await this.runAppServerCall(() =>
-        this.appClient.readThread(input.threadId, input.includeTurns),
-      );
-      return {
-        thread: result.thread,
-      };
-    } catch (error) {
-      if (!this.shouldRetryReadThreadAfterResume(error)) {
-        throw error;
+    let retryDelayMilliseconds = READ_THREAD_MATERIALIZATION_RETRY_BASE_DELAY_MILLISECONDS;
+    for (
+      let attemptIndex = 0;
+      attemptIndex < READ_THREAD_MATERIALIZATION_RETRY_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      try {
+        const result = await this.runAppServerCall(() =>
+          this.appClient.readThread(input.threadId, input.includeTurns),
+        );
+        return {
+          thread: result.thread,
+        };
+      } catch (error) {
+        if (
+          this.shouldRetryReadThreadDuringMaterialization(error, input.includeTurns, attemptIndex)
+        ) {
+          await this.waitForMilliseconds(retryDelayMilliseconds);
+          retryDelayMilliseconds = computeReadThreadRetryDelayMilliseconds(retryDelayMilliseconds);
+          continue;
+        }
+        if (!this.shouldRetryReadThreadAfterResume(error)) {
+          throw error;
+        }
+        break;
       }
     }
 
-    await this.runAppServerCall(() =>
+    const resumedThreadResult = await this.runAppServerCall(() =>
       this.appClient.resumeThread(input.threadId, {
         persistExtendedHistory: READ_THREAD_RESUME_WITH_EXTENDED_HISTORY,
       }),
     );
+    if (input.includeTurns) {
+      return {
+        thread: resumedThreadResult.thread,
+      };
+    }
     const result = await this.runAppServerCall(() =>
       this.appClient.readThread(input.threadId, input.includeTurns),
     );
     return {
       thread: result.thread,
     };
+  }
+
+  private shouldRetryReadThreadDuringMaterialization<ErrorType>(
+    error: ErrorType,
+    _includeTurns: boolean,
+    attemptIndex: number,
+  ): boolean {
+    if (attemptIndex >= READ_THREAD_MATERIALIZATION_RETRY_MAXIMUM_ATTEMPTS - 1) {
+      return false;
+    }
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    return /includeTurns is unavailable before first user message/i.test(error.message);
+  }
+
+  private async warmCreatedThreadBestEffort(threadId: string): Promise<void> {
+    let retryDelayMilliseconds = CREATE_THREAD_WARMUP_BASE_DELAY_MILLISECONDS;
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < CREATE_THREAD_WARMUP_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      try {
+        await this.runAppServerCall(() =>
+          this.appClient.resumeThread(threadId, {
+            persistExtendedHistory: READ_THREAD_RESUME_WITH_EXTENDED_HISTORY,
+          }),
+        );
+        return;
+      } catch (error) {
+        if (!this.shouldRetryCreateThreadWarmup(error, attemptIndex)) {
+          return;
+        }
+        await this.waitForMilliseconds(retryDelayMilliseconds);
+        retryDelayMilliseconds = computeCreateThreadWarmupDelayMilliseconds(retryDelayMilliseconds);
+      }
+    }
+  }
+
+  private shouldRetryCreateThreadWarmup<ErrorType>(
+    error: ErrorType,
+    attemptIndex: number,
+  ): boolean {
+    if (attemptIndex >= CREATE_THREAD_WARMUP_MAXIMUM_ATTEMPTS - 1) {
+      return false;
+    }
+    if (this.isConversationNotFoundError(error)) {
+      return true;
+    }
+    if (error instanceof Error) {
+      return this.isThreadNotLoadedError(error);
+    }
+    return false;
   }
 
   private shouldRetryReadThreadAfterResume<ErrorType>(error: ErrorType): boolean {

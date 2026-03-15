@@ -178,6 +178,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const snapshot = await coordinator.readSnapshot({
       threadId: "thread-2",
       includeTurns: false,
+      preserveNoTurnsOnReadRetry: false,
       includeReadThread: true,
       canReadLiveState: false,
       canReadStreamEvents: false,
@@ -189,6 +190,172 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     expect(waitDurations).toEqual([10]);
     expect(snapshot.includeTurnsUsedForRead).toBe(true);
     expect(snapshot.containsAnyTurns).toBe(true);
+  });
+
+  it("retries transient pending-thread read errors without forcing includeTurns", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 3,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 40,
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readThreadCalls: boolean[] = [];
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string, options) => {
+        readThreadCalls.push(options?.includeTurns === true);
+        if (readThreadCalls.length === 1) {
+          throw new Error("thread not loaded in app-server");
+        }
+        return buildReadThreadSnapshot(threadId, []);
+      }),
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-pending",
+      includeTurns: false,
+      preserveNoTurnsOnReadRetry: true,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readThreadCalls).toEqual([false, false]);
+    expect(waitDurations).toEqual([10]);
+    expect(snapshot.includeTurnsUsedForRead).toBe(false);
+    expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("treats still-materializing empty-thread reads as an empty snapshot when turns were not requested", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readThread = vi.fn(async () => {
+      throw new Error(
+        "app-server error -32600: thread thread-empty is not materialized yet; includeTurns is unavailable before first user message",
+      );
+    });
+    const chatClient = createChatClient({
+      readThread,
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-empty",
+      includeTurns: false,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readThread).toHaveBeenCalledTimes(1);
+    expect(waitDurations).toEqual([]);
+    expect(snapshot.readThreadSnapshot).toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(false);
+    expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("retries still-materializing no-turn reads when pending-send promotion is requested", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 3,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 40,
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readThreadCalls: boolean[] = [];
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string, options) => {
+        readThreadCalls.push(options?.includeTurns === true);
+        if (readThreadCalls.length < 3) {
+          throw new Error(
+            "app-server error -32600: thread thread-empty is not materialized yet; includeTurns is unavailable before first user message",
+          );
+        }
+        return buildReadThreadSnapshot(threadId, []);
+      }),
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-empty",
+      includeTurns: false,
+      preserveNoTurnsOnReadRetry: true,
+      promotePendingThreadToFullRead: true,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readThreadCalls).toEqual([false, false, false]);
+    expect(waitDurations).toEqual([10, 20]);
+    expect(snapshot.readThreadSnapshot).not.toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(false);
+    expect(snapshot.containsAnyTurns).toBe(false);
+  });
+
+  it("retries promoted full reads when the includeTurns route returns a transient 500", async () => {
+    const waitDurations: number[] = [];
+    const coordinator = new SelectedThreadDataRefreshCoordinator({
+      retryConfiguration: {
+        maximumAttempts: 3,
+        baseDelayMilliseconds: 10,
+        maximumDelayMilliseconds: 40,
+      },
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    const readThreadCalls: boolean[] = [];
+    const chatClient = createChatClient({
+      readThread: vi.fn(async (threadId: string, options) => {
+        readThreadCalls.push(options?.includeTurns === true);
+        if (readThreadCalls.length === 1) {
+          throw new Error(
+            "Request failed for /api/threads/thread-empty?includeTurns=true status=500 Internal Server Error",
+          );
+        }
+        return buildReadThreadSnapshot(threadId, []);
+      }),
+      readLiveState: vi.fn(async (threadId: string) => buildLiveStateSnapshot(threadId, null)),
+      readStreamEvents: vi.fn(async (threadId: string) => buildStreamEventsSnapshot(threadId)),
+    });
+
+    const snapshot = await coordinator.readSnapshot({
+      threadId: "thread-empty",
+      includeTurns: true,
+      preserveNoTurnsOnReadRetry: false,
+      promotePendingThreadToFullRead: true,
+      includeReadThread: true,
+      canReadLiveState: false,
+      canReadStreamEvents: false,
+      streamEventsSinceSequence: null,
+      chatClient,
+    });
+
+    expect(readThreadCalls).toEqual([true, true]);
+    expect(waitDurations).toEqual([10]);
+    expect(snapshot.readThreadSnapshot).not.toBeNull();
+    expect(snapshot.includeTurnsUsedForRead).toBe(true);
   });
 
   it("does not retry missing-thread read-thread 404 failures", async () => {
@@ -321,6 +488,7 @@ describe("SelectedThreadDataRefreshCoordinator", () => {
     const snapshot = await coordinator.readSnapshot({
       threadId: "thread-2a",
       includeTurns: false,
+      preserveNoTurnsOnReadRetry: false,
       includeReadThread: true,
       canReadLiveState: false,
       canReadStreamEvents: false,

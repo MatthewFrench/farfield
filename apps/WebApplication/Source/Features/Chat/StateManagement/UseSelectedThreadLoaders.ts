@@ -41,6 +41,7 @@ import {
 export interface LoadSelectedThreadOptions {
   includeTurns?: boolean;
   includeReadThread?: boolean;
+  promotePendingThreadToFullRead?: boolean;
 }
 
 export type ApplySelectedThreadStreamDeltaInput = SelectedThreadStreamDeltaInput;
@@ -219,6 +220,9 @@ export function useSelectedThreadLoaders(
         threadId,
         input.pendingThreadMaterializationCoordinator,
       );
+      const promotePendingThreadToFullRead = options?.promotePendingThreadToFullRead ?? false;
+      const preserveNoTurnsOnReadRetry =
+        !includeTurns && input.pendingThreadMaterializationCoordinator.isPending(threadId);
       const includeReadThread = resolveIncludeReadThreadForThreadRead(options?.includeReadThread);
       const readCapabilities = resolveReadCapabilitiesForThread({
         threadId,
@@ -259,11 +263,13 @@ export function useSelectedThreadLoaders(
       const snapshot = await input.selectedThreadDataRefreshCoordinator.readSnapshot({
         threadId,
         includeTurns,
+        preserveNoTurnsOnReadRetry,
         includeReadThread: includeReadThreadForRefresh,
         canReadLiveState: readCapabilities.canReadLiveState,
         canReadStreamEvents: readCapabilities.canReadStreamEvents,
         streamEventsSinceSequence,
         baselineLiveStateSnapshot: persistedSnapshot?.liveStateSnapshot ?? null,
+        promotePendingThreadToFullRead,
         chatClient: input.chatServerClient,
         ...(signal ? { signal } : {}),
       });
@@ -276,11 +282,13 @@ export function useSelectedThreadLoaders(
         ? await input.selectedThreadDataRefreshCoordinator.readSnapshot({
             threadId,
             includeTurns,
+            preserveNoTurnsOnReadRetry,
             includeReadThread,
             canReadLiveState: readCapabilities.canReadLiveState,
             canReadStreamEvents: readCapabilities.canReadStreamEvents,
             streamEventsSinceSequence: null,
             baselineLiveStateSnapshot: null,
+            promotePendingThreadToFullRead,
             chatClient: input.chatServerClient,
             ...(signal ? { signal } : {}),
           })
@@ -321,6 +329,7 @@ export function useSelectedThreadLoaders(
           input.pendingThreadMaterializationCoordinator,
         ),
         includeReadThread: resolveIncludeReadThreadForThreadRead(options?.includeReadThread),
+        promotePendingThreadToFullRead: options?.promotePendingThreadToFullRead ?? false,
       };
 
       await input.selectedThreadRefreshConcurrencyCoordinator.run({
@@ -331,6 +340,7 @@ export function useSelectedThreadLoaders(
             {
               includeTurns: nextRequest.includeTurns,
               includeReadThread: nextRequest.includeReadThread,
+              promotePendingThreadToFullRead: nextRequest.promotePendingThreadToFullRead,
             },
             signal,
           );

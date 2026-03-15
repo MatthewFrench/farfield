@@ -327,6 +327,8 @@ function RuntimeCompositionHarness(): React.JSX.Element {
     pendingUserInputRequestSelector: applicationOwnerDependencies.pendingUserInputRequestSelector,
     conversationItemFlattener: applicationOwnerDependencies.conversationItemFlattener,
     debugIssueStateResolver: applicationOwnerDependencies.debugIssueStateResolver,
+    threadComposerProjectContextStateOwner:
+      applicationOwnerDependencies.threadComposerProjectContextStateOwner,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 

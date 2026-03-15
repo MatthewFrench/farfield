@@ -34,6 +34,9 @@ import {
   readThreadRuntimeStatusBadgeTitle,
 } from "@/Features/Threads/UserInterface/ThreadRuntimeStatusBadgeMetadata";
 
+const LOADED_IN_MEMORY_BADGE_LABEL = "Loaded";
+const LOADED_IN_MEMORY_BADGE_TITLE = "Loaded in memory";
+
 interface ThreadListActiveThreadRowProps {
   thread: ThreadListItem;
   isSelected: boolean;
@@ -50,6 +53,7 @@ interface ThreadListActiveThreadRowProps {
   onCancelThreadRename: () => void;
   onBeginThreadRename: (threadId: string, currentLabel: string) => void;
   onSelectThread: ThreadListPaneThreadSelectionHandler;
+  onCopyThreadId: ThreadListPaneThreadSelectionHandler;
   onArchiveThread: ThreadListPaneThreadSelectionHandler;
   onForkThread: ThreadListPaneThreadSelectionHandler;
   onRollbackThread: ThreadListPaneThreadSelectionHandler;
@@ -74,6 +78,7 @@ export const ThreadListActiveThreadRow = memo(function ThreadListActiveThreadRow
   onCancelThreadRename,
   onBeginThreadRename,
   onSelectThread,
+  onCopyThreadId,
   onArchiveThread,
   onForkThread,
   onRollbackThread,
@@ -180,10 +185,12 @@ export const ThreadListActiveThreadRow = memo(function ThreadListActiveThreadRow
             {thread.isLoadedInMemory === true && (
               <span
                 data-testid={`thread-loaded-indicator-${thread.id}`}
-                aria-label="Loaded in memory"
-                title="Loaded in memory"
-                className="h-2 w-2 rounded-full bg-emerald-500"
-              />
+                aria-label={LOADED_IN_MEMORY_BADGE_TITLE}
+                title={LOADED_IN_MEMORY_BADGE_TITLE}
+                className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-700"
+              >
+                {LOADED_IN_MEMORY_BADGE_LABEL}
+              </span>
             )}
             {threadIsGenerating && (
               <Loader2
@@ -229,6 +236,15 @@ export const ThreadListActiveThreadRow = memo(function ThreadListActiveThreadRow
             >
               <Pencil size={13} />
               Rename thread
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                onCopyThreadId(thread.id);
+              }}
+              disabled={isBusy}
+            >
+              <Copy size={13} />
+              Copy thread ID
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {

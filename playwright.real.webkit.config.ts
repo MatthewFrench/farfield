@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolveRealEndToEndPlaywrightOutputDirectory } from "./end-to-end/real/helpers/output-profile";
 
-const baseURL = (process.env["E2E_REAL_BASE_URL"] ?? "http://127.0.0.1:4312").trim();
+const baseURL = (process.env["E2E_REAL_BASE_URL"] ?? "http://127.0.0.1:4322").trim();
 const outputDirectory = resolveRealEndToEndPlaywrightOutputDirectory(
   "test-results",
   "real-app-webkit",

@@ -4,6 +4,7 @@ import type { AgentId } from "@/Shared/Contracts/ApiContracts";
 import { type ThreadMutationServerClient } from "../DataAccess/ThreadMutationServerClient";
 import { type ThreadListItem } from "../DomainModel/ThreadGroupTypes";
 import { PendingThreadMaterializationCoordinator } from "./PendingThreadMaterializationCoordinator";
+import { type ThreadComposerProjectContextStateOwner } from "./ThreadComposerProjectContextStateOwner";
 import { type ThreadDisplayNameStateOwner } from "./ThreadDisplayNameStateOwner";
 import { ThreadListStateController } from "./ThreadListStateController";
 import {
@@ -29,6 +30,7 @@ export interface UseThreadActionHandlersInput {
   pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadMutationServerClient: ThreadMutationServerClient;
+  threadComposerProjectContextStateOwner: ThreadComposerProjectContextStateOwner;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
   threadListStateController: ThreadListStateController;
   loadCoreDataTracked: () => Promise<void>;
@@ -41,6 +43,7 @@ export interface ThreadActionHandlers {
   createThreadForSingleAgent: (projectPath: string) => void;
   runArchiveThread: (threadId: string) => Promise<void>;
   runForkThread: (threadId: string) => Promise<void>;
+  runForkThreadFromMessage: (threadId: string, messageId: string) => Promise<void>;
   runRollbackThread: (threadId: string) => Promise<void>;
   runCompactThread: (threadId: string) => Promise<void>;
   runCleanThreadBackgroundTerminals: (threadId: string) => Promise<void>;
@@ -58,6 +61,127 @@ async function refreshCreatedThreadData(
   await threadListStateController.prepareActiveThreadQueryForExplicitRefresh();
   await loadCoreDataTracked();
   await loadSelectedThreadTracked(threadId);
+}
+
+interface ForkThreadHandlerFactoryInput {
+  input: UseThreadActionHandlersInput;
+  markThreadPendingMaterialization: (threadId: string) => void;
+  handleThreadSelected: (threadId: string | null) => void;
+  invalidateActiveThreadQuery: () => void;
+  refreshCreatedThreadDataForThread: (threadId: string) => Promise<void>;
+}
+
+function createRunForkThreadHandler(
+  factoryInput: ForkThreadHandlerFactoryInput,
+): ThreadActionHandlers["runForkThread"] {
+  return async (threadId: string) => {
+    await factoryInput.input.threadMutationActionCoordinator.forkThread({
+      threadId,
+      buildActionRequestOptions: factoryInput.input.buildActionRequestOptions,
+      onSetBusy: factoryInput.input.setIsBusy,
+      onMarkThreadPendingMaterialization: factoryInput.markThreadPendingMaterialization,
+      onThreadSelected: factoryInput.handleThreadSelected,
+      onSetMobileSidebarOpen: factoryInput.input.setMobileSidebarOpen,
+      onInvalidateActiveThreadQuery: factoryInput.invalidateActiveThreadQuery,
+      onRefreshCreatedThreadData: factoryInput.refreshCreatedThreadDataForThread,
+      threadMutationClient: factoryInput.input.threadMutationServerClient,
+      reportTrackedUserInterfaceError: factoryInput.input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createRunForkThreadFromMessageHandler(
+  factoryInput: ForkThreadHandlerFactoryInput,
+): ThreadActionHandlers["runForkThreadFromMessage"] {
+  return async (threadId: string, messageId: string) => {
+    await factoryInput.input.threadMutationActionCoordinator.forkThreadFromMessage({
+      threadId,
+      messageId,
+      buildActionRequestOptions: factoryInput.input.buildActionRequestOptions,
+      onSetBusy: factoryInput.input.setIsBusy,
+      onMarkThreadPendingMaterialization: factoryInput.markThreadPendingMaterialization,
+      onThreadSelected: factoryInput.handleThreadSelected,
+      onSetMobileSidebarOpen: factoryInput.input.setMobileSidebarOpen,
+      onInvalidateActiveThreadQuery: factoryInput.invalidateActiveThreadQuery,
+      onRefreshCreatedThreadData: factoryInput.refreshCreatedThreadDataForThread,
+      threadMutationClient: factoryInput.input.threadMutationServerClient,
+      reportTrackedUserInterfaceError: factoryInput.input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+interface UnarchiveThreadHandlerFactoryInput {
+  input: UseThreadActionHandlersInput;
+  handleThreadSelected: (threadId: string | null) => void;
+  invalidateActiveThreadQuery: () => void;
+  invalidateArchivedThreadQuery: () => void;
+}
+
+function createRunUnarchiveThreadHandler(
+  factoryInput: UnarchiveThreadHandlerFactoryInput,
+): ThreadActionHandlers["runUnarchiveThread"] {
+  return async (threadId: string) => {
+    await factoryInput.input.threadMutationActionCoordinator.unarchiveThread({
+      threadId,
+      buildActionRequestOptions: factoryInput.input.buildActionRequestOptions,
+      onSetBusy: factoryInput.input.setIsBusy,
+      onThreadSelected: factoryInput.handleThreadSelected,
+      onSetMobileSidebarOpen: factoryInput.input.setMobileSidebarOpen,
+      onInvalidateActiveThreadQuery: factoryInput.invalidateActiveThreadQuery,
+      onInvalidateArchivedThreadQuery: factoryInput.invalidateArchivedThreadQuery,
+      loadCoreData: factoryInput.input.loadCoreDataTracked,
+      threadMutationClient: factoryInput.input.threadMutationServerClient,
+      reportTrackedUserInterfaceError: factoryInput.input.reportTrackedUserInterfaceError,
+    });
+  };
+}
+
+function createThreadForSingleAgentHandler(
+  availableAgentIds: AgentId[],
+  setError: Dispatch<SetStateAction<string>>,
+  createNewThread: ThreadActionHandlers["createNewThread"],
+): ThreadActionHandlers["createThreadForSingleAgent"] {
+  return (projectPath: string) => {
+    const onlyAgentId = availableAgentIds[0];
+    if (onlyAgentId === undefined) {
+      setError("Cannot create thread: no enabled agent");
+      return;
+    }
+    void createNewThread(projectPath, onlyAgentId);
+  };
+}
+
+interface CreateNewThreadHandlerFactoryInput {
+  input: UseThreadActionHandlersInput;
+  markThreadPendingMaterialization: (threadId: string) => void;
+  handleThreadSelected: (threadId: string | null) => void;
+  invalidateActiveThreadQuery: () => void;
+  refreshCreatedThreadDataForThread: (threadId: string) => Promise<void>;
+}
+
+function createNewThreadHandler(
+  factoryInput: CreateNewThreadHandlerFactoryInput,
+): ThreadActionHandlers["createNewThread"] {
+  return async (projectPath: string, agentId?: AgentId) => {
+    factoryInput.input.threadComposerProjectContextStateOwner.writeCurrentProjectPath(projectPath);
+    const createThreadInput: CreateThreadActionInput = {
+      projectPath,
+      buildActionRequestOptions: factoryInput.input.buildActionRequestOptions,
+      onSetBusy: factoryInput.input.setIsBusy,
+      onSetErrorMessage: factoryInput.input.setError,
+      onMarkThreadPendingMaterialization: factoryInput.markThreadPendingMaterialization,
+      onThreadSelected: factoryInput.handleThreadSelected,
+      onSetMobileSidebarOpen: factoryInput.input.setMobileSidebarOpen,
+      onInvalidateActiveThreadQuery: factoryInput.invalidateActiveThreadQuery,
+      threadMutationClient: factoryInput.input.threadMutationServerClient,
+      onRefreshCreatedThreadData: factoryInput.refreshCreatedThreadDataForThread,
+      reportTrackedUserInterfaceError: factoryInput.input.reportTrackedUserInterfaceError,
+    };
+    if (agentId !== undefined) {
+      createThreadInput.agentId = agentId;
+    }
+    await factoryInput.input.threadMutationActionCoordinator.createThread(createThreadInput);
+  };
 }
 
 export function useThreadActionHandlers(input: UseThreadActionHandlersInput): ThreadActionHandlers {
@@ -91,27 +215,14 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
   const invalidateArchivedThreadQuery = useCallback((): void => {
     input.threadListStateController.invalidateArchivedThreadQuery();
   }, [input.threadListStateController]);
-
   const createNewThread = useCallback(
-    async (projectPath: string, agentId?: AgentId) => {
-      const createThreadInput: CreateThreadActionInput = {
-        projectPath,
-        buildActionRequestOptions: input.buildActionRequestOptions,
-        onSetBusy: input.setIsBusy,
-        onSetErrorMessage: input.setError,
-        onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
-        onThreadSelected: handleThreadSelected,
-        onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
-        threadMutationClient: input.threadMutationServerClient,
-        onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
-        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-      };
-      if (agentId !== undefined) {
-        createThreadInput.agentId = agentId;
-      }
-      await input.threadMutationActionCoordinator.createThread(createThreadInput);
-    },
+    createNewThreadHandler({
+      input,
+      markThreadPendingMaterialization,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      refreshCreatedThreadDataForThread,
+    }),
     [
       input.buildActionRequestOptions,
       handleThreadSelected,
@@ -122,28 +233,21 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.setError,
       input.setIsBusy,
       input.setMobileSidebarOpen,
+      input.threadComposerProjectContextStateOwner,
       input.threadMutationActionCoordinator,
       input.threadMutationServerClient,
     ],
   );
 
   const createThreadForSingleAgent = useCallback(
-    (projectPath: string) => {
-      const onlyAgentId = input.availableAgentIds[0];
-      if (onlyAgentId === undefined) {
-        input.setError("Cannot create thread: no enabled agent");
-        return;
-      }
-      void createNewThread(projectPath, onlyAgentId);
-    },
+    createThreadForSingleAgentHandler(input.availableAgentIds, input.setError, createNewThread),
     [createNewThread, input.availableAgentIds, input.setError],
   );
-
   const runArchiveThread = useCallback(
     async (threadId: string) => {
       await input.threadMutationActionCoordinator.archiveThread({
         threadId,
-        selectedThreadId: selectedThreadIdRef.current,
+        selectedThreadId: input.selectedThreadIdRef.current,
         activeThreadIdentifiersInOrder: input.threads.map((thread) => thread.id),
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
@@ -168,22 +272,13 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.threads,
     ],
   );
-
   const runUnarchiveThread = useCallback(
-    async (threadId: string) => {
-      await input.threadMutationActionCoordinator.unarchiveThread({
-        threadId,
-        buildActionRequestOptions: input.buildActionRequestOptions,
-        onSetBusy: input.setIsBusy,
-        onThreadSelected: handleThreadSelected,
-        onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
-        onInvalidateArchivedThreadQuery: invalidateArchivedThreadQuery,
-        loadCoreData: input.loadCoreDataTracked,
-        threadMutationClient: input.threadMutationServerClient,
-        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-      });
-    },
+    createRunUnarchiveThreadHandler({
+      input,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      invalidateArchivedThreadQuery,
+    }),
     [
       input.buildActionRequestOptions,
       handleThreadSelected,
@@ -197,22 +292,14 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
       input.threadMutationServerClient,
     ],
   );
-
   const runForkThread = useCallback(
-    async (threadId: string) => {
-      await input.threadMutationActionCoordinator.forkThread({
-        threadId,
-        buildActionRequestOptions: input.buildActionRequestOptions,
-        onSetBusy: input.setIsBusy,
-        onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
-        onThreadSelected: handleThreadSelected,
-        onSetMobileSidebarOpen: input.setMobileSidebarOpen,
-        onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
-        onRefreshCreatedThreadData: refreshCreatedThreadDataForThread,
-        threadMutationClient: input.threadMutationServerClient,
-        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-      });
-    },
+    createRunForkThreadHandler({
+      input,
+      markThreadPendingMaterialization,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      refreshCreatedThreadDataForThread,
+    }),
     [
       input.buildActionRequestOptions,
       handleThreadSelected,
@@ -262,12 +349,34 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     ],
   );
 
+  const runForkThreadFromMessage = useCallback(
+    createRunForkThreadFromMessageHandler({
+      input,
+      markThreadPendingMaterialization,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      refreshCreatedThreadDataForThread,
+    }),
+    [
+      input.buildActionRequestOptions,
+      handleThreadSelected,
+      invalidateActiveThreadQuery,
+      markThreadPendingMaterialization,
+      input.reportTrackedUserInterfaceError,
+      refreshCreatedThreadDataForThread,
+      input.setIsBusy,
+      input.setMobileSidebarOpen,
+      input.threadMutationActionCoordinator,
+      input.threadMutationServerClient,
+    ],
+  );
+
   const runRollbackThread = useCallback(
     async (threadId: string) => {
       await input.threadMutationActionCoordinator.rollbackThread({
         threadId,
         numTurns: 1,
-        selectedThreadId: selectedThreadIdRef.current,
+        selectedThreadId: input.selectedThreadIdRef.current,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onSetErrorMessage: input.setError,
@@ -296,7 +405,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     async (threadId: string) => {
       await input.threadMutationActionCoordinator.compactThread({
         threadId,
-        selectedThreadId: selectedThreadIdRef.current,
+        selectedThreadId: input.selectedThreadIdRef.current,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
@@ -330,7 +439,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     async (threadId: string) => {
       await input.threadMutationActionCoordinator.cleanThreadBackgroundTerminals({
         threadId,
-        selectedThreadId: selectedThreadIdRef.current,
+        selectedThreadId: input.selectedThreadIdRef.current,
         buildActionRequestOptions: input.buildActionRequestOptions,
         onSetBusy: input.setIsBusy,
         onInvalidateActiveThreadQuery: invalidateActiveThreadQuery,
@@ -392,6 +501,7 @@ export function useThreadActionHandlers(input: UseThreadActionHandlersInput): Th
     createThreadForSingleAgent,
     runArchiveThread,
     runForkThread,
+    runForkThreadFromMessage,
     runRollbackThread,
     runCompactThread,
     runCleanThreadBackgroundTerminals,

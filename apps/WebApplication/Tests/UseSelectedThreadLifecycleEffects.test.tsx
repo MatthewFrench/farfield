@@ -12,6 +12,7 @@ import {
   useSelectedThreadLifecycleEffects,
 } from "@/Features/Chat/StateManagement/UseSelectedThreadLifecycleEffects";
 import type { LoadSelectedThreadOptions } from "@/Features/Chat/StateManagement/UseSelectedThreadLoaders";
+import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 
 interface LifecycleHarnessProperties {
   input: UseSelectedThreadLifecycleEffectsInput;
@@ -58,6 +59,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
   > = {
     current: null,
   };
+  const pendingThreadMaterializationCoordinator = new PendingThreadMaterializationCoordinator();
   const applyCachedSelectedThreadSnapshot = vi.fn((_threadId: string): boolean => false);
   const selectedThreadRefreshConcurrencyCoordinator =
     new SelectedThreadRefreshConcurrencyCoordinator();
@@ -79,6 +81,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
       selectedThreadIdRef,
       selectedThreadLoadTokenRef,
       loadSelectedThreadRef,
+      pendingThreadMaterializationCoordinator,
       applyCachedSelectedThreadSnapshot,
       selectedThreadRefreshConcurrencyCoordinator,
       setLiveState,
@@ -94,6 +97,7 @@ function createLifecycleInput(selectedThreadId: string | null) {
     setSelectedThreadId,
     setErrorMessage,
     loadSelectedThreadRef,
+    pendingThreadMaterializationCoordinator,
     applyCachedSelectedThreadSnapshot,
     selectedThreadRefreshConcurrencyCoordinator,
     setLiveState,

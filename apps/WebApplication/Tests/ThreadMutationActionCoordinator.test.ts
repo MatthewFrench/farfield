@@ -25,6 +25,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -72,6 +77,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -139,6 +149,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -194,6 +209,11 @@ describe("ThreadMutationActionCoordinator", () => {
       }),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -245,6 +265,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -304,6 +329,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -358,6 +388,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -405,6 +440,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-8", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -449,6 +489,74 @@ describe("ThreadMutationActionCoordinator", () => {
     expect(busyStates).toEqual([true, false]);
   });
 
+  it("forks a thread from a message, selects the new thread, and refreshes it", async () => {
+    const coordinator = new ThreadMutationActionCoordinator();
+    const busyStates: boolean[] = [];
+    const markedThreadIdentifiers: string[] = [];
+    const selectedThreadIdentifiers: string[] = [];
+    const mobileSidebarOpenStates: boolean[] = [];
+    const onInvalidateActiveThreadQuery = vi.fn();
+    const onRefreshCreatedThreadData = vi.fn(async (_threadId: string) => {});
+    const reportTrackedUserInterfaceError = vi.fn(async () => {});
+    const threadMutationClient = {
+      createThread: vi.fn(async () => ({ threadId: "thread-1" })),
+      archiveThread: vi.fn(async () => {}),
+      unarchiveThread: vi.fn(async () => {}),
+      forkThread: vi.fn(async () => ({ threadId: "thread-8", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-9",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-7",
+      })),
+      rollbackThread: vi.fn(async () => {}),
+      compactThread: vi.fn(async () => {}),
+      cleanThreadBackgroundTerminals: vi.fn(async () => {}),
+      startThreadReview: vi.fn(async () => ({
+        reviewThreadId: "thread-review-1",
+        reviewTurnId: "turn-review-1",
+      })),
+      setThreadName: vi.fn(async () => {}),
+    };
+
+    await coordinator.forkThreadFromMessage({
+      threadId: "thread-1",
+      messageId: "message-7",
+      buildActionRequestOptions,
+      onSetBusy: (isBusy) => {
+        busyStates.push(isBusy);
+      },
+      onMarkThreadPendingMaterialization: (threadId) => {
+        markedThreadIdentifiers.push(threadId);
+      },
+      onThreadSelected: (threadId) => {
+        selectedThreadIdentifiers.push(threadId);
+      },
+      onSetMobileSidebarOpen: (isOpen) => {
+        mobileSidebarOpenStates.push(isOpen);
+      },
+      onInvalidateActiveThreadQuery,
+      onRefreshCreatedThreadData,
+      threadMutationClient,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(threadMutationClient.forkThreadFromMessage).toHaveBeenCalledWith(
+      "thread-1",
+      "message-7",
+      {
+        actionId: "action-fork-thread-from-message",
+        actionName: "fork-thread-from-message",
+      },
+    );
+    expect(markedThreadIdentifiers).toEqual(["thread-9"]);
+    expect(selectedThreadIdentifiers).toEqual(["thread-9"]);
+    expect(mobileSidebarOpenStates).toEqual([false]);
+    expect(onInvalidateActiveThreadQuery).toHaveBeenCalledTimes(1);
+    expect(onRefreshCreatedThreadData).toHaveBeenCalledWith("thread-9");
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
   it("rolls back selected thread and refreshes selected thread data", async () => {
     const coordinator = new ThreadMutationActionCoordinator();
     const busyStates: boolean[] = [];
@@ -462,6 +570,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -513,6 +626,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -562,6 +680,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -614,6 +737,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -669,6 +797,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {
         throw new Error("compact failed");
@@ -720,6 +853,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -775,6 +913,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {
@@ -826,6 +969,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),
@@ -879,6 +1027,11 @@ describe("ThreadMutationActionCoordinator", () => {
       archiveThread: vi.fn(async () => {}),
       unarchiveThread: vi.fn(async () => {}),
       forkThread: vi.fn(async () => ({ threadId: "thread-forked", sourceThreadId: "thread-1" })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-1",
+        sourceMessageId: "message-1",
+      })),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
       cleanThreadBackgroundTerminals: vi.fn(async () => {}),

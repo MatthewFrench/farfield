@@ -12,9 +12,12 @@ import {
 process.env["VITE_APP_BUILD_ID"] ??= "dev";
 process.env["VITE_GIT_COMMIT"] ??= "dev";
 
+const apiPort = (process.env["FARFIELD_API_PORT"] ?? "4311").trim();
+const webPort = Number(process.env["FARFIELD_WEB_PORT"] ?? "4312");
 const apiToken = (process.env["API_TOKEN"] ?? process.env["PUSH_API_TOKEN"] ?? "").trim();
 const trustedDevProxyOrigins = parseTrustedDevelopmentProxyOrigins(
   process.env["VITE_DEV_PROXY_TRUSTED_ORIGINS"],
+  webPort,
 );
 
 function shouldInjectApiToken(req: IncomingMessage): boolean {
@@ -28,12 +31,13 @@ function shouldInjectApiToken(req: IncomingMessage): boolean {
 }
 
 function createTokenAwareProxyTarget(): string | ProxyOptions {
+  const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
   if (apiToken.length === 0) {
-    return "http://127.0.0.1:4311";
+    return apiBaseUrl;
   }
 
   return {
-    target: "http://127.0.0.1:4311",
+    target: apiBaseUrl,
     configure(proxy) {
       proxy.on("proxyReq", (proxyReq, req) => {
         if (!shouldInjectApiToken(req)) {
@@ -51,16 +55,17 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./Source"),
     },
+    conditions: ["farfield-source"],
   },
   server: {
     host: true,
     allowedHosts: true,
-    port: 4312,
+    port: webPort,
     strictPort: true,
     proxy: {
       "/api": createTokenAwareProxyTarget(),
       "/events": createTokenAwareProxyTarget(),
-      "/healthz": "http://127.0.0.1:4311",
+      "/healthz": `http://127.0.0.1:${apiPort}`,
     },
   },
   test: {

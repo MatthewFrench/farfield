@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   buildApplicationChatFeatureCompositionInput,
   buildApplicationDebugFeatureCompositionInput,
@@ -41,6 +41,23 @@ export function useApplicationRuntimeComposition(
   loadSelectedThreadRef.current = input.loadSelectedThreadTracked;
 
   const runtimeCompositionContext = createApplicationRuntimeCompositionContext(input);
+
+  useEffect(() => {
+    const selectedThread = input.applicationDerivedState.selectedThread;
+    if (selectedThread === null) {
+      return;
+    }
+    const selectedThreadProjectPath = selectedThread.cwd ?? selectedThread.path ?? null;
+    if (selectedThreadProjectPath === null || selectedThreadProjectPath.trim().length === 0) {
+      return;
+    }
+    input.applicationOwnerDependencies.threadComposerProjectContextStateOwner.writeCurrentProjectPath(
+      selectedThreadProjectPath,
+    );
+  }, [
+    input.applicationDerivedState.selectedThread,
+    input.applicationOwnerDependencies.threadComposerProjectContextStateOwner,
+  ]);
 
   const {
     loadSelectedThreadIfPresentFromRuntimeState,

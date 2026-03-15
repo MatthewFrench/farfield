@@ -36,6 +36,7 @@ const BOOLEAN_FALSE_QUERY_VALUE = "false";
 const THREAD_ARCHIVE_ROUTE_SEGMENT = "archive";
 const THREAD_UNARCHIVE_ROUTE_SEGMENT = "unarchive";
 const THREAD_FORK_ROUTE_SEGMENT = "fork";
+const THREAD_FORK_MESSAGE_ROUTE_SEGMENT = "fork-message";
 const THREAD_NAME_ROUTE_SEGMENT = "name";
 const THREAD_ROLLBACK_ROUTE_SEGMENT = "rollback";
 const THREAD_COMPACT_ROUTE_SEGMENT = "compact";
@@ -125,6 +126,28 @@ const ForkThreadResponseSchema = z
   .strict()
   .transform(({ ok: _ok, ...forkThreadResponse }) => forkThreadResponse);
 
+const ForkThreadFromMessageInputSchema = z
+  .object({
+    threadId: z.string().min(1),
+    messageId: z.string().trim().min(1),
+  })
+  .strict();
+type ForkThreadFromMessageInput = z.infer<typeof ForkThreadFromMessageInputSchema>;
+const ForkThreadFromMessageRequestBodySchema = ForkThreadFromMessageInputSchema.omit({
+  threadId: true,
+}).strict();
+type ForkThreadFromMessageRequestBody = z.infer<typeof ForkThreadFromMessageRequestBodySchema>;
+
+const ForkThreadFromMessageResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    threadId: z.string().min(1),
+    sourceThreadId: z.string().min(1),
+    sourceMessageId: z.string().min(1),
+  })
+  .strict()
+  .transform(({ ok: _ok, ...forkThreadResponse }) => forkThreadResponse);
+
 const StartThreadReviewResponseSchema = z
   .object({
     ok: z.literal(true),
@@ -174,6 +197,7 @@ type ThreadMutationRouteSegment =
   | typeof THREAD_ARCHIVE_ROUTE_SEGMENT
   | typeof THREAD_UNARCHIVE_ROUTE_SEGMENT
   | typeof THREAD_FORK_ROUTE_SEGMENT
+  | typeof THREAD_FORK_MESSAGE_ROUTE_SEGMENT
   | typeof THREAD_NAME_ROUTE_SEGMENT
   | typeof THREAD_ROLLBACK_ROUTE_SEGMENT
   | typeof THREAD_COMPACT_ROUTE_SEGMENT
@@ -325,6 +349,12 @@ export interface ApiStartThreadReviewResponse {
   reviewTurnId: string;
 }
 
+export interface ApiForkThreadFromMessageResponse {
+  threadId: string;
+  sourceThreadId: string;
+  sourceMessageId: string;
+}
+
 export async function forkThread(
   threadId: string,
   options?: ApiRequestOptions,
@@ -334,6 +364,23 @@ export async function forkThread(
     buildThreadMutationRequestInit(options),
   );
   return ForkThreadResponseSchema.parse(data);
+}
+
+export async function forkThreadFromMessage(
+  input: ForkThreadFromMessageInput,
+  options?: ApiRequestOptions,
+): Promise<ApiForkThreadFromMessageResponse> {
+  const parsedInput = ForkThreadFromMessageInputSchema.parse(input);
+  const parsedRequestBody: ForkThreadFromMessageRequestBody =
+    ForkThreadFromMessageRequestBodySchema.parse({
+      messageId: parsedInput.messageId,
+    });
+
+  const data = await request(
+    buildThreadMutationRequestPath(parsedInput.threadId, THREAD_FORK_MESSAGE_ROUTE_SEGMENT),
+    buildThreadMutationJsonRequestInit(parsedRequestBody, options),
+  );
+  return ForkThreadFromMessageResponseSchema.parse(data);
 }
 
 export async function setThreadName(

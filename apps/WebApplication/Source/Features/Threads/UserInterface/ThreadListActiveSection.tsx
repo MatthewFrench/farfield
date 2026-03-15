@@ -211,6 +211,7 @@ export function ThreadListActiveSection({
                           onCancelThreadRename={cancelThreadRename}
                           onBeginThreadRename={beginThreadRename}
                           onSelectThread={properties.onSelectThread}
+                          onCopyThreadId={properties.onCopyThreadId}
                           onArchiveThread={properties.onArchiveThread}
                           onForkThread={properties.onForkThread}
                           onRollbackThread={properties.onRollbackThread}

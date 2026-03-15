@@ -80,10 +80,12 @@ export interface UseApplicationShellViewPropertiesInput {
   setSuccessBannerDetails: Dispatch<SetStateAction<SuccessBannerDetails | null>>;
   liveStateReductionError: DebugStatusBannersProps["liveStateReductionError"];
   chatSurfaceState: ChatWorkspacePaneProps["chatSurfaceState"];
+  interruptedTurnNotice: ChatWorkspacePaneProps["interruptedTurnNotice"];
   selectedThreadId: string | null;
   isCoreLoading: boolean;
   isSelectedThreadLoading: boolean;
   availableAgentIds: ChatWorkspacePaneProps["availableAgentIds"];
+  canCreateNewThreadFromComposer: ChatWorkspacePaneProps["canCreateNewThreadFromComposer"];
   turnCount: number;
   scrollRef: ChatWorkspacePaneProps["scrollRef"];
   chatContentRef: ChatWorkspacePaneProps["chatContentRef"];
@@ -116,6 +118,7 @@ export interface UseApplicationShellViewPropertiesInput {
   submitToolCallRequestResponse?: ChatWorkspacePaneProps["onSubmitToolCallRequestResponse"];
   selectedAgentLabel: string;
   runInterrupt: ChatWorkspacePaneProps["onInterrupt"];
+  forkThreadFromMessage: (threadId: string, messageId: string) => void | Promise<void>;
   steerMessage: ChatWorkspacePaneProps["onSteerMessage"];
   submitMessage: ChatWorkspacePaneProps["onSendMessage"];
   chatModeToolbarProperties: ChatWorkspacePaneProps["chatModeToolbarProperties"];
@@ -472,8 +475,10 @@ function buildChatWorkspacePaneProperties(
   const runtimeUsageSummaryLines = readRuntimeUsageSummaryLines(input.threadSidebarRuntimeSummary);
   const properties: ChatWorkspacePaneProps = {
     chatSurfaceState: input.chatSurfaceState,
+    interruptedTurnNotice: input.interruptedTurnNotice,
     selectedThreadId: input.selectedThreadId,
     availableAgentIds: input.availableAgentIds,
+    canCreateNewThreadFromComposer: input.canCreateNewThreadFromComposer,
     turnCount: input.turnCount,
     scrollRef: input.scrollRef,
     chatContentRef: input.chatContentRef,
@@ -563,6 +568,16 @@ function buildChatWorkspacePaneProperties(
     nextProperties = {
       ...nextProperties,
       onSubmitToolCallRequestResponse: input.submitToolCallRequestResponse,
+    };
+  }
+
+  if (input.selectedThreadId !== null) {
+    const selectedThreadId = input.selectedThreadId;
+    nextProperties = {
+      ...nextProperties,
+      onForkFromMessage: (messageId: string) => {
+        invokeAsyncOwnerAction(() => input.forkThreadFromMessage(selectedThreadId, messageId));
+      },
     };
   }
 
@@ -843,6 +858,7 @@ export function useApplicationShellViewProperties(
       input.chatModeToolbarProperties,
       input.chatScrollStateCoordinator,
       input.chatSurfaceState,
+      input.interruptedTurnNotice,
       input.conversationItemCount,
       input.handleAnswerChange,
       input.hasHiddenChatItems,
@@ -851,6 +867,7 @@ export function useApplicationShellViewProperties(
       input.isChatAtBottom,
       input.isGenerating,
       input.runInterrupt,
+      input.forkThreadFromMessage,
       input.scrollRef,
       input.selectedAgentLabel,
       input.selectedThreadId,

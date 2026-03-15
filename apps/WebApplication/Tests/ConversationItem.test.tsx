@@ -1,6 +1,6 @@
 import type { TurnItemSchema } from "@farfield/protocol";
-import { cleanup, type RenderResult, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, type RenderResult, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 import { ConversationItem } from "@/Components/ConversationItem";
 
@@ -12,6 +12,7 @@ function renderConversationItem(input: {
   turnIsInProgress?: boolean;
   previousItemType?: TurnItem["type"];
   nextItemType?: TurnItem["type"];
+  onForkFromMessage?: (messageId: string) => void;
 }): RenderResult {
   cleanup();
   return render(
@@ -21,6 +22,7 @@ function renderConversationItem(input: {
       turnIsInProgress={input.turnIsInProgress ?? false}
       previousItemType={input.previousItemType}
       nextItemType={input.nextItemType}
+      onForkFromMessage={input.onForkFromMessage}
     />,
   );
 }
@@ -177,5 +179,21 @@ describe("ConversationItem", () => {
 
     const image = screen.getByRole("img", { name: "Viewed image: /tmp/viewed image.png" });
     expect(image.getAttribute("src")).toBe("/api/files/local-image?path=%2Ftmp%2Fviewed+image.png");
+  });
+
+  it("emits message fork actions for supported message items", () => {
+    const onForkFromMessage = vi.fn();
+
+    renderConversationItem({
+      item: {
+        id: "agent-message-1",
+        type: "agentMessage",
+        text: "Response",
+      },
+      onForkFromMessage,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fork from here" }));
+    expect(onForkFromMessage).toHaveBeenCalledWith("agent-message-1");
   });
 });

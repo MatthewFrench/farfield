@@ -2,6 +2,7 @@ export interface SelectedThreadRefreshRequest {
   threadId: string;
   includeTurns: boolean;
   includeReadThread: boolean;
+  promotePendingThreadToFullRead: boolean;
 }
 
 export interface SelectedThreadRefreshRunInput {
@@ -94,6 +95,8 @@ export class SelectedThreadRefreshConcurrencyCoordinator {
       threadId: existing.threadId,
       includeTurns: existing.includeTurns || incoming.includeTurns,
       includeReadThread: existing.includeReadThread || incoming.includeReadThread,
+      promotePendingThreadToFullRead:
+        existing.promotePendingThreadToFullRead || incoming.promotePendingThreadToFullRead,
     };
   }
 

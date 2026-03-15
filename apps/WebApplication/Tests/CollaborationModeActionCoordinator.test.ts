@@ -190,7 +190,9 @@ describe("CollaborationModeActionCoordinator", () => {
     });
 
     expect(chatClient.setCollaborationMode).toHaveBeenCalledTimes(1);
-    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID, {
+      includeTurns: false,
+    });
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(onSetModeSyncing.mock.calls).toEqual([[true], [false]]);
   });
@@ -244,7 +246,9 @@ describe("CollaborationModeActionCoordinator", () => {
         actionName: "set-collaboration-mode",
       },
     );
-    expect(onReloadSelectedThread).toHaveBeenCalledWith(APPLY_THREAD_ID);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(APPLY_THREAD_ID, {
+      includeTurns: false,
+    });
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
     expect(modeSignatureUpdates).toEqual([
       modeSelectionStateResolver.buildModeSignature("default", "", "high"),
@@ -293,7 +297,9 @@ describe("CollaborationModeActionCoordinator", () => {
         actionName: "set-collaboration-mode",
       },
     );
-    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_ID, {
+      includeTurns: false,
+    });
     expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
   });
 

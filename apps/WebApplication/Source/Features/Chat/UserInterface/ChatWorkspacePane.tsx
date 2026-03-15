@@ -17,6 +17,7 @@ import { PendingRequestCard } from "@/Components/PendingRequestCard";
 import { PendingToolCallRequestCard } from "@/Components/PendingToolCallRequestCard";
 import { Button } from "@/Components/UserInterface/Button";
 import { type FlattenedConversationItem } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
+import { type InterruptedTurnNotice } from "@/Features/Chat/DomainModel/InterruptedTurnNoticeDerivation";
 import { type PendingApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingCommandExecutionApprovalRequest } from "@/Features/Chat/DomainModel/PendingCommandExecutionApprovalRequestSelector";
@@ -45,12 +46,14 @@ const CHAT_LOG_ARIA_LABEL = "Conversation updates";
 interface ChatEmptyStateDescriptor {
   testId: string;
   message: string;
+  detail?: string;
   showLoadingIndicator: boolean;
 }
 
 function readChatEmptyStateDescriptor(
   chatSurfaceState: ChatSurfaceState,
-  canCreateNewThread: boolean,
+  availableAgentIds: readonly AgentId[],
+  canCreateNewThreadFromComposer: boolean,
 ): ChatEmptyStateDescriptor {
   switch (chatSurfaceState) {
     case "loading-threads":
@@ -68,15 +71,19 @@ function readChatEmptyStateDescriptor(
     case "no-messages":
       return {
         testId: "chat-empty-no-messages",
-        message: "No messages yet",
+        message: "This thread has no messages yet.",
+        detail: "Send the first message to get started.",
         showLoadingIndicator: false,
       };
     case "no-thread":
       return {
         testId: "chat-empty-no-thread",
-        message: canCreateNewThread
-          ? "Start typing to create a new thread"
-          : "Select a thread from the sidebar",
+        message:
+          availableAgentIds.length === 0
+            ? "Select a thread from the sidebar"
+            : canCreateNewThreadFromComposer
+              ? "Start typing to create a new thread"
+              : "Choose a project from the sidebar to start a new thread",
         showLoadingIndicator: false,
       };
     case "ready":
@@ -87,10 +94,6 @@ function readChatEmptyStateDescriptor(
   }
 }
 
-function readCanCreateNewThread(availableAgentIds: readonly AgentId[]): boolean {
-  return availableAgentIds.length > 0;
-}
-
 function readCanSendMessage(selectedThreadId: string | null, canCreateNewThread: boolean): boolean {
   return selectedThreadId !== null || canCreateNewThread;
 }
@@ -99,7 +102,11 @@ function readComposerPlaceholder(
   selectedThreadId: string | null,
   activeAgentLabel: string,
   selectedAgentLabel: string,
+  canCreateNewThreadFromComposer: boolean,
 ): string {
+  if (selectedThreadId === null && !canCreateNewThreadFromComposer) {
+    return "Choose a project to start a new thread...";
+  }
   return selectedThreadId !== null && selectedThreadId.length > 0
     ? `Message ${activeAgentLabel}…`
     : `Message ${selectedAgentLabel}…`;
@@ -107,8 +114,10 @@ function readComposerPlaceholder(
 
 export interface ChatWorkspacePaneProps {
   chatSurfaceState: ChatSurfaceState;
+  interruptedTurnNotice: InterruptedTurnNotice | null;
   selectedThreadId: string | null;
   availableAgentIds: readonly AgentId[];
+  canCreateNewThreadFromComposer: boolean;
   turnCount: number;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   chatContentRef: React.RefObject<HTMLDivElement | null>;
@@ -149,6 +158,7 @@ export interface ChatWorkspacePaneProps {
   activeAgentLabel: string;
   selectedAgentLabel: string;
   onInterrupt: () => void | Promise<void>;
+  onForkFromMessage?: (messageId: string) => void;
   onSteerMessage: (text: string) => void | Promise<void>;
   onSendMessage: (text: string) => void | Promise<void>;
   chatModeToolbarProperties: ChatModeToolbarProps;
@@ -156,8 +166,10 @@ export interface ChatWorkspacePaneProps {
 
 export function ChatWorkspacePane({
   chatSurfaceState,
+  interruptedTurnNotice,
   selectedThreadId,
   availableAgentIds,
+  canCreateNewThreadFromComposer,
   turnCount,
   scrollRef,
   chatContentRef,
@@ -190,20 +202,25 @@ export function ChatWorkspacePane({
   activeAgentLabel,
   selectedAgentLabel,
   onInterrupt,
+  onForkFromMessage,
   onSteerMessage,
   onSendMessage,
   chatModeToolbarProperties,
 }: ChatWorkspacePaneProps): React.JSX.Element {
   const shouldRenderEmptyState = turnCount === 0;
-  const canCreateNewThread = readCanCreateNewThread(availableAgentIds);
-  const canSendMessage = readCanSendMessage(selectedThreadId, canCreateNewThread);
+  const canSendMessage = readCanSendMessage(selectedThreadId, canCreateNewThreadFromComposer);
   const composerPlaceholder = readComposerPlaceholder(
     selectedThreadId,
     activeAgentLabel,
     selectedAgentLabel,
+    canCreateNewThreadFromComposer,
   );
   const emptyStateDescriptor = shouldRenderEmptyState
-    ? readChatEmptyStateDescriptor(chatSurfaceState, canCreateNewThread)
+    ? readChatEmptyStateDescriptor(
+        chatSurfaceState,
+        availableAgentIds,
+        canCreateNewThreadFromComposer,
+      )
     : null;
   const shouldShowEmptyStateLoadingIndicator =
     emptyStateDescriptor !== null && emptyStateDescriptor.showLoadingIndicator === true;
@@ -251,8 +268,16 @@ export function ChatWorkspacePane({
                     {loadingEmptyStateDescriptor.message}
                   </span>
                 ) : (
-                  <span data-testid={emptyStateDescriptor?.testId}>
-                    {emptyStateDescriptor?.message}
+                  <span
+                    data-testid={emptyStateDescriptor?.testId}
+                    className="inline-flex flex-col items-center gap-1"
+                  >
+                    <span>{emptyStateDescriptor?.message}</span>
+                    {emptyStateDescriptor?.detail !== undefined ? (
+                      <span className="text-xs text-muted-foreground/80">
+                        {emptyStateDescriptor.detail}
+                      </span>
+                    ) : null}
                   </span>
                 )}
               </div>
@@ -266,6 +291,19 @@ export function ChatWorkspacePane({
                 aria-label={CHAT_LOG_ARIA_LABEL}
                 className="space-y-0"
               >
+                {interruptedTurnNotice !== null && (
+                  <div
+                    data-testid="chat-interrupted-turn-notice"
+                    className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left"
+                  >
+                    <div className="text-sm font-medium text-foreground">
+                      {interruptedTurnNotice.title}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {interruptedTurnNotice.message}
+                    </p>
+                  </div>
+                )}
                 {hasHiddenChatItems && (
                   <div className="flex justify-center pb-3">
                     <Button
@@ -287,6 +325,7 @@ export function ChatWorkspacePane({
                       turnIsInProgress={entry.turnIsInProgress}
                       previousItemType={entry.previousItemType}
                       nextItemType={entry.nextItemType}
+                      onForkFromMessage={onForkFromMessage}
                     />
                   </div>
                 ))}

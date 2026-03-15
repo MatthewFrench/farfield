@@ -43,6 +43,13 @@ export interface BuildChatModeToolbarPropertiesInput {
 
 const EMPTY_MODE_KEY = "";
 
+function readEffectiveModeKey(input: BuildChatModeToolbarPropertiesInput): string {
+  if (input.selectedModeKey.length > 0) {
+    return input.selectedModeKey;
+  }
+  return input.defaultModeKey ?? EMPTY_MODE_KEY;
+}
+
 export class ChatModeToolbarPropertiesBuilder {
   public build(input: BuildChatModeToolbarPropertiesInput): ChatModeToolbarProps {
     const applyModeDraft = (modeDraftOverrides: ModeDraftOverrides): void => {
@@ -98,7 +105,7 @@ export class ChatModeToolbarPropertiesBuilder {
     modeDraftOverrides: ModeDraftOverrides,
   ): ModeDraftInput {
     return {
-      modeKey: modeDraftOverrides.modeKey ?? input.selectedModeKey,
+      modeKey: modeDraftOverrides.modeKey ?? readEffectiveModeKey(input),
       modelId: modeDraftOverrides.modelId ?? input.selectedModelId,
       reasoningEffort: modeDraftOverrides.reasoningEffort ?? input.selectedReasoningEffort,
     };

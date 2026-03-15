@@ -4,6 +4,8 @@ import { spawn, spawnSync } from "node:child_process";
 
 const bunBinary = process.platform === "win32" ? "bun.exe" : "bun";
 const DEFAULT_DEVELOPMENT_RUNTIME_PROFILE = "dev";
+const DEFAULT_DEVELOPMENT_API_PORT = "4321";
+const DEFAULT_DEVELOPMENT_WEB_PORT = "4322";
 
 function printHelp() {
   process.stdout.write(
@@ -60,6 +62,23 @@ function parseArgs(argv) {
   return result;
 }
 
+function readDevelopmentPort(environmentValue, defaultValue) {
+  const trimmedEnvironmentValue = (environmentValue ?? "").trim();
+  return trimmedEnvironmentValue.length > 0 ? trimmedEnvironmentValue : defaultValue;
+}
+
+function appendNodeCondition(existingNodeOptions, conditionName) {
+  const trimmedExistingNodeOptions = (existingNodeOptions ?? "").trim();
+  const conditionFlag = `--conditions=${conditionName}`;
+  if (trimmedExistingNodeOptions.length === 0) {
+    return conditionFlag;
+  }
+  if (trimmedExistingNodeOptions.includes(conditionFlag)) {
+    return trimmedExistingNodeOptions;
+  }
+  return `${trimmedExistingNodeOptions} ${conditionFlag}`;
+}
+
 function runBuild(filter) {
   const result = spawnSync(bunBinary, ["run", "--filter", filter, "build"], {
     stdio: "inherit",
@@ -77,20 +96,13 @@ function runBuild(filter) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-
-const buildFilters = ["@farfield/protocol", "@farfield/api", "@farfield/opencode-api"];
-for (const filter of buildFilters) {
-  const status = runBuild(filter);
-  if (status !== 0) {
-    process.exit(status);
-  }
-}
-
-const sharedPackageWatchers = buildFilters.map((filter) =>
-  spawn(bunBinary, ["run", "--filter", filter, "build", "--watch"], {
-    stdio: "inherit",
-    env: process.env,
-  }),
+const developmentApiPort = readDevelopmentPort(
+  process.env["FARFIELD_DEV_API_PORT"],
+  DEFAULT_DEVELOPMENT_API_PORT,
+);
+const developmentWebPort = readDevelopmentPort(
+  process.env["FARFIELD_DEV_WEB_PORT"],
+  DEFAULT_DEVELOPMENT_WEB_PORT,
 );
 
 const devScript = args.remote ? "dev:remote" : "dev";
@@ -108,6 +120,8 @@ const serverProcess = spawn(bunBinary, serverCommand, {
   stdio: "inherit",
   env: {
     ...process.env,
+    PORT: developmentApiPort,
+    NODE_OPTIONS: appendNodeCondition(process.env["NODE_OPTIONS"], "farfield-source"),
     FARFIELD_RUNTIME_PROFILE:
       (process.env["FARFIELD_RUNTIME_PROFILE"] ?? "").trim() || DEFAULT_DEVELOPMENT_RUNTIME_PROFILE,
   },
@@ -115,10 +129,15 @@ const serverProcess = spawn(bunBinary, serverCommand, {
 
 const webProcess = spawn(bunBinary, ["run", "--filter", "@farfield/web", devScript], {
   stdio: "inherit",
-  env: process.env,
+  env: {
+    ...process.env,
+    FARFIELD_API_PORT: developmentApiPort,
+    FARFIELD_WEB_PORT: developmentWebPort,
+    NODE_OPTIONS: appendNodeCondition(process.env["NODE_OPTIONS"], "farfield-source"),
+  },
 });
 
-const childProcesses = [...sharedPackageWatchers, serverProcess, webProcess];
+const childProcesses = [serverProcess, webProcess];
 let terminating = false;
 let firstExit = {
   code: null,

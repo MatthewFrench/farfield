@@ -11,7 +11,7 @@ import { z } from "zod";
  * so interactive debugging can fail fast with concrete diagnostics.
  */
 const DEFAULT_API_HOST = "127.0.0.1";
-const DEFAULT_API_PORT = "4311";
+const DEFAULT_API_PORT = "4321";
 const DEFAULT_POLL_INTERVAL_MILLISECONDS = 2_000;
 const DEFAULT_HTTP_TIMEOUT_MILLISECONDS = 5_000;
 const DEFAULT_DEBUG_ERROR_LIMIT = 300;

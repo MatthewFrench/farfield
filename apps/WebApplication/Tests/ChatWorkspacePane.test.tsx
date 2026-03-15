@@ -15,8 +15,10 @@ import {
 
 const baseChatWorkspacePaneProperties: ChatWorkspacePaneProps = {
   chatSurfaceState: "loading-threads",
+  interruptedTurnNotice: null,
   selectedThreadId: null,
   availableAgentIds: ["codex"],
+  canCreateNewThreadFromComposer: true,
   turnCount: 0,
   scrollRef: createRef<HTMLDivElement>(),
   chatContentRef: createRef<HTMLDivElement>(),
@@ -188,6 +190,56 @@ describe("ChatWorkspacePane", () => {
     );
   });
 
+  it("renders project-selection guidance when chat cannot resolve a project for new-thread creation", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "no-thread",
+      selectedThreadId: null,
+      availableAgentIds: ["codex"],
+      canCreateNewThreadFromComposer: false,
+      turnCount: 0,
+    });
+
+    expect(screen.getByTestId("chat-empty-no-thread").textContent).toBe(
+      "Choose a project from the sidebar to start a new thread",
+    );
+    expect(screen.getByPlaceholderText("Choose a project to start a new thread...")).toBeDefined();
+  });
+
+  it("renders clearer empty-thread guidance when a selected thread has no messages", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "no-messages",
+      selectedThreadId: "thread-empty",
+      turnCount: 0,
+    });
+
+    expect(screen.getByTestId("chat-empty-no-messages").textContent).toContain(
+      "This thread has no messages yet.",
+    );
+    expect(screen.getByTestId("chat-empty-no-messages").textContent).toContain(
+      "Send the first message to get started.",
+    );
+  });
+
+  it("renders an interrupted-turn notice above conversation content", () => {
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      interruptedTurnNotice: {
+        title: "Turn Interrupted",
+        message:
+          "This turn ended before the agent produced a response. Send another message to retry.",
+      },
+      turnCount: 1,
+      visibleConversationItems: [],
+    });
+
+    expect(screen.getByTestId("chat-interrupted-turn-notice").textContent).toContain(
+      "Turn Interrupted",
+    );
+    expect(screen.getByTestId("chat-interrupted-turn-notice").textContent).toContain(
+      "This turn ended before the agent produced a response. Send another message to retry.",
+    );
+  });
+
   it("fails fast when an empty-state render is requested while the surface state is ready", () => {
     expect(() => {
       renderChatWorkspacePane({
@@ -237,6 +289,38 @@ describe("ChatWorkspacePane", () => {
     });
 
     expect(screen.getByRole("log", { name: "Conversation updates" })).toBeDefined();
+  });
+
+  it("routes per-message fork actions through the provided handler", () => {
+    const onForkFromMessage = vi.fn();
+
+    renderChatWorkspacePane({
+      chatSurfaceState: "ready",
+      selectedThreadId: "thread-1",
+      turnCount: 1,
+      onForkFromMessage,
+      visibleConversationItems: [
+        {
+          key: "message-1",
+          item: {
+            id: "message-1",
+            type: "userMessage",
+            content: [
+              {
+                type: "text",
+                text: "Branch here",
+              },
+            ],
+          },
+          isLast: true,
+          turnIsInProgress: false,
+          spacingTop: 0,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fork from here" }));
+    expect(onForkFromMessage).toHaveBeenCalledWith("message-1");
   });
 
   it("uses the selected-agent placeholder when no thread is selected", () => {

@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo } from "react";
+import { readInterruptedTurnNotice } from "@/Features/Chat/DomainModel/InterruptedTurnNoticeDerivation";
 import { readRunningTerminalCount } from "@/Features/Chat/DomainModel/RunningTerminalCountSelector";
 import { toErrorBannerDetails } from "@/Features/Debugging/DomainModel/ErrorBannerDetailsParser";
 import {
@@ -141,6 +142,143 @@ function readSurfaceDerivation(input: {
   };
 }
 
+function readThreadProjectDerivedState(input: {
+  threadListPresentationState: ApplicationDerivedState["threadListPresentationState"];
+  selectedAgentProjectDirectories: readonly string[];
+  threadComposerProjectContextStateOwner: UseApplicationDerivedStateInput["threadComposerProjectContextStateOwner"];
+}): Pick<
+  ApplicationDerivedState,
+  | "newThreadProjectPathResolution"
+  | "activeProjectGroups"
+  | "archivedProjectGroups"
+  | "archivedThreadIds"
+  | "archivedSectionThreadCount"
+> {
+  return {
+    newThreadProjectPathResolution: input.threadComposerProjectContextStateOwner.resolveProjectPath(
+      {
+        activeProjectGroups: input.threadListPresentationState.activeProjectGroups,
+        selectedAgentProjectDirectories: input.selectedAgentProjectDirectories,
+      },
+    ),
+    activeProjectGroups: input.threadListPresentationState.activeProjectGroups,
+    archivedProjectGroups: input.threadListPresentationState.archivedProjectGroups,
+    archivedThreadIds: input.threadListPresentationState.archivedThreadIdentifiers,
+    archivedSectionThreadCount: input.threadListPresentationState.archivedSectionThreadCount,
+  };
+}
+
+function readActiveAgentDerivedState(input: {
+  activeThreadAgentId: ApplicationDerivedState["activeThreadAgentId"];
+  agentsById: ApplicationDerivedState["agentsById"];
+  selectedAgentDescriptor: ApplicationDerivedState["selectedAgentDescriptor"];
+  selectedAgentLabel: ApplicationDerivedState["selectedAgentLabel"];
+  selectedAgentCapabilities: ApplicationDerivedState["selectedAgentCapabilities"];
+}): Pick<
+  ApplicationDerivedState,
+  | "activeAgentDescriptor"
+  | "activeAgentLabel"
+  | "activeAgentCapabilities"
+  | "canSetCollaborationMode"
+  | "canListModels"
+  | "canListCollaborationModes"
+  | "canSubmitUserInputForActiveAgent"
+> {
+  const activeAgentDescriptor = readActiveAgentDescriptor({
+    activeThreadAgentId: input.activeThreadAgentId,
+    agentsById: input.agentsById,
+    selectedAgentDescriptor: input.selectedAgentDescriptor,
+  });
+  const activeAgentLabel = readActiveAgentLabel({
+    activeAgentDescriptor,
+    selectedAgentLabel: input.selectedAgentLabel,
+  });
+  const activeAgentCapabilities = readActiveAgentCapabilities({
+    activeAgentDescriptor,
+    selectedAgentCapabilities: input.selectedAgentCapabilities,
+  });
+  const {
+    canSetCollaborationMode,
+    canListModels,
+    canListCollaborationModes,
+    canSubmitUserInputForActiveAgent,
+  } = readAgentCapabilityFlags(activeAgentCapabilities);
+
+  return {
+    activeAgentDescriptor,
+    activeAgentLabel,
+    activeAgentCapabilities,
+    canSetCollaborationMode,
+    canListModels,
+    canListCollaborationModes,
+    canSubmitUserInputForActiveAgent,
+  };
+}
+
+function readModeAndModelDerivedState(input: {
+  modes: UseApplicationDerivedStateInput["modes"];
+  models: UseApplicationDerivedStateInput["models"];
+  modeSelectionStateResolver: UseApplicationDerivedStateInput["modeSelectionStateResolver"];
+  selectedModeKey: UseApplicationDerivedStateInput["selectedModeKey"];
+  selectedModelId: UseApplicationDerivedStateInput["selectedModelId"];
+  selectedReasoningEffort: UseApplicationDerivedStateInput["selectedReasoningEffort"];
+  conversationState: ApplicationDerivedState["conversationState"];
+  defaultEffortOptions: UseApplicationDerivedStateInput["defaultEffortOptions"];
+  appDefaultModel: ApplicationDerivedState["appDefaultModel"];
+  appDefaultReasoningEffort: ApplicationDerivedState["appDefaultReasoningEffort"];
+}): Pick<
+  ApplicationDerivedState,
+  | "planModeOption"
+  | "defaultModeOption"
+  | "isPlanModeEnabled"
+  | "effortOptions"
+  | "effortOptionsWithoutAssumedDefault"
+  | "modelOptions"
+  | "modelOptionsWithoutAssumedDefault"
+> {
+  const planModeOption = readPlanModeOption({
+    modes: input.modes,
+    modeSelectionStateResolver: input.modeSelectionStateResolver,
+  });
+  const defaultModeOption = readDefaultModeOption({
+    modes: input.modes,
+    modeSelectionStateResolver: input.modeSelectionStateResolver,
+  });
+  const isPlanModeEnabled = readIsPlanModeEnabled({
+    planModeOption,
+    selectedModeKey: input.selectedModeKey,
+  });
+  const effortOptions = readEffortOptions({
+    defaultEffortOptions: input.defaultEffortOptions,
+    modes: input.modes,
+    latestReasoningEffort: input.conversationState?.latestReasoningEffort,
+    selectedReasoningEffort: input.selectedReasoningEffort,
+  });
+  const effortOptionsWithoutAssumedDefault = readEffortOptionsWithoutAssumedDefault({
+    appDefaultReasoningEffort: input.appDefaultReasoningEffort,
+    effortOptions,
+  });
+  const modelOptions = readModelOptions({
+    models: input.models,
+    latestModel: input.conversationState?.latestModel,
+    selectedModelId: input.selectedModelId,
+  });
+  const modelOptionsWithoutAssumedDefault = readModelOptionsWithoutAssumedDefault({
+    appDefaultModel: input.appDefaultModel,
+    modelOptions,
+  });
+
+  return {
+    planModeOption,
+    defaultModeOption,
+    isPlanModeEnabled,
+    effortOptions,
+    effortOptionsWithoutAssumedDefault,
+    modelOptions,
+    modelOptionsWithoutAssumedDefault,
+  };
+}
+
 export function useApplicationDerivedState(
   input: UseApplicationDerivedStateInput,
 ): ApplicationDerivedState {
@@ -231,10 +369,25 @@ export function useApplicationDerivedState(
     configDefaults?.reasoningEffort ?? assumedAppDefaultReasoningEffort;
   const selectedAgentLabel = selectedAgentDescriptor?.label ?? DEFAULT_SELECTED_AGENT_LABEL;
   const selectedAgentCapabilities = selectedAgentDescriptor?.capabilities ?? null;
-  const activeProjectGroups = threadListPresentationState.activeProjectGroups;
-  const archivedProjectGroups = threadListPresentationState.archivedProjectGroups;
-  const archivedThreadIds = threadListPresentationState.archivedThreadIdentifiers;
-  const archivedSectionThreadCount = threadListPresentationState.archivedSectionThreadCount;
+  const {
+    newThreadProjectPathResolution,
+    activeProjectGroups,
+    archivedProjectGroups,
+    archivedThreadIds,
+    archivedSectionThreadCount,
+  } = useMemo(
+    () =>
+      readThreadProjectDerivedState({
+        threadListPresentationState,
+        selectedAgentProjectDirectories: selectedAgentDescriptor?.projectDirectories ?? [],
+        threadComposerProjectContextStateOwner: input.threadComposerProjectContextStateOwner,
+      }),
+    [
+      input.threadComposerProjectContextStateOwner,
+      selectedAgentDescriptor?.projectDirectories,
+      threadListPresentationState,
+    ],
+  );
 
   const conversationState = useMemo<ApplicationDerivedState["conversationState"]>(() => {
     const liveConversationState = liveState?.conversationState ?? null;
@@ -253,6 +406,10 @@ export function useApplicationDerivedState(
 
   const immediateTurns = conversationState?.turns ?? EMPTY_TURNS;
   const lastTurn = immediateTurns[immediateTurns.length - 1];
+  const interruptedTurnNotice = useMemo(
+    () => readInterruptedTurnNotice(immediateTurns),
+    [immediateTurns],
+  );
   const isGenerating = conversationItemFlattener.isTurnInProgressStatus(lastTurn?.status);
 
   const deferredConversationState = useDeferredValue(conversationState);
@@ -282,14 +439,30 @@ export function useApplicationDerivedState(
     [selectedAgentId, selectedThread],
   );
 
-  const activeAgentDescriptor = useMemo(
+  const {
+    activeAgentDescriptor,
+    activeAgentLabel,
+    activeAgentCapabilities,
+    canSetCollaborationMode,
+    canListModels,
+    canListCollaborationModes,
+    canSubmitUserInputForActiveAgent,
+  } = useMemo(
     () =>
-      readActiveAgentDescriptor({
+      readActiveAgentDerivedState({
         activeThreadAgentId,
         agentsById,
         selectedAgentDescriptor,
+        selectedAgentLabel,
+        selectedAgentCapabilities,
       }),
-    [activeThreadAgentId, agentsById, selectedAgentDescriptor],
+    [
+      activeThreadAgentId,
+      agentsById,
+      selectedAgentDescriptor,
+      selectedAgentLabel,
+      selectedAgentCapabilities,
+    ],
   );
 
   const selectedThreadLabel = readSelectedThreadLabel({
@@ -307,86 +480,40 @@ export function useApplicationDerivedState(
     [history],
   );
 
-  const activeAgentLabel = readActiveAgentLabel({
-    activeAgentDescriptor,
-    selectedAgentLabel,
-  });
-  const activeAgentCapabilities = readActiveAgentCapabilities({
-    activeAgentDescriptor,
-    selectedAgentCapabilities,
-  });
   const {
-    canSetCollaborationMode,
-    canListModels,
-    canListCollaborationModes,
-    canSubmitUserInputForActiveAgent,
-  } = readAgentCapabilityFlags(activeAgentCapabilities);
-
-  const planModeOption = useMemo(
-    () =>
-      readPlanModeOption({
-        modes,
-        modeSelectionStateResolver,
-      }),
-    [modeSelectionStateResolver, modes],
-  );
-
-  const defaultModeOption = useMemo(
-    () =>
-      readDefaultModeOption({
-        modes,
-        modeSelectionStateResolver,
-      }),
-    [modeSelectionStateResolver, modes],
-  );
-
-  const isPlanModeEnabled = readIsPlanModeEnabled({
     planModeOption,
-    selectedModeKey,
-  });
-
-  const effortOptions = useMemo(
+    defaultModeOption,
+    isPlanModeEnabled,
+    effortOptions,
+    effortOptionsWithoutAssumedDefault,
+    modelOptions,
+    modelOptionsWithoutAssumedDefault,
+  } = useMemo(
     () =>
-      readEffortOptions({
-        defaultEffortOptions,
+      readModeAndModelDerivedState({
         modes,
-        latestReasoningEffort: conversationState?.latestReasoningEffort,
+        models,
+        modeSelectionStateResolver,
+        selectedModeKey,
+        selectedModelId,
         selectedReasoningEffort,
+        conversationState,
+        defaultEffortOptions,
+        appDefaultModel,
+        appDefaultReasoningEffort,
       }),
     [
-      conversationState?.latestReasoningEffort,
+      appDefaultModel,
+      appDefaultReasoningEffort,
+      conversationState,
       defaultEffortOptions,
+      modeSelectionStateResolver,
+      models,
       modes,
+      selectedModeKey,
+      selectedModelId,
       selectedReasoningEffort,
     ],
-  );
-
-  const effortOptionsWithoutAssumedDefault = useMemo(
-    () =>
-      readEffortOptionsWithoutAssumedDefault({
-        appDefaultReasoningEffort,
-        effortOptions,
-      }),
-    [appDefaultReasoningEffort, effortOptions],
-  );
-
-  const modelOptions = useMemo(
-    () =>
-      readModelOptions({
-        models,
-        latestModel: conversationState?.latestModel,
-        selectedModelId,
-      }),
-    [conversationState?.latestModel, models, selectedModelId],
-  );
-
-  const modelOptionsWithoutAssumedDefault = useMemo(
-    () =>
-      readModelOptionsWithoutAssumedDefault({
-        appDefaultModel,
-        modelOptions,
-      }),
-    [appDefaultModel, modelOptions],
   );
 
   const turns = immediateTurns;
@@ -452,6 +579,7 @@ export function useApplicationDerivedState(
     appDefaultReasoningEffort,
     selectedAgentLabel,
     selectedAgentCapabilities,
+    newThreadProjectPathResolution,
     activeProjectGroups,
     archivedProjectGroups,
     archivedThreadIds,
@@ -483,6 +611,7 @@ export function useApplicationDerivedState(
     deferredConversationState,
     turns,
     lastTurn,
+    interruptedTurnNotice,
     isGenerating,
     threadListState,
     chatSurfaceState,

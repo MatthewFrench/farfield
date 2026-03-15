@@ -7,6 +7,7 @@
   "exports": {
     ".": {
       "types": "./dist/Index.d.ts",
+      "farfield-source": "./Source/Index.ts",
       "default": "./dist/Index.js"
     }
   },

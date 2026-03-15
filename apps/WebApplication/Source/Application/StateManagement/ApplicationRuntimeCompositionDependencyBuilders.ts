@@ -1,3 +1,4 @@
+import { ThreadPreviewReadClient } from "@/Features/Chat/DataAccess/ThreadPreviewReadClient";
 import {
   readActiveApplyPatchApprovalRequest,
   readPendingApplyPatchApprovalRequests,
@@ -200,6 +201,8 @@ export function buildSelectedThreadLifecycleEffectsInput(
     selectedThreadIdRef: applicationShellState.selectedThreadIdRef,
     selectedThreadLoadTokenRef: applicationShellState.selectedThreadLoadTokenRef,
     loadSelectedThreadRef: applicationShellState.loadSelectedThreadRef,
+    pendingThreadMaterializationCoordinator:
+      applicationShellState.pendingThreadMaterializationCoordinator,
     applyCachedSelectedThreadSnapshot: context.input.applyCachedSelectedThreadSnapshot,
     selectedThreadRefreshConcurrencyCoordinator:
       applicationOwnerDependencies.selectedThreadRefreshConcurrencyCoordinator,
@@ -331,6 +334,7 @@ export function buildApplicationChatFeatureCompositionInput(
     chatActionHandlersInput: {
       selectedThreadId: applicationShellState.selectedThreadId,
       selectedAgentId: applicationShellState.selectedAgentId,
+      newThreadProjectPathResolution: applicationDerivedState.newThreadProjectPathResolution,
       modes: applicationShellState.modes,
       isModeSyncing: applicationShellState.isModeSyncing,
       activeRequest: applicationDerivedState.activeRequest,
@@ -353,6 +357,7 @@ export function buildApplicationChatFeatureCompositionInput(
       answerDraft: applicationShellState.answerDraft,
       setAnswerDraft: applicationShellState.setAnswerDraft,
       buildActionRequestOptions: runtimeRequestHandlers.buildActionRequestOptions,
+      setErrorMessage: applicationShellState.setError,
       setIsBusy: applicationShellState.setIsBusy,
       setIsModeSyncing: applicationShellState.setIsModeSyncing,
       setSelectedThreadId: applicationShellState.setSelectedThreadId,
@@ -366,6 +371,11 @@ export function buildApplicationChatFeatureCompositionInput(
       collaborationModeActionCoordinator:
         applicationOwnerDependencies.collaborationModeActionCoordinator,
       chatClient: applicationOwnerDependencies.chatServerClient,
+      selectedThreadReadClient: {
+        readThread: async (threadId) => {
+          return new ThreadPreviewReadClient().readThread(threadId);
+        },
+      },
       threadMutationClient: applicationOwnerDependencies.threadMutationServerClient,
       pendingUserInputAnswerBuilder: applicationOwnerDependencies.pendingUserInputAnswerBuilder,
       onInvalidateActiveThreadQuery: dependencies.invalidateActiveThreadQuery,
@@ -487,6 +497,8 @@ export function buildApplicationShellCompositionInput(
     threadMutationServerClient: applicationOwnerDependencies.threadMutationServerClient,
     threadMutationActionCoordinator: applicationOwnerDependencies.threadMutationActionCoordinator,
     threadDisplayNameStateOwner: applicationOwnerDependencies.threadDisplayNameStateOwner,
+    threadComposerProjectContextStateOwner:
+      applicationOwnerDependencies.threadComposerProjectContextStateOwner,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
     mobileSidebarSwipeCoordinator: applicationOwnerDependencies.mobileSidebarSwipeCoordinator,
     runtimeViewportSizingCoordinator: applicationOwnerDependencies.runtimeViewportSizingCoordinator,

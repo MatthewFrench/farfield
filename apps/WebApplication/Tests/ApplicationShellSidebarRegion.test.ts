@@ -31,6 +31,7 @@ function createThreadListPanePropertiesIdentity(identifier: string): ThreadListP
     onCreateThreadForSingleAgent: () => {},
     onCreateNewThread: () => {},
     onSelectThread: () => {},
+    onCopyThreadId: () => {},
     onArchiveThread: () => {},
     onForkThread: () => {},
     onRollbackThread: () => {},

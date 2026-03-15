@@ -1,4 +1,7 @@
-import { isTransientReadThreadError } from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
+import {
+  isThreadStillMaterializingReadError,
+  isTransientReadThreadError,
+} from "@/Features/Chat/DomainModel/ReadThreadErrorClassifier";
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import type {
@@ -37,6 +40,8 @@ export interface SelectedThreadDataRefreshRetryConfiguration {
 export interface SelectedThreadDataRefreshInput {
   threadId: string;
   includeTurns: boolean;
+  preserveNoTurnsOnReadRetry?: boolean;
+  promotePendingThreadToFullRead?: boolean;
   includeReadThread: boolean;
   canReadLiveState: boolean;
   canReadStreamEvents: boolean;
@@ -71,6 +76,17 @@ interface SelectedThreadReadThreadRetryState {
   nextRetryDelayMilliseconds: number;
 }
 
+function shouldForceIncludeTurnsOnReadRetry(
+  initialIncludeTurns: boolean,
+  preserveNoTurnsOnReadRetry: boolean | undefined,
+  currentIncludeTurnsForRead: boolean,
+): boolean {
+  if (!initialIncludeTurns && preserveNoTurnsOnReadRetry) {
+    return false;
+  }
+  return !currentIncludeTurnsForRead;
+}
+
 const DEFAULT_RETRY_CONFIGURATION: SelectedThreadDataRefreshRetryConfiguration = {
   maximumAttempts: 6,
   baseDelayMilliseconds: 140,
@@ -90,6 +106,8 @@ const EMPTY_RESPONSE_STATUS_200_ERROR_PATTERN = "empty response status=200";
 const STATUS_502_ERROR_PATTERN = "status=502";
 const STATUS_503_ERROR_PATTERN = "status=503";
 const STATUS_504_ERROR_PATTERN = "status=504";
+const READ_THREAD_ROUTE_STATUS_500_PATTERN =
+  /^request failed for \/api\/threads\/[^?\s]+\?includeTurns=true status=500\b/i;
 
 async function waitForMilliseconds(durationMilliseconds: number): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -124,6 +142,10 @@ function isTransientSnapshotReadError(errorMessage: string): boolean {
     normalizedErrorMessage.includes(STATUS_503_ERROR_PATTERN) ||
     normalizedErrorMessage.includes(STATUS_504_ERROR_PATTERN)
   );
+}
+
+function isTransientPendingThreadPromotionReadError(errorMessage: string): boolean {
+  return READ_THREAD_ROUTE_STATUS_500_PATTERN.test(errorMessage);
 }
 
 function buildUnreadableLiveStateSnapshot(threadId: string): SelectedThreadLiveStateSnapshot {
@@ -295,12 +317,37 @@ export class SelectedThreadDataRefreshCoordinator {
           includeTurnsUsedForRead: retryState.includeTurnsForRead,
         };
       } catch (error) {
-        if (!this.canRetryReadThread(error, attemptIndex)) {
+        const errorMessage = toErrorMessage(error);
+        if (!retryState.includeTurnsForRead && isThreadStillMaterializingReadError(errorMessage)) {
+          if (
+            input.promotePendingThreadToFullRead === true &&
+            attemptIndex < this.retryConfiguration.maximumAttempts - 1
+          ) {
+            await this.waitForMilliseconds(retryState.nextRetryDelayMilliseconds);
+            retryState.nextRetryDelayMilliseconds = this.computeNextRetryDelayMilliseconds(
+              retryState.nextRetryDelayMilliseconds,
+            );
+            continue;
+          }
+          return {
+            readThreadSnapshot: null,
+            includeTurnsUsedForRead: false,
+          };
+        }
+        if (!this.canRetryReadThread(error, attemptIndex, input.promotePendingThreadToFullRead)) {
           throw error;
         }
 
-        // Retrying read-thread with turns guarantees downstream snapshot consumers get full turn state.
-        retryState.includeTurnsForRead = true;
+        // Pending thread materialization must keep retries on the no-turn path until the thread exists.
+        if (
+          shouldForceIncludeTurnsOnReadRetry(
+            input.includeTurns,
+            input.preserveNoTurnsOnReadRetry,
+            retryState.includeTurnsForRead,
+          )
+        ) {
+          retryState.includeTurnsForRead = true;
+        }
         await this.waitForMilliseconds(retryState.nextRetryDelayMilliseconds);
         retryState.nextRetryDelayMilliseconds = this.computeNextRetryDelayMilliseconds(
           retryState.nextRetryDelayMilliseconds,
@@ -313,11 +360,22 @@ export class SelectedThreadDataRefreshCoordinator {
     );
   }
 
-  private canRetryReadThread<ErrorType>(error: ErrorType, attemptIndex: number): boolean {
+  private canRetryReadThread<ErrorType>(
+    error: ErrorType,
+    attemptIndex: number,
+    promotePendingThreadToFullRead: boolean | undefined,
+  ): boolean {
     if (attemptIndex >= this.retryConfiguration.maximumAttempts - 1) {
       return false;
     }
-    return this.isTransientReadError(toErrorMessage(error));
+    const errorMessage = toErrorMessage(error);
+    if (this.isTransientReadError(errorMessage)) {
+      return true;
+    }
+    return (
+      promotePendingThreadToFullRead === true &&
+      isTransientPendingThreadPromotionReadError(errorMessage)
+    );
   }
 
   private computeNextRetryDelayMilliseconds(currentDelayMilliseconds: number): number {

@@ -95,6 +95,22 @@ describe("ChatModeToolbarPropertiesBuilder", () => {
     });
   });
 
+  it("uses the default mode key when reasoning effort changes while the default mode is selected implicitly", () => {
+    const builder = new ChatModeToolbarPropertiesBuilder();
+    const input = createInput();
+    input.selectedModeKey = "";
+
+    const properties = builder.build(input);
+    properties.onReasoningEffortChange("low");
+
+    expect(input.onSetSelectedReasoningEffort).toHaveBeenCalledWith("low");
+    expect(input.onApplyModeDraft).toHaveBeenCalledWith({
+      modeKey: "default",
+      modelId: "gpt-5",
+      reasoningEffort: "low",
+    });
+  });
+
   it("keeps mode and model selections when reasoning effort changes", () => {
     const builder = new ChatModeToolbarPropertiesBuilder();
     const input = createInput();

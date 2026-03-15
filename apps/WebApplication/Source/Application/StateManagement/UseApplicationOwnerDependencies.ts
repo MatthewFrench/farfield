@@ -59,6 +59,7 @@ import {
 import { ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "@/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "@/Features/Threads/DataAccess/ThreadServerClient";
+import { ThreadComposerProjectContextStateOwner } from "@/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import { ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListPresentationStateResolver } from "@/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import type { ThreadListPresentationWorkerOwner } from "@/Features/Threads/StateManagement/ThreadListPresentationWorkerOwner";
@@ -134,6 +135,7 @@ export interface ApplicationOwnerDependencies<
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
+  threadComposerProjectContextStateOwner: ThreadComposerProjectContextStateOwner;
   threadListStateController: ThreadListStateController;
   lastViewedThreadPreferenceStore: LastViewedThreadPreferenceStore;
   pushServerClient: PushServerClient;
@@ -368,6 +370,9 @@ export function useApplicationOwnerDependencies<
   const threadMutationActionCoordinator = useStableOwner(
     () => new ThreadMutationActionCoordinator(),
   );
+  const threadComposerProjectContextStateOwner = useStableOwner(
+    () => new ThreadComposerProjectContextStateOwner(),
+  );
   const threadDisplayNameStateOwner = useMemo(
     () =>
       new ThreadDisplayNameStateOwner({
@@ -455,6 +460,7 @@ export function useApplicationOwnerDependencies<
     threadMutationServerClient,
     threadMutationActionCoordinator,
     threadDisplayNameStateOwner,
+    threadComposerProjectContextStateOwner,
     threadListStateController,
     lastViewedThreadPreferenceStore,
     pushServerClient,

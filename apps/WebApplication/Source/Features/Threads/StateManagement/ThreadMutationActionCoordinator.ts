@@ -6,6 +6,7 @@ const CREATE_THREAD_OPERATION_NAME = "create-thread";
 const ARCHIVE_THREAD_OPERATION_NAME = "archive-thread";
 const UNARCHIVE_THREAD_OPERATION_NAME = "unarchive-thread";
 const FORK_THREAD_OPERATION_NAME = "fork-thread";
+const FORK_THREAD_FROM_MESSAGE_OPERATION_NAME = "fork-thread-from-message";
 const SET_THREAD_NAME_OPERATION_NAME = "set-thread-name";
 const ROLLBACK_THREAD_OPERATION_NAME = "rollback-thread";
 const COMPACT_THREAD_OPERATION_NAME = "compact-thread";
@@ -21,6 +22,7 @@ export type ThreadMutationOperationName =
   | typeof ARCHIVE_THREAD_OPERATION_NAME
   | typeof UNARCHIVE_THREAD_OPERATION_NAME
   | typeof FORK_THREAD_OPERATION_NAME
+  | typeof FORK_THREAD_FROM_MESSAGE_OPERATION_NAME
   | typeof SET_THREAD_NAME_OPERATION_NAME
   | typeof ROLLBACK_THREAD_OPERATION_NAME
   | typeof COMPACT_THREAD_OPERATION_NAME
@@ -56,6 +58,11 @@ export interface ThreadMutationActionClient {
     threadId: string,
     options?: ApiRequestOptions,
   ): Promise<{ threadId: string; sourceThreadId: string }>;
+  forkThreadFromMessage(
+    threadId: string,
+    messageId: string,
+    options?: ApiRequestOptions,
+  ): Promise<{ threadId: string; sourceThreadId: string; sourceMessageId: string }>;
   startThreadReview(
     threadId: string,
     options?: ApiRequestOptions,
@@ -123,6 +130,22 @@ export interface UnarchiveThreadActionInput {
 
 export interface ForkThreadActionInput {
   threadId: string;
+  buildActionRequestOptions: (
+    actionName: ThreadMutationOperationName,
+  ) => ThreadMutationActionRequestOptions;
+  onSetBusy: (isBusy: boolean) => void;
+  onMarkThreadPendingMaterialization: (threadId: string) => void;
+  onThreadSelected: (threadId: string) => void;
+  onSetMobileSidebarOpen: (isOpen: boolean) => void;
+  onInvalidateActiveThreadQuery: () => void;
+  onRefreshCreatedThreadData: (threadId: string) => Promise<void>;
+  threadMutationClient: ThreadMutationActionClient;
+  reportTrackedUserInterfaceError: (input: ThreadMutationActionErrorReportInput) => Promise<void>;
+}
+
+export interface ForkThreadFromMessageActionInput {
+  threadId: string;
+  messageId: string;
   buildActionRequestOptions: (
     actionName: ThreadMutationOperationName,
   ) => ThreadMutationActionRequestOptions;
@@ -322,6 +345,37 @@ export class ThreadMutationActionCoordinator {
         actionId,
         threadId: input.threadId,
         error: toErrorMessage(error),
+      });
+    } finally {
+      input.onSetBusy(false);
+    }
+  }
+
+  public async forkThreadFromMessage(input: ForkThreadFromMessageActionInput): Promise<void> {
+    const { actionId, requestOptions } = input.buildActionRequestOptions(
+      FORK_THREAD_FROM_MESSAGE_OPERATION_NAME,
+    );
+    input.onSetBusy(true);
+    try {
+      const forkResult = await input.threadMutationClient.forkThreadFromMessage(
+        input.threadId,
+        input.messageId,
+        requestOptions,
+      );
+      input.onMarkThreadPendingMaterialization(forkResult.threadId);
+      input.onThreadSelected(forkResult.threadId);
+      input.onSetMobileSidebarOpen(false);
+      input.onInvalidateActiveThreadQuery();
+      await input.onRefreshCreatedThreadData(forkResult.threadId);
+    } catch (error) {
+      await input.reportTrackedUserInterfaceError({
+        operation: FORK_THREAD_FROM_MESSAGE_OPERATION_NAME,
+        actionId,
+        threadId: input.threadId,
+        error: toErrorMessage(error),
+        details: {
+          messageId: input.messageId,
+        },
       });
     } finally {
       input.onSetBusy(false);

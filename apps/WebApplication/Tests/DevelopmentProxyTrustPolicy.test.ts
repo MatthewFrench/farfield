@@ -15,6 +15,12 @@ describe("DevelopmentProxyTrustPolicy", () => {
     );
   });
 
+  it("builds loopback development origins for an alternate dev port", () => {
+    expect(parseTrustedDevelopmentProxyOrigins(undefined, 4322)).toEqual(
+      new Set(["http://localhost:4322", "http://127.0.0.1:4322", "http://[::1]:4322"]),
+    );
+  });
+
   it("parses explicit trusted origins with normalization", () => {
     expect(
       parseTrustedDevelopmentProxyOrigins(" HTTP://192.168.7.56:4312,https://phone.example.test "),

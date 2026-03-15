@@ -32,6 +32,7 @@ import { ThreadDisplayNamePreferenceStore } from "../Source/Features/Threads/Dat
 import { ThreadMutationServerClient } from "../Source/Features/Threads/DataAccess/ThreadMutationServerClient";
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
+import { ThreadComposerProjectContextStateOwner } from "../Source/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import { ThreadDisplayNameStateOwner } from "../Source/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
@@ -81,6 +82,7 @@ interface ShellCompositionFixture {
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
+  threadComposerProjectContextStateOwner: ThreadComposerProjectContextStateOwner;
   threadListStateController: ThreadListStateController;
   mobileSidebarSwipeCoordinator: MobileSidebarSwipeCoordinator;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -191,6 +193,7 @@ function createThreadActionHandlersFixture(): ThreadActionHandlers {
     createThreadForSingleAgent: vi.fn((): void => {}),
     runArchiveThread: vi.fn(async (): Promise<void> => {}),
     runForkThread: vi.fn(async (): Promise<void> => {}),
+    runForkThreadFromMessage: vi.fn(async (): Promise<void> => {}),
     runRollbackThread: vi.fn(async (): Promise<void> => {}),
     runCompactThread: vi.fn(async (): Promise<void> => {}),
     runCleanThreadBackgroundTerminals: vi.fn(async (): Promise<void> => {}),
@@ -228,6 +231,7 @@ function createShellCompositionFixture(): ShellCompositionFixture {
         "test.use-application-shell-composition.display-name",
       ),
     }),
+    threadComposerProjectContextStateOwner: new ThreadComposerProjectContextStateOwner(),
     threadListStateController,
     mobileSidebarSwipeCoordinator: new MobileSidebarSwipeCoordinator({
       mobileLayoutMaximumWidthPx: MOBILE_LAYOUT_MAXIMUM_WIDTH_PX,
@@ -315,6 +319,8 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     pendingUserInputRequestSelector,
     conversationItemFlattener,
     debugIssueStateResolver,
+    threadComposerProjectContextStateOwner:
+      properties.fixture.threadComposerProjectContextStateOwner,
     threadListStateController: properties.fixture.threadListStateController,
   });
 
@@ -337,6 +343,8 @@ function RuntimeHarness(properties: RuntimeHarnessProperties): React.JSX.Element
     threadMutationServerClient: properties.fixture.threadMutationServerClient,
     threadMutationActionCoordinator: properties.fixture.threadMutationActionCoordinator,
     threadDisplayNameStateOwner: properties.fixture.threadDisplayNameStateOwner,
+    threadComposerProjectContextStateOwner:
+      properties.fixture.threadComposerProjectContextStateOwner,
     threadListStateController: properties.fixture.threadListStateController,
     mobileSidebarSwipeCoordinator: properties.fixture.mobileSidebarSwipeCoordinator,
     runtimeViewportSizingCoordinator: properties.fixture.runtimeViewportSizingCoordinator,
@@ -404,6 +412,7 @@ describe("useApplicationShellComposition", () => {
       threadMutationActionCoordinator: fixture.threadMutationActionCoordinator,
       threadMutationServerClient: fixture.threadMutationServerClient,
       threadDisplayNameStateOwner: fixture.threadDisplayNameStateOwner,
+      threadComposerProjectContextStateOwner: fixture.threadComposerProjectContextStateOwner,
       threadListStateController: fixture.threadListStateController,
       loadCoreDataTracked: fixture.loadCoreDataTracked,
       loadSelectedThreadTracked: fixture.loadSelectedThreadTracked,
@@ -471,6 +480,7 @@ describe("useApplicationShellComposition", () => {
         submitMessage: fixture.chatFeatureComposition.submitMessage,
         steerMessage: fixture.chatFeatureComposition.steerMessage,
         runInterrupt: fixture.chatFeatureComposition.runInterrupt,
+        forkThreadFromMessage: threadActionHandlersFixture.runForkThreadFromMessage,
         openDebugFromErrorBanner: fixture.debugFeatureComposition.openDebugFromErrorBanner,
         clearDebugIssuesFromDebugPanel: fixture.debugFeatureComposition.clearDebugIssuesFromPanel,
         replayHistoryEntryFromDetail: fixture.debugFeatureComposition.replayHistoryEntryFromDetail,

@@ -14,8 +14,9 @@ This plan is setup and workflow only. It does not include turning manual session
 
 ### Runtime topology already in place
 
-- Frontend Vite dev server runs on `127.0.0.1:4312` (`apps/WebApplication/vite.config.ts`).
-- Backend server runs on `127.0.0.1:4311` (`apps/ServerApplication/Source/Application/ServerBootstrap.ts`).
+- Frontend normal dev Vite server runs on `127.0.0.1:4322` (`apps/WebApplication/vite.config.ts`).
+- Backend normal dev server runs on `127.0.0.1:4321` (`apps/ServerApplication/Source/Application/ServerBootstrap.ts`).
+- Stable-dev remains on `127.0.0.1:4312` (web) and `127.0.0.1:4311` (API).
 - Frontend proxies `/api` and `/events` to backend (`apps/WebApplication/vite.config.ts`).
 - API token injection in dev proxy is restricted to trusted origins (`localhost` defaults, configurable via `VITE_DEV_PROXY_TRUSTED_ORIGINS`) when `API_TOKEN` or `PUSH_API_TOKEN` is set (`apps/WebApplication/vite.config.ts`).
 - Same-host browser requests from remote devices are trusted by the dev proxy, but originless requests remain loopback-only so command-line traffic does not inherit protected API access accidentally.
@@ -183,7 +184,7 @@ Note: these commands should be wrapped via `scripts/tooling/with-env.mjs` so `.e
 - `retries`: `0`
 - `workers`: `1`
 - `fullyParallel`: `false`
-- `use.baseURL`: `process.env.E2E_REAL_BASE_URL ?? "http://127.0.0.1:4312"`
+- `use.baseURL`: `process.env.E2E_REAL_BASE_URL ?? "http://127.0.0.1:4322"`
 - `use.trace`: `"retain-on-failure"`
 - `use.screenshot`: `"only-on-failure"`
 - `use.video`: `"retain-on-failure"`

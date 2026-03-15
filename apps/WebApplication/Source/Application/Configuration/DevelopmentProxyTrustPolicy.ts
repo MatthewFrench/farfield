@@ -7,11 +7,7 @@ import { z } from "zod";
  */
 const HTTP_PROTOCOL = "http:";
 const HTTPS_PROTOCOL = "https:";
-const DEVELOPMENT_PROXY_DEFAULT_TRUSTED_ORIGIN_VALUES = [
-  "http://localhost:4312",
-  "http://127.0.0.1:4312",
-  "http://[::1]:4312",
-] as const;
+const DEFAULT_DEVELOPMENT_PROXY_PORT = 4312;
 const LOOPBACK_REMOTE_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 const LOOPBACK_ORIGIN_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -44,12 +40,23 @@ function isLoopbackTrustedOrigin(origin: string): boolean {
   return LOOPBACK_ORIGIN_HOSTNAMES.has(parsedOrigin.hostname);
 }
 
+function buildDefaultTrustedDevelopmentProxyOriginValues(port: number): string[] {
+  return [
+    `http://localhost:${String(port)}`,
+    `http://127.0.0.1:${String(port)}`,
+    `http://[::1]:${String(port)}`,
+  ];
+}
+
 export function parseTrustedDevelopmentProxyOrigins(
   rawOrigins: string | undefined,
+  port = DEFAULT_DEVELOPMENT_PROXY_PORT,
 ): ReadonlySet<string> {
   if (!rawOrigins || rawOrigins.trim().length === 0) {
     return new Set(
-      DEVELOPMENT_PROXY_DEFAULT_TRUSTED_ORIGIN_VALUES.map((origin) => normalizeOrigin(origin)),
+      buildDefaultTrustedDevelopmentProxyOriginValues(port).map((origin) =>
+        normalizeOrigin(origin),
+      ),
     );
   }
 
@@ -95,7 +102,7 @@ export function shouldInjectApiTokenForDevelopmentProxy(
 
 const DevelopmentProxyTrustedOriginSchema = z.string().trim().min(1);
 export const DEFAULT_TRUSTED_DEVELOPMENT_PROXY_ORIGINS = new Set(
-  DEVELOPMENT_PROXY_DEFAULT_TRUSTED_ORIGIN_VALUES.map((origin) =>
+  buildDefaultTrustedDevelopmentProxyOriginValues(DEFAULT_DEVELOPMENT_PROXY_PORT).map((origin) =>
     DevelopmentProxyTrustedOriginSchema.parse(normalizeOrigin(origin)),
   ),
 );

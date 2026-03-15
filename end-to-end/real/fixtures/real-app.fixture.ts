@@ -11,8 +11,8 @@ export type RealAppFixtures = {
   enforceUnexpectedSignals: boolean;
 };
 
-const DEFAULT_REAL_API_URL = "http://127.0.0.1:4311";
-const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4312";
+const DEFAULT_REAL_API_URL = "http://127.0.0.1:4321";
+const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4322";
 const STABLE_REAL_API_URL = "http://127.0.0.1:4311";
 const STABLE_REAL_BASE_URL = "http://127.0.0.1:4312";
 

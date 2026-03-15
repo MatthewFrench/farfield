@@ -11,11 +11,11 @@ const LOADING_THREAD_LABEL = "Loading thread...";
 const NO_THREAD_SELECTED_LABEL = "No thread selected";
 
 export function readSelectedThreadLabel(input: SelectedThreadLabelInput): string {
-  const { selectedThread, selectedThreadId, isSelectedThreadLoading } = input;
+  const { selectedThread, selectedThreadId } = input;
   if (selectedThread) {
     return ThreadGroupSelectors.threadLabel(selectedThread);
   }
-  if (selectedThreadId !== null && selectedThreadId.length > 0 && isSelectedThreadLoading) {
+  if (selectedThreadId !== null && selectedThreadId.length > 0) {
     return LOADING_THREAD_LABEL;
   }
   return NO_THREAD_SELECTED_LABEL;

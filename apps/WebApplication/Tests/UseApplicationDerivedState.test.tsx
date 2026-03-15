@@ -27,6 +27,7 @@ import { type DebugIssueDerivationResult } from "../Source/Features/Debugging/St
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { type ThreadListItem } from "../Source/Features/Threads/DomainModel/ThreadGroupTypes";
+import { ThreadComposerProjectContextStateOwner } from "../Source/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import {
   type ThreadListPresentationStateInput,
   ThreadListPresentationStateResolver,
@@ -242,6 +243,26 @@ function buildAgentMessageTurn(turnIdentifier: string, text: string): Conversati
         id: `item-${turnIdentifier}`,
         type: "agentMessage",
         text,
+      },
+    ],
+  };
+}
+
+function buildInterruptedUserOnlyTurn(turnIdentifier: string): ConversationTurn {
+  return {
+    id: turnIdentifier,
+    status: "interrupted",
+    items: [
+      {
+        id: `user-${turnIdentifier}`,
+        type: "userMessage",
+        content: [
+          {
+            type: "text",
+            text: "hello",
+            text_elements: [],
+          },
+        ],
       },
     ],
   };
@@ -494,6 +515,7 @@ function createBaseInput(): UseApplicationDerivedStateInput {
     pendingUserInputRequestSelector: new PendingUserInputRequestSelector(),
     conversationItemFlattener: new ConversationItemFlattener(),
     debugIssueStateResolver: new DebugIssueStateResolver(),
+    threadComposerProjectContextStateOwner: new ThreadComposerProjectContextStateOwner(),
     threadListStateController: createThreadListStateController(),
   };
 }
@@ -735,6 +757,28 @@ describe("useApplicationDerivedState", () => {
     const derivedState = renderDerivedState(input);
 
     expect(derivedState.runningTerminalCount).toBe(1);
+  });
+
+  it("derives an interrupted-turn notice when the latest turn ended before agent output", () => {
+    const input: UseApplicationDerivedStateInput = {
+      ...createBaseInput(),
+      readThreadState: buildReadThreadSnapshot({
+        threadIdentifier: "thread-1",
+        turns: [buildInterruptedUserOnlyTurn("turn-1")],
+        latestModel: "gpt-5",
+        latestReasoningEffort: "medium",
+      }),
+      selectedThreadId: "thread-1",
+      threads: [buildThreadListItem("thread-1")],
+    };
+
+    const derivedState = renderDerivedState(input);
+
+    expect(derivedState.interruptedTurnNotice).toEqual({
+      title: "Turn Interrupted",
+      message:
+        "This turn ended before the agent produced a response. Send another message to retry.",
+    });
   });
 
   it("keeps the newest thread-list worker projection when an older response resolves later", async () => {

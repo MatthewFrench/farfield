@@ -21,6 +21,7 @@ import { ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/
 interface SnapshotOwnerHarness {
   owner: SelectedThreadSnapshotStateOwner;
   selectedThreadIdRef: MutableRefObject<string | null>;
+  pendingThreadMaterializationCoordinator: PendingThreadMaterializationCoordinator;
   readStreamEvents: () => ChatStreamEventsResponse["events"];
   readPersistedThreadDisplayName: () => string | null;
   readPersistedSnapshots: () => SelectedThreadSnapshotCacheRecord[];
@@ -161,6 +162,7 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
   let setLiveStateCount = 0;
   let setReadThreadStateCount = 0;
   let setStreamEventsCount = 0;
+  const pendingThreadMaterializationCoordinator = new PendingThreadMaterializationCoordinator();
 
   const threadDisplayNamePreferenceStore = new ThreadDisplayNamePreferenceStore(
     `test.selected-thread-snapshot.display-name.${initialSelectedThreadId}`,
@@ -170,7 +172,7 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
     appDefaultModel: "gpt-5.3-codex",
     appDefaultReasoningEffort: "medium",
     selectedThreadIdRef,
-    pendingThreadMaterializationCoordinator: new PendingThreadMaterializationCoordinator(),
+    pendingThreadMaterializationCoordinator,
     conversationSyncSignatureBuilder: new ConversationSyncSignatureBuilder(
       new ModeSelectionStateResolver(),
     ),
@@ -207,6 +209,7 @@ function createHarness(initialSelectedThreadId: string): SnapshotOwnerHarness {
   return {
     owner,
     selectedThreadIdRef,
+    pendingThreadMaterializationCoordinator,
     readStreamEvents: () => streamEvents,
     readPersistedThreadDisplayName: () =>
       threadDisplayNamePreferenceStore.readThreadDisplayName(initialSelectedThreadId),
@@ -368,6 +371,47 @@ describe("SelectedThreadSnapshotStateOwner", () => {
     expect(latestPersistedSnapshot?.streamEventsSnapshot.events).toEqual([
       buildBroadcastEvent("event-2"),
     ]);
+  });
+
+  it("keeps pending thread materialization until a read-thread snapshot is available", () => {
+    const harness = createHarness("thread-1");
+    harness.pendingThreadMaterializationCoordinator.markPending("thread-1");
+
+    harness.owner.applySnapshots({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Pending title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [],
+        nextSequence: 1,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: null,
+      includeTurnsUsedForRead: false,
+    });
+
+    expect(harness.pendingThreadMaterializationCoordinator.isPending("thread-1")).toBe(true);
+
+    harness.owner.applySnapshots({
+      threadId: "thread-1",
+      liveStateSnapshot: buildLiveStateSnapshot("thread-1", "Pending title"),
+      streamEventsSnapshot: buildStreamEventsSnapshot({
+        threadId: "thread-1",
+        events: [],
+        nextSequence: 1,
+        resetRequired: false,
+      }),
+      streamEventsSinceSequenceUsed: null,
+      readThreadSnapshot: {
+        ok: true,
+        agentId: "codex",
+        thread: buildConversationState("thread-1"),
+      },
+      includeTurnsUsedForRead: false,
+    });
+
+    expect(harness.pendingThreadMaterializationCoordinator.isPending("thread-1")).toBe(false);
   });
 
   it("skips redundant selected-thread snapshot applies when effective state is unchanged", () => {

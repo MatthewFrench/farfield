@@ -10,6 +10,9 @@ import type { AgentSendMessageInput, AgentThreadConversationState } from "../Typ
 import type { CodexThreadStreamStateOwner } from "./CodexThreadStreamStateOwner.js";
 
 const RESUME_WITH_EXTENDED_HISTORY = true;
+const SEND_MESSAGE_RESUME_RETRY_MAXIMUM_ATTEMPTS = 8;
+const SEND_MESSAGE_RESUME_RETRY_BASE_DELAY_MILLISECONDS = 250;
+const SEND_MESSAGE_RESUME_RETRY_MAXIMUM_DELAY_MILLISECONDS = 4_000;
 const IPC_SEND_MESSAGE_FAILURE_LOG_EVENT = "codex-ipc-send-message-failed";
 const TURN_IN_PROGRESS_STATUS = "inProgress";
 const TURN_IN_PROGRESS_UNDERSCORE_STATUS = "in_progress";
@@ -22,6 +25,21 @@ export interface CodexMessageDispatchOwnerOptions {
   threadStreamStateOwner: CodexThreadStreamStateOwner;
   runAppServerCall: <ValueType>(operation: () => Promise<ValueType>) => Promise<ValueType>;
   isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
+  isThreadNotLoadedError: (error: Error) => boolean;
+  waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
+}
+
+async function waitForMilliseconds(durationMilliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMilliseconds);
+  });
+}
+
+function computeNextRetryDelayMilliseconds(currentDelayMilliseconds: number): number {
+  return Math.min(
+    currentDelayMilliseconds * 2,
+    SEND_MESSAGE_RESUME_RETRY_MAXIMUM_DELAY_MILLISECONDS,
+  );
 }
 
 export class CodexMessageDispatchOwner {
@@ -32,6 +50,8 @@ export class CodexMessageDispatchOwner {
     operation: () => Promise<ValueType>,
   ) => Promise<ValueType>;
   private readonly isConversationNotFoundError: <ErrorType>(error: ErrorType) => boolean;
+  private readonly isThreadNotLoadedError: (error: Error) => boolean;
+  private readonly waitForMilliseconds: (durationMilliseconds: number) => Promise<void>;
 
   public constructor(options: CodexMessageDispatchOwnerOptions) {
     this.appClient = options.appClient;
@@ -39,6 +59,8 @@ export class CodexMessageDispatchOwner {
     this.threadStreamStateOwner = options.threadStreamStateOwner;
     this.runAppServerCall = options.runAppServerCall;
     this.isConversationNotFoundError = options.isConversationNotFoundError;
+    this.isThreadNotLoadedError = options.isThreadNotLoadedError;
+    this.waitForMilliseconds = options.waitForMilliseconds ?? waitForMilliseconds;
   }
 
   public async sendMessage(input: AgentSendMessageInput, isIpcReady: boolean): Promise<void> {
@@ -85,21 +107,41 @@ export class CodexMessageDispatchOwner {
       }
     }
 
-    try {
-      await this.sendMessageThroughAppServer(input);
-      return;
-    } catch (error) {
-      if (!this.isConversationNotFoundError(error)) {
-        throw error;
+    let retryDelayMilliseconds = SEND_MESSAGE_RESUME_RETRY_BASE_DELAY_MILLISECONDS;
+    for (
+      let attemptIndex = 0;
+      attemptIndex < SEND_MESSAGE_RESUME_RETRY_MAXIMUM_ATTEMPTS;
+      attemptIndex += 1
+    ) {
+      try {
+        await this.sendMessageThroughAppServer(input);
+        return;
+      } catch (error) {
+        if (!this.shouldRetrySendMessageAfterResume(error)) {
+          throw error;
+        }
+        await this.runAppServerCall(() =>
+          this.appClient.resumeThread(input.threadId, {
+            persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY,
+          }),
+        );
+        if (attemptIndex >= SEND_MESSAGE_RESUME_RETRY_MAXIMUM_ATTEMPTS - 1) {
+          throw error;
+        }
+        await this.waitForMilliseconds(retryDelayMilliseconds);
+        retryDelayMilliseconds = computeNextRetryDelayMilliseconds(retryDelayMilliseconds);
       }
     }
+  }
 
-    await this.runAppServerCall(() =>
-      this.appClient.resumeThread(input.threadId, {
-        persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY,
-      }),
-    );
-    await this.sendMessageThroughAppServer(input);
+  private shouldRetrySendMessageAfterResume<ErrorType>(error: ErrorType): boolean {
+    if (this.isConversationNotFoundError(error)) {
+      return true;
+    }
+    if (error instanceof Error) {
+      return this.isThreadNotLoadedError(error);
+    }
+    return false;
   }
 
   private async sendMessageThroughAppServer(input: AgentSendMessageInput): Promise<void> {
@@ -109,6 +151,14 @@ export class CodexMessageDispatchOwner {
         this.appClient.steerTurn(input.threadId, expectedTurnId, input.text),
       );
       return;
+    }
+
+    if (this.shouldResumeThreadBeforeAppServerSend(input.threadId)) {
+      await this.runAppServerCall(() =>
+        this.appClient.resumeThread(input.threadId, {
+          persistExtendedHistory: RESUME_WITH_EXTENDED_HISTORY,
+        }),
+      );
     }
 
     const turnStartTemplate = this.readTurnStartTemplate(input.threadId);
@@ -131,6 +181,10 @@ export class CodexMessageDispatchOwner {
       nowMilliseconds: Date.now(),
       isSteering: false,
     });
+  }
+
+  private shouldResumeThreadBeforeAppServerSend(threadId: string): boolean {
+    return this.threadStreamStateOwner.getProjectedConversationState(threadId) === null;
   }
 
   private async readSteerExpectedTurnIdentifier(threadId: string): Promise<string> {

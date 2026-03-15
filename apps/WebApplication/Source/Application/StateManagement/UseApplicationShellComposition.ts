@@ -26,6 +26,7 @@ import {
   useDebugAppServerCoverageDiagnostics,
 } from "@/Features/Debugging/StateManagement/UseDebugAppServerCoverageDiagnostics";
 import { type ThreadMutationServerClient } from "@/Features/Threads/DataAccess/ThreadMutationServerClient";
+import { type ThreadComposerProjectContextStateOwner } from "@/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import { type ThreadDisplayNameStateOwner } from "@/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { type ThreadListStateController } from "@/Features/Threads/StateManagement/ThreadListStateController";
 import {
@@ -68,6 +69,7 @@ export interface UseApplicationShellCompositionInput {
   threadMutationServerClient: ThreadMutationServerClient;
   threadMutationActionCoordinator: ThreadMutationActionCoordinator;
   threadDisplayNameStateOwner: ThreadDisplayNameStateOwner;
+  threadComposerProjectContextStateOwner: ThreadComposerProjectContextStateOwner;
   threadListStateController: ThreadListStateController;
   mobileSidebarSwipeCoordinator: MobileSidebarSwipeCoordinator;
   runtimeViewportSizingCoordinator: RuntimeViewportSizingCoordinator;
@@ -136,6 +138,7 @@ function buildThreadActionHandlersInput(
       applicationShellState.pendingThreadMaterializationCoordinator,
     threadMutationActionCoordinator: input.threadMutationActionCoordinator,
     threadMutationServerClient: input.threadMutationServerClient,
+    threadComposerProjectContextStateOwner: input.threadComposerProjectContextStateOwner,
     threadDisplayNameStateOwner: input.threadDisplayNameStateOwner,
     threadListStateController: input.threadListStateController,
     loadCoreDataTracked: input.loadCoreDataTracked,
@@ -210,6 +213,7 @@ function buildThreadListPanePropertiesInput(
 
 function buildApplicationShellViewPropertiesInput(
   context: ApplicationShellCompositionContext,
+  threadActionHandlers: ThreadActionHandlers,
   debugCoverageDiagnostics: DebugAppServerCoverageDiagnostics,
 ): UseApplicationShellViewPropertiesInput {
   const { input, applicationShellState, applicationDerivedState } = context;
@@ -261,10 +265,13 @@ function buildApplicationShellViewPropertiesInput(
     setSuccessBannerDetails: applicationShellState.setSuccessBannerDetails,
     liveStateReductionError: applicationDerivedState.liveStateReductionError,
     chatSurfaceState: applicationDerivedState.chatSurfaceState,
+    interruptedTurnNotice: applicationDerivedState.interruptedTurnNotice,
     selectedThreadId: applicationShellState.selectedThreadId,
     isCoreLoading: applicationShellState.isCoreLoading,
     isSelectedThreadLoading: applicationShellState.isSelectedThreadLoading,
     availableAgentIds: applicationDerivedState.availableAgentIds,
+    canCreateNewThreadFromComposer:
+      applicationDerivedState.newThreadProjectPathResolution.status === "resolved",
     turnCount: applicationDerivedState.turns.length,
     scrollRef: applicationShellState.scrollRef,
     chatContentRef: applicationShellState.chatContentRef,
@@ -309,6 +316,7 @@ function buildApplicationShellViewPropertiesInput(
     submitToolCallRequestResponse: input.chatFeatureComposition.submitToolCallRequestResponse,
     selectedAgentLabel: applicationDerivedState.selectedAgentLabel,
     runInterrupt: input.chatFeatureComposition.runInterrupt,
+    forkThreadFromMessage: threadActionHandlers.runForkThreadFromMessage,
     steerMessage: input.chatFeatureComposition.steerMessage,
     submitMessage: input.chatFeatureComposition.submitMessage,
     chatModeToolbarProperties: input.chatFeatureComposition.chatModeToolbarProperties,
@@ -470,7 +478,11 @@ export function useApplicationShellComposition(
   );
 
   const shellViewProperties = useApplicationShellViewProperties(
-    buildApplicationShellViewPropertiesInput(context, debugCoverageDiagnostics),
+    buildApplicationShellViewPropertiesInput(
+      context,
+      threadActionHandlers,
+      debugCoverageDiagnostics,
+    ),
   );
 
   return {

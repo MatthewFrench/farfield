@@ -6,6 +6,7 @@ import { CommandBlock } from "./CommandBlock";
 import { DiffBlock } from "./DiffBlock";
 import { MarkdownText } from "./MarkdownText";
 import { ReasoningBlock } from "./ReasoningBlock";
+import { Button } from "./UserInterface/Button";
 
 type TurnItem = z.infer<typeof TurnItemSchema>;
 type UserMessageLikeItem = Extract<TurnItem, { type: "userMessage" | "steeringUserMessage" }>;
@@ -17,6 +18,7 @@ interface Props {
   turnIsInProgress: boolean;
   previousItemType?: TurnItem["type"] | undefined;
   nextItemType?: TurnItem["type"] | undefined;
+  onForkFromMessage?: ((messageId: string) => void) | undefined;
 }
 
 const TOOL_BLOCK_TYPES: readonly TurnItem["type"][] = [
@@ -109,6 +111,21 @@ const IMAGE_VIEW_IMAGE_CLASS =
   "max-h-[26rem] w-auto max-w-full rounded-lg border border-border/60 bg-background";
 const IMAGE_VIEW_PATH_CLASS =
   "mt-2 text-xs text-muted-foreground whitespace-pre-wrap break-all leading-relaxed";
+const FORK_MESSAGE_ACTION_CLASS =
+  "h-7 rounded-full px-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground";
+const USER_MESSAGE_LAYOUT_CLASS = "flex max-w-[80%] flex-col items-end gap-1.5";
+const AGENT_MESSAGE_LAYOUT_CLASS = "space-y-2";
+
+function canRenderForkFromMessageAction(item: TurnItem): boolean {
+  switch (item.type) {
+    case "userMessage":
+    case "steeringUserMessage":
+    case "agentMessage":
+      return true;
+    default:
+      return false;
+  }
+}
 
 function isToolBlockType(type: TurnItem["type"] | undefined): boolean {
   return type !== undefined && TOOL_BLOCK_TYPES.includes(type);
@@ -203,6 +220,29 @@ function renderImageViewPanel(path: string) {
   );
 }
 
+function renderForkFromMessageAction(
+  item: TurnItem,
+  onForkFromMessage: ((messageId: string) => void) | undefined,
+): React.JSX.Element | null {
+  if (onForkFromMessage === undefined || !canRenderForkFromMessageAction(item)) {
+    return null;
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className={FORK_MESSAGE_ACTION_CLASS}
+      onClick={() => {
+        onForkFromMessage(item.id);
+      }}
+    >
+      Fork from here
+    </Button>
+  );
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled turn item type: ${String(value)}`);
 }
@@ -213,9 +253,11 @@ function ConversationItemComponent({
   turnIsInProgress,
   previousItemType,
   nextItemType,
+  onForkFromMessage,
 }: Props) {
   const isActive = isLast && turnIsInProgress;
   const toolSpacing = toolBlockSpacingClass(previousItemType, nextItemType);
+  const forkFromMessageAction = renderForkFromMessageAction(item, onForkFromMessage);
 
   switch (item.type) {
     /* ── User message ───────────────────────────────────── */
@@ -225,8 +267,11 @@ function ConversationItemComponent({
       if (text.length === 0) return null;
       return (
         <div className={USER_MESSAGE_WRAPPER_CLASS}>
-          <div className={USER_MESSAGE_BUBBLE_CLASS}>
-            <p className={USER_MESSAGE_TEXT_CLASS}>{text}</p>
+          <div className={USER_MESSAGE_LAYOUT_CLASS}>
+            {forkFromMessageAction}
+            <div className={USER_MESSAGE_BUBBLE_CLASS}>
+              <p className={USER_MESSAGE_TEXT_CLASS}>{text}</p>
+            </div>
           </div>
         </div>
       );
@@ -235,7 +280,14 @@ function ConversationItemComponent({
     /* ── Agent message ──────────────────────────────────── */
     case "agentMessage":
       if (item.text.length === 0) return null;
-      return <MarkdownText text={item.text} />;
+      return (
+        <div className={AGENT_MESSAGE_LAYOUT_CLASS}>
+          {forkFromMessageAction !== null && (
+            <div className="flex justify-end">{forkFromMessageAction}</div>
+          )}
+          <MarkdownText text={item.text} />
+        </div>
+      );
 
     /* ── Error message ──────────────────────────────────── */
     case "error":
@@ -426,7 +478,8 @@ function areConversationItemPropsEqual(prev: Props, next: Props): boolean {
     prev.isLast === next.isLast &&
     prev.turnIsInProgress === next.turnIsInProgress &&
     prev.previousItemType === next.previousItemType &&
-    prev.nextItemType === next.nextItemType
+    prev.nextItemType === next.nextItemType &&
+    prev.onForkFromMessage === next.onForkFromMessage
   );
 }
 

@@ -12,6 +12,7 @@ import {
   type ToolCallResponsePayload,
   UserInputRequestMethod,
 } from "@farfield/protocol";
+import { MISSING_NEW_THREAD_PROJECT_PATH_ERROR_MESSAGE } from "@/Features/Chat/DomainModel/NewThreadProjectPathResolver";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 
@@ -69,6 +70,7 @@ export interface ChatRequestActionThreadMutationClient {
   createThread(
     input?: {
       agentId?: AgentId | undefined;
+      cwd?: string | undefined;
     },
     options?: ApiRequestOptions,
   ): Promise<{
@@ -80,8 +82,10 @@ export interface SendMessageActionInput {
   draft: string;
   selectedThreadId: string | null;
   selectedAgentId: AgentId;
+  projectPathForNewThread?: string | null;
   buildActionRequestOptions: (actionName: string) => ChatRequestActionRequestOptions;
   onSetBusy: (isBusy: boolean) => void;
+  onSetErrorMessage: (errorMessage: string) => void;
   onThreadSelected: (threadId: string) => void;
   onMarkThreadPendingMaterialization: (threadId: string) => void;
   chatClient: ChatRequestActionChatClient;
@@ -230,12 +234,21 @@ export class ChatRequestActionCoordinator {
 
     const { actionId, requestOptions } = input.buildActionRequestOptions(SEND_MESSAGE_ACTION_NAME);
     let threadId: string | null = input.selectedThreadId;
+    const normalizedProjectPathForNewThread = input.projectPathForNewThread?.trim();
     input.onSetBusy(true);
     try {
       if (threadId === null || threadId.length === 0) {
+        if (
+          normalizedProjectPathForNewThread === undefined ||
+          normalizedProjectPathForNewThread.length === 0
+        ) {
+          input.onSetErrorMessage(MISSING_NEW_THREAD_PROJECT_PATH_ERROR_MESSAGE);
+          return;
+        }
         const created = await input.threadMutationClient.createThread(
           {
             agentId: input.selectedAgentId,
+            cwd: normalizedProjectPathForNewThread,
           },
           requestOptions,
         );
@@ -255,6 +268,7 @@ export class ChatRequestActionCoordinator {
         error: toErrorMessage(error),
         details: {
           draftLength: trimmedDraft.length,
+          projectPath: normalizedProjectPathForNewThread ?? null,
         },
       });
     } finally {

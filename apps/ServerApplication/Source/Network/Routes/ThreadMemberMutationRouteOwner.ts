@@ -1,6 +1,7 @@
 import { ThreadMemberArchiveMutationRouteOwner } from "./ThreadMemberArchiveMutationRouteOwner.js";
 import { ThreadMemberBackgroundTerminalsCleanMutationRouteOwner } from "./ThreadMemberBackgroundTerminalsCleanMutationRouteOwner.js";
 import { ThreadMemberCompactMutationRouteOwner } from "./ThreadMemberCompactMutationRouteOwner.js";
+import { ThreadMemberForkFromMessageMutationRouteOwner } from "./ThreadMemberForkFromMessageMutationRouteOwner.js";
 import { ThreadMemberForkMutationRouteOwner } from "./ThreadMemberForkMutationRouteOwner.js";
 import { ThreadMemberInteractionMutationRouteOwner } from "./ThreadMemberInteractionMutationRouteOwner.js";
 import { ThreadMemberMessageMutationRouteOwner } from "./ThreadMemberMessageMutationRouteOwner.js";
@@ -27,6 +28,7 @@ const ThreadMemberMutationRouteOwnerNameByName = {
   unsubscribe: "unsubscribe",
   interaction: "interaction",
   fork: "fork",
+  forkFromMessage: "fork-from-message",
   name: "name",
   review: "review",
   rollback: "rollback",
@@ -43,6 +45,7 @@ type ThreadMemberMutationSubresource =
   | typeof ThreadMemberRouteSegmentByName.unarchive
   | typeof ThreadMemberRouteSegmentByName.unsubscribe
   | typeof ThreadMemberRouteSegmentByName.fork
+  | typeof ThreadMemberRouteSegmentByName.forkMessage
   | typeof ThreadMemberRouteSegmentByName.name
   | typeof ThreadMemberRouteSegmentByName.review
   | typeof ThreadMemberRouteSegmentByName.rollback
@@ -82,6 +85,10 @@ const ThreadMemberMutationDispatchDescriptors: readonly ThreadMemberMutationDisp
   {
     subresource: ThreadMemberRouteSegmentByName.fork,
     ownerName: ThreadMemberMutationRouteOwnerNameByName.fork,
+  },
+  {
+    subresource: ThreadMemberRouteSegmentByName.forkMessage,
+    ownerName: ThreadMemberMutationRouteOwnerNameByName.forkFromMessage,
   },
   {
     subresource: ThreadMemberRouteSegmentByName.name,
@@ -131,6 +138,8 @@ const ThreadMemberMutationHandlerFactoryByOwnerName: Record<
     new ThreadMemberInteractionMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.fork]: (options) =>
     new ThreadMemberForkMutationRouteOwner(options),
+  [ThreadMemberMutationRouteOwnerNameByName.forkFromMessage]: (options) =>
+    new ThreadMemberForkFromMessageMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.name]: (options) =>
     new ThreadMemberNameMutationRouteOwner(options),
   [ThreadMemberMutationRouteOwnerNameByName.review]: (options) =>

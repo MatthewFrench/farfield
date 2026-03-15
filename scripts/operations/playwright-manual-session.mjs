@@ -16,13 +16,13 @@ import { FarfieldHealthResponseSchema } from "@farfield/protocol";
  */
 
 const DEFAULT_API_HOST = "127.0.0.1";
-const DEFAULT_API_PORT = "4311";
+const DEFAULT_API_PORT = "4321";
 const DEFAULT_HEALTH_TIMEOUT_MILLISECONDS = 120_000;
 const DEFAULT_HEALTH_POLL_INTERVAL_MILLISECONDS = 1_000;
 const DEFAULT_PROCESS_SHUTDOWN_GRACE_MILLISECONDS = 5_000;
 const DEFAULT_SMOKE_ATTEMPTS = 3;
 const DEFAULT_SMOKE_RETRY_DELAY_MILLISECONDS = 1_500;
-const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4312";
+const DEFAULT_REAL_BASE_URL = "http://127.0.0.1:4322";
 const DEFAULT_PORT_PROBE_TIMEOUT_MILLISECONDS = 500;
 
 const InheritedEnvironmentSchema = z.record(z.string().min(1), z.string());

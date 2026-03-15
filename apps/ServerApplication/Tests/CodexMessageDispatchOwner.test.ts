@@ -160,16 +160,21 @@ function createOwnerTestContext(
     initialTurnStatus?: "completed" | "inProgress" | "in_progress";
     initialTurnId?: string;
     includeInitialTurnParams?: boolean;
+    withInitialProjection?: boolean;
+    waitForMilliseconds?: (durationMilliseconds: number) => Promise<void>;
   },
 ): OwnerTestContext {
   const appServerTransport = new TestAppServerTransport();
   const appClient = new AppServerClient(appServerTransport);
   const service = new TestCodexMonitorService();
-  const threadStreamStateOwner = createThreadStreamStateOwner(threadId, ownerClientId, {
-    turnStatus: options?.initialTurnStatus,
-    turnId: options?.initialTurnId,
-    includeInitialTurnParams: options?.includeInitialTurnParams,
-  });
+  const threadStreamStateOwner =
+    options?.withInitialProjection === false
+      ? new CodexThreadStreamStateOwner()
+      : createThreadStreamStateOwner(threadId, ownerClientId, {
+          turnStatus: options?.initialTurnStatus,
+          turnId: options?.initialTurnId,
+          includeInitialTurnParams: options?.includeInitialTurnParams,
+        });
   let runAppServerCallCount = 0;
 
   const owner = new CodexMessageDispatchOwner({
@@ -184,6 +189,12 @@ function createOwnerTestContext(
     },
     isConversationNotFoundError:
       options?.isConversationNotFoundError ?? (<ErrorType>(_error: ErrorType): boolean => false),
+    isThreadNotLoadedError: (error: Error): boolean => {
+      return (
+        error.message.includes("thread not loaded") || error.message.includes("no rollout found")
+      );
+    },
+    waitForMilliseconds: options?.waitForMilliseconds,
   });
 
   return {
@@ -334,6 +345,59 @@ describe("CodexMessageDispatchOwner", () => {
     ]);
   });
 
+  it("resumes a thread before app-server turn/start when no projected conversation state exists", async () => {
+    const threadId = "thread-app-server-resume-first";
+    const ownerClientId = "owner-client-app-server-resume-first";
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      withInitialProjection: false,
+    });
+    context.appServerTransport.setResponse("thread/resume", {
+      thread: {
+        id: threadId,
+        turns: [],
+        requests: [],
+      },
+    });
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-after-resume",
+      },
+    });
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "resume then send",
+      },
+      false,
+    );
+
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "thread/resume",
+        params: {
+          threadId,
+          persistExtendedHistory: true,
+        },
+        timeoutMs: undefined,
+      },
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "resume then send",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
+  });
+
   it("does not reread the thread before app-server sends when no projected turn template exists", async () => {
     const threadId = "thread-app-server-no-template";
     const ownerClientId = "owner-client-app-server-no-template";
@@ -467,6 +531,122 @@ describe("CodexMessageDispatchOwner", () => {
         timeoutMs: undefined,
       },
     ]);
+  });
+
+  it("resumes the thread and retries turn/start after thread-not-loaded errors", async () => {
+    const threadId = "thread-4b";
+    const ownerClientId = "owner-client-4b";
+    const context = createOwnerTestContext(threadId, ownerClientId);
+    context.appServerTransport.setResponse("thread/resume", {
+      thread: {
+        id: threadId,
+        turns: [],
+        requests: [],
+      },
+    });
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-2b",
+      },
+    });
+    context.appServerTransport.queueError(
+      "turn/start",
+      new Error("no rollout found for thread id thread-4b"),
+    );
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "retry turn start after not loaded",
+      },
+      false,
+    );
+
+    expect(context.appServerTransport.requestCalls).toEqual([
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "retry turn start after not loaded",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+      {
+        method: "thread/resume",
+        params: {
+          threadId,
+          persistExtendedHistory: true,
+        },
+        timeoutMs: undefined,
+      },
+      {
+        method: "turn/start",
+        params: {
+          threadId,
+          input: [
+            {
+              type: "text",
+              text: "retry turn start after not loaded",
+            },
+          ],
+          attachments: [],
+        },
+        timeoutMs: undefined,
+      },
+    ]);
+  });
+
+  it("retries multiple resume-and-turn-start attempts for rollout-missing send errors", async () => {
+    const threadId = "thread-4c";
+    const ownerClientId = "owner-client-4c";
+    const waitDurations: number[] = [];
+    const context = createOwnerTestContext(threadId, ownerClientId, {
+      waitForMilliseconds: async (durationMilliseconds) => {
+        waitDurations.push(durationMilliseconds);
+      },
+    });
+    context.appServerTransport.setResponse("thread/resume", {
+      thread: {
+        id: threadId,
+        turns: [],
+        requests: [],
+      },
+    });
+    context.appServerTransport.setResponse("turn/start", {
+      turn: {
+        id: "turn-2c",
+      },
+    });
+    context.appServerTransport.queueError(
+      "turn/start",
+      new Error("no rollout found for thread id thread-4c"),
+    );
+    context.appServerTransport.queueError(
+      "turn/start",
+      new Error("no rollout found for thread id thread-4c"),
+    );
+
+    await context.owner.sendMessage(
+      {
+        threadId,
+        text: "retry turn start twice",
+      },
+      false,
+    );
+
+    expect(waitDurations).toEqual([250, 500]);
+    expect(
+      context.appServerTransport.requestCalls.filter((call) => call.method === "thread/resume"),
+    ).toHaveLength(2);
+    expect(
+      context.appServerTransport.requestCalls.filter((call) => call.method === "turn/start"),
+    ).toHaveLength(3);
   });
 
   it("uses turn/steer for steering sends when IPC is unavailable", async () => {

@@ -17,6 +17,7 @@ const ACTIVE_THREAD_ITEMS: ThreadListItem[] = [
     path: "/Users/example/alpha",
     agentId: "codex",
     hasUnreadTurn: null,
+    isLoadedInMemory: true,
     isProjectRemoved: false,
   },
   {
@@ -100,6 +101,7 @@ function createThreadListPaneProperties(
     onCreateThreadForSingleAgent: () => {},
     onCreateNewThread: () => {},
     onSelectThread: () => {},
+    onCopyThreadId: () => {},
     onArchiveThread: () => {},
     onForkThread: () => {},
     onRollbackThread: () => {},
@@ -258,6 +260,19 @@ describe("ThreadListPane", () => {
 
     expect(screen.queryByTestId("thread-unread-indicator-thread_active_two")).toBeNull();
     expect(screen.queryByTestId("thread-generating-indicator-thread_active_two")).not.toBeNull();
+  });
+
+  it("renders an explicit loaded badge instead of a status dot", () => {
+    cleanup();
+    render(<ThreadListPane {...createThreadListPaneProperties()} />);
+
+    expect(screen.getByTestId("thread-loaded-indicator-thread_active_one").textContent).toBe(
+      "Loaded",
+    );
+    expect(
+      screen.getByTestId("thread-loaded-indicator-thread_active_one").getAttribute("title"),
+    ).toBe("Loaded in memory");
+    expect(screen.queryByTestId("thread-loaded-indicator-thread_active_two")).toBeNull();
   });
 
   it("prefers last user message text for active thread row titles", () => {

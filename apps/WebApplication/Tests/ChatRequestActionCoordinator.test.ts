@@ -15,6 +15,7 @@ import {
 } from "../Source/Features/Chat/StateManagement/ChatRequestActionCoordinator";
 
 const DEFAULT_AGENT_ID = "codex";
+const DEFAULT_PROJECT_PATH = "/workspace/project-alpha";
 const DEFAULT_THREAD_ID = "thread-1";
 const EXISTING_THREAD_ID = "thread-4";
 const SKIP_REQUEST_ID = 17;
@@ -54,6 +55,7 @@ function createActionCallbacks() {
     onSetBusy: (isBusy: boolean) => {
       busyStates.push(isBusy);
     },
+    onSetErrorMessage: vi.fn(),
     onInvalidateActiveThreadQuery: vi.fn(),
     onRefreshThreadData: vi.fn(async (_threadId: string) => {}),
     reportTrackedUserInterfaceError: vi.fn(async () => {}),
@@ -66,6 +68,7 @@ describe("ChatRequestActionCoordinator", () => {
     const {
       busyStates,
       onSetBusy,
+      onSetErrorMessage,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
       reportTrackedUserInterfaceError,
@@ -79,8 +82,10 @@ describe("ChatRequestActionCoordinator", () => {
       draft: "hello world",
       selectedThreadId: null,
       selectedAgentId: DEFAULT_AGENT_ID,
+      projectPathForNewThread: DEFAULT_PROJECT_PATH,
       buildActionRequestOptions,
       onSetBusy,
+      onSetErrorMessage,
       onThreadSelected: (threadId) => {
         selectedThreads.push(threadId);
       },
@@ -95,7 +100,7 @@ describe("ChatRequestActionCoordinator", () => {
     });
 
     expect(threadMutationClient.createThread).toHaveBeenCalledWith(
-      { agentId: DEFAULT_AGENT_ID },
+      { agentId: DEFAULT_AGENT_ID, cwd: DEFAULT_PROJECT_PATH },
       { actionId: "action-send-message", actionName: "send-message" },
     );
     expect(chatClient.sendMessage).toHaveBeenCalledWith(
@@ -111,10 +116,56 @@ describe("ChatRequestActionCoordinator", () => {
     expect(busyStates).toEqual([true, false]);
   });
 
+  it("sets a clear error and skips creation when a new chat thread has no resolved project path", async () => {
+    const coordinator = new ChatRequestActionCoordinator();
+    const {
+      busyStates,
+      onSetBusy,
+      onSetErrorMessage,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    } = createActionCallbacks();
+    const onThreadSelected = vi.fn();
+    const onMarkThreadPendingMaterialization = vi.fn();
+    const chatClient = createChatClient();
+    const threadMutationClient = createThreadMutationClient();
+
+    await coordinator.sendMessage({
+      draft: "hello world",
+      selectedThreadId: null,
+      selectedAgentId: DEFAULT_AGENT_ID,
+      projectPathForNewThread: null,
+      buildActionRequestOptions,
+      onSetBusy,
+      onSetErrorMessage,
+      onThreadSelected,
+      onMarkThreadPendingMaterialization,
+      chatClient,
+      threadMutationClient,
+      onInvalidateActiveThreadQuery,
+      onRefreshThreadData,
+      reportTrackedUserInterfaceError,
+    });
+
+    expect(onSetErrorMessage).toHaveBeenCalledWith(
+      "Cannot start a new thread from chat: choose a project from the sidebar first.",
+    );
+    expect(threadMutationClient.createThread).not.toHaveBeenCalled();
+    expect(chatClient.sendMessage).not.toHaveBeenCalled();
+    expect(onThreadSelected).not.toHaveBeenCalled();
+    expect(onMarkThreadPendingMaterialization).not.toHaveBeenCalled();
+    expect(onInvalidateActiveThreadQuery).not.toHaveBeenCalled();
+    expect(onRefreshThreadData).not.toHaveBeenCalled();
+    expect(reportTrackedUserInterfaceError).not.toHaveBeenCalled();
+    expect(busyStates).toEqual([true, false]);
+  });
+
   it("skips send-message when draft is blank after trimming", async () => {
     const coordinator = new ChatRequestActionCoordinator();
     const {
       onSetBusy,
+      onSetErrorMessage,
       onInvalidateActiveThreadQuery,
       onRefreshThreadData,
       reportTrackedUserInterfaceError,
@@ -128,8 +179,10 @@ describe("ChatRequestActionCoordinator", () => {
       draft: "   ",
       selectedThreadId: null,
       selectedAgentId: DEFAULT_AGENT_ID,
+      projectPathForNewThread: DEFAULT_PROJECT_PATH,
       buildActionRequestOptions,
       onSetBusy,
+      onSetErrorMessage,
       onThreadSelected,
       onMarkThreadPendingMaterialization,
       chatClient,

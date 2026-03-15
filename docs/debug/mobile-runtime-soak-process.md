@@ -153,6 +153,12 @@ Stable verification path:
 - verified on Sunday, March 8, 2026: the stable Chromium soak wrote to `.runtime/end-to-end-performance/stable-dev/`, `.runtime/end-to-end-sentinel/stable-dev/`, `test-results/stable-dev/real-app/`, and `playwright-report/stable-dev/real-app/`, and the run passed with `freezeCount=0`
 - stable builds now install the client freeze probe too; direct browser evaluation on Sunday, March 8, 2026, confirmed `window.__farfieldClientPerformanceFreezeProbeOwner` exists on the stable shell and returns populated instant events, completed operations, long tasks, and freeze windows
 
+Normal development path:
+
+- `bun run dev` now serves the live dev API on `http://127.0.0.1:4321` and the live dev web shell on `http://127.0.0.1:4322`
+- default `end-to-end:real:*` and `smoke:app` commands now target that `4321`/`4322` dev stack so stable-dev can remain on `4311`/`4312` without port collisions
+- real Playwright commands no longer prebuild `@farfield/protocol` before launch, which avoids restarting the live dev server by touching watched package outputs
+
 ## Triage Order For AI
 
 When the soak fails, use this order:

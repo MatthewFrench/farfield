@@ -151,6 +151,10 @@ export function useThreadListPaneProperties(
     [archiveThread],
   );
 
+  const handleCopyThreadId = useCallback((threadId: string): void => {
+    void navigator.clipboard.writeText(threadId);
+  }, []);
+
   const handleForkThread = useCallback(
     (threadId: string): void => {
       void forkThread(threadId);
@@ -237,6 +241,7 @@ export function useThreadListPaneProperties(
       onCreateThreadForSingleAgent: handleCreateThreadForSingleAgent,
       onCreateNewThread: handleCreateNewThread,
       onSelectThread: handleSelectThread,
+      onCopyThreadId: handleCopyThreadId,
       onArchiveThread: handleArchiveThread,
       onForkThread: handleForkThread,
       onRollbackThread: handleRollbackThread,
@@ -278,6 +283,7 @@ export function useThreadListPaneProperties(
       handleArchiveThread,
       handleCleanThreadBackgroundTerminals,
       handleCompactThread,
+      handleCopyThreadId,
       handleCreateNewThread,
       handleCreateThreadForSingleAgent,
       handleForkThread,

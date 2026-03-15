@@ -19,6 +19,7 @@ export type ThreadListPaneToggleProjectGroup = (groupKey: string, nextCollapsed:
 export type ThreadListPaneCreateThreadForSingleAgent = (projectPath: string) => void;
 export type ThreadListPaneCreateThread = (projectPath: string, agentId: AgentId) => void;
 export type ThreadListPaneThreadSelectionHandler = (threadId: string) => void;
+export type ThreadListPaneThreadCopyHandler = (threadId: string) => void;
 export type ThreadListPaneArchiveToggle = (nextOpen: boolean) => void;
 export type ThreadListPaneDateFormatter = (value: number | string | null | undefined) => string;
 export type ThreadListPaneAgentFaviconRenderer = (
@@ -46,6 +47,7 @@ export interface ThreadListPaneProperties {
   onCreateThreadForSingleAgent: ThreadListPaneCreateThreadForSingleAgent;
   onCreateNewThread: ThreadListPaneCreateThread;
   onSelectThread: ThreadListPaneThreadSelectionHandler;
+  onCopyThreadId: ThreadListPaneThreadCopyHandler;
   onArchiveThread: ThreadListPaneThreadSelectionHandler;
   onForkThread: ThreadListPaneThreadSelectionHandler;
   onRollbackThread: ThreadListPaneThreadSelectionHandler;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const host = process.env["HOST"] ?? "127.0.0.1";
-const port = Number(process.env["PORT"] ?? "4311");
+const port = Number(process.env["PORT"] ?? "4321");
 const baseUrl = (process.env["APP_SMOKE_URL"] ?? `http://${host}:${String(port)}`).trim();
 const apiToken = (
   process.env["APP_SMOKE_TOKEN"] ??

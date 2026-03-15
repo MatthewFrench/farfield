@@ -2,7 +2,7 @@ import {
   AppServerStartThreadResponseSchema,
   FarfieldThreadListResponseSchema,
 } from "@farfield/protocol";
-import type { APIRequestContext, Page, Request } from "@playwright/test";
+import type { APIRequestContext, Page, Request, Response } from "@playwright/test";
 import { z } from "zod";
 
 const ThreadListEnvelopeSchema = z
@@ -150,6 +150,12 @@ export class RealAppStateIsolationGuard {
   private readonly baselineThreadIds = new Set<string>();
   private readonly managedThreadIds = new Set<string>();
   private readonly violations: string[] = [];
+  private allowedBrowserThreadCreationRequestCount = 0;
+  private allowedBrowserThreadMutationRequestCount = 0;
+  private pendingBrowserThreadCreationResponseCount = 0;
+  private pendingBrowserThreadCreationPromise:
+    | { resolve: (threadId: string) => void; reject: (error: Error) => void }
+    | null = null;
   private initialized = false;
 
   private readonly handleRequest = (request: Request): void => {
@@ -164,6 +170,11 @@ export class RealAppStateIsolationGuard {
     }
 
     if (method === "POST" && pathname === "/api/threads") {
+      if (this.allowedBrowserThreadCreationRequestCount > 0) {
+        this.allowedBrowserThreadCreationRequestCount -= 1;
+        this.pendingBrowserThreadCreationResponseCount += 1;
+        return;
+      }
       this.violations.push(
         "POST /api/threads from browser is not allowed in real end-to-end tests. Use guard.createManagedThread() so thread lifecycle is isolated.",
       );
@@ -183,6 +194,12 @@ export class RealAppStateIsolationGuard {
       return;
     }
 
+    if (this.allowedBrowserThreadMutationRequestCount > 0) {
+      this.allowedBrowserThreadMutationRequestCount -= 1;
+      this.managedThreadIds.add(threadId);
+      return;
+    }
+
     if (this.baselineThreadIds.has(threadId)) {
       this.violations.push(
         `Mutation request POST ${pathname} targeted pre-existing thread ${threadId}`,
@@ -193,6 +210,39 @@ export class RealAppStateIsolationGuard {
     this.violations.push(
       `Mutation request POST ${pathname} targeted unmanaged thread ${threadId}. Register thread through guard.createManagedThread() before mutating it.`,
     );
+  };
+
+  private readonly handleResponse = async (response: Response): Promise<void> => {
+    const request = response.request();
+    const method = request.method().toUpperCase();
+    if (method !== "POST") {
+      return;
+    }
+
+    const pathname = parseApiPath(response.url());
+    if (pathname !== "/api/threads") {
+      return;
+    }
+    if (this.pendingBrowserThreadCreationResponseCount <= 0) {
+      return;
+    }
+
+    this.pendingBrowserThreadCreationResponseCount -= 1;
+    if (!response.ok()) {
+      const pendingBrowserThreadCreationPromise = this.pendingBrowserThreadCreationPromise;
+      this.pendingBrowserThreadCreationPromise = null;
+      pendingBrowserThreadCreationPromise?.reject(
+        new Error(`Browser thread creation failed with HTTP ${String(response.status())}`),
+      );
+      return;
+    }
+
+    const payload = await response.json();
+    const parsedEnvelope = CreateThreadEnvelopeSchema.parse(payload);
+    this.managedThreadIds.add(parsedEnvelope.threadId);
+    const pendingBrowserThreadCreationPromise = this.pendingBrowserThreadCreationPromise;
+    this.pendingBrowserThreadCreationPromise = null;
+    pendingBrowserThreadCreationPromise?.resolve(parsedEnvelope.threadId);
   };
 
   public constructor(options: { page: Page; request: APIRequestContext }) {
@@ -211,6 +261,7 @@ export class RealAppStateIsolationGuard {
     }
 
     this.page.on("request", this.handleRequest);
+    this.page.on("response", this.handleResponse);
     this.initialized = true;
   }
 
@@ -220,8 +271,31 @@ export class RealAppStateIsolationGuard {
     }
 
     this.page.off("request", this.handleRequest);
+    this.page.off("response", this.handleResponse);
     await this.archiveManagedThreads();
     this.initialized = false;
+  }
+
+  public allowNextBrowserThreadCreation(): void {
+    this.allowedBrowserThreadCreationRequestCount += 1;
+    this.allowedBrowserThreadMutationRequestCount += 1;
+  }
+
+  public waitForNextBrowserThreadCreation(): Promise<string> {
+    if (this.pendingBrowserThreadCreationPromise !== null) {
+      throw new Error("Already waiting for an allowed browser thread creation response.");
+    }
+    return new Promise<string>((resolve, reject) => {
+      this.pendingBrowserThreadCreationPromise = { resolve, reject };
+    });
+  }
+
+  public registerManagedThread(threadId: string): void {
+    const normalizedThreadId = threadId.trim();
+    if (normalizedThreadId.length === 0) {
+      throw new Error("Managed thread registration requires a non-empty thread id.");
+    }
+    this.managedThreadIds.add(normalizedThreadId);
   }
 
   public async createManagedThread(input?: {
@@ -233,7 +307,9 @@ export class RealAppStateIsolationGuard {
       data: {
         ...(input?.agentId ? { agentId: input.agentId } : {}),
         ...(input?.cwd ? { cwd: input.cwd } : {}),
-        ephemeral: input?.ephemeral ?? true,
+        // Managed threads must support includeTurns because readiness and completion polling
+        // read full thread state after creation and send actions.
+        ephemeral: input?.ephemeral ?? false,
       },
     });
 
@@ -303,7 +379,7 @@ export class RealAppStateIsolationGuard {
     ) {
       const isFinalAttempt = attemptIndex + 1 >= MANAGED_THREAD_READINESS_FETCH_MAXIMUM_ATTEMPTS;
       const response = await this.request.get(
-        `/api/threads/${encodeURIComponent(threadId)}?includeTurns=true`,
+        `/api/threads/${encodeURIComponent(threadId)}?includeTurns=false`,
       );
       const payload = await response.json();
 
@@ -331,12 +407,12 @@ export class RealAppStateIsolationGuard {
 
       if (parsedError.success) {
         throw new Error(
-          `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=true -> ${parsedError.data.error}`,
+          `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=false -> ${parsedError.data.error}`,
         );
       }
 
       throw new Error(
-        `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=true -> HTTP ${String(response.status())}`,
+        `Managed thread readiness failed: GET /api/threads/${threadId}?includeTurns=false -> HTTP ${String(response.status())}`,
       );
     }
   }
@@ -418,7 +494,9 @@ export class RealAppStateIsolationGuard {
 
   public async readManagedThreadTurnCount(threadId: string): Promise<number> {
     if (!this.managedThreadIds.has(threadId)) {
-      throw new Error(`Managed thread turn count requires a registered managed thread: ${threadId}`);
+      throw new Error(
+        `Managed thread turn count requires a registered managed thread: ${threadId}`,
+      );
     }
 
     const response = await this.request.get(

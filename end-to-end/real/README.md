@@ -19,6 +19,13 @@ These scenarios validate Farfield against a running real stack.
 pnpm dev
 ```
 
+Default runtime ports:
+
+- normal dev API: `http://127.0.0.1:4321`
+- normal dev web shell: `http://127.0.0.1:4322`
+- stable-dev API: `http://127.0.0.1:4311`
+- stable-dev web shell: `http://127.0.0.1:4312`
+
 2. Ensure baseline runtime health:
 
 ```bash
@@ -27,8 +34,8 @@ pnpm smoke:app
 
 ## Runtime env knobs
 
-- `E2E_REAL_BASE_URL` (default `http://127.0.0.1:4312`) controls Playwright UI navigation.
-- `E2E_REAL_API_URL` (default `http://127.0.0.1:4311`) controls sentinel API probes.
+- `E2E_REAL_BASE_URL` (default `http://127.0.0.1:4322`) controls Playwright UI navigation.
+- `E2E_REAL_API_URL` (default `http://127.0.0.1:4321`) controls sentinel API probes.
 - `E2E_REAL_API_TOKEN` overrides the API auth token used by sentinel. If unset, sentinel uses `API_TOKEN`, then `APP_SMOKE_TOKEN`, then `PUSH_API_TOKEN`.
 - `E2E_REAL_PERFORMANCE_BUDGET_MODE` (`fail` or `warn`, default `fail`) controls real end-to-end readiness/render budget enforcement behavior.
 - `APP_SMOKE_TIMEOUT_MS` (default `120000`) controls per-request smoke timeout for `pnpm smoke:app`.
@@ -87,6 +94,8 @@ Stable-mode convenience:
 bun run dev:stable
 bun run end-to-end:real:mobile-soak:stable
 ```
+
+Normal `end-to-end:real:*` commands now target the normal dev stack by default and do not prebuild `@farfield/protocol` before Playwright runs, so they no longer restart the live dev server by touching shared package build outputs.
 
 Use the dedicated mobile freeze run for repeated sidebar open/close profiling:
 

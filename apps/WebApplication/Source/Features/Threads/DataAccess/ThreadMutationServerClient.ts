@@ -8,6 +8,7 @@ import {
   compactThread,
   createThread,
   forkThread,
+  forkThreadFromMessage,
   rollbackThread,
   setThreadName,
   startThreadReview,
@@ -20,14 +21,22 @@ export type ThreadMutationForkThreadResponse = {
   threadId: string;
   sourceThreadId: string;
 };
+export type ThreadMutationForkThreadFromMessageResponse = {
+  threadId: string;
+  sourceThreadId: string;
+  sourceMessageId: string;
+};
 export type ThreadMutationStartThreadReviewResponse = {
   reviewThreadId: string;
   reviewTurnId: string;
 };
 
 const ThreadIdentifierSchema = z.string().trim().min(1);
+const MessageIdentifierSchema = z.string().trim().min(1);
 const INVALID_THREAD_IDENTIFIER_MESSAGE =
   "ThreadMutationServerClient requires threadId to be a non-empty string";
+const INVALID_MESSAGE_IDENTIFIER_MESSAGE =
+  "ThreadMutationServerClient requires messageId to be a non-empty string";
 
 /**
  * Owns thread mutation endpoints.
@@ -50,6 +59,20 @@ export class ThreadMutationServerClient {
     options?: ApiRequestOptions,
   ): Promise<ThreadMutationForkThreadResponse> {
     return forkThread(readThreadIdentifier(threadId), options);
+  }
+
+  public async forkThreadFromMessage(
+    threadId: string,
+    messageId: string,
+    options?: ApiRequestOptions,
+  ): Promise<ThreadMutationForkThreadFromMessageResponse> {
+    return forkThreadFromMessage(
+      {
+        threadId: readThreadIdentifier(threadId),
+        messageId: readMessageIdentifier(messageId),
+      },
+      options,
+    );
   }
 
   public async setThreadName(
@@ -107,6 +130,14 @@ function readThreadIdentifier(value: string): string {
   const parsedValue = ThreadIdentifierSchema.safeParse(value);
   if (!parsedValue.success) {
     throw new Error(INVALID_THREAD_IDENTIFIER_MESSAGE);
+  }
+  return parsedValue.data;
+}
+
+function readMessageIdentifier(value: string): string {
+  const parsedValue = MessageIdentifierSchema.safeParse(value);
+  if (!parsedValue.success) {
+    throw new Error(INVALID_MESSAGE_IDENTIFIER_MESSAGE);
   }
   return parsedValue.data;
 }

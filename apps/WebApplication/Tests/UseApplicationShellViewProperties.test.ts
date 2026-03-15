@@ -128,6 +128,7 @@ function createUseApplicationShellViewPropertiesFixture() {
   const submitPendingRequestSpy = vi.fn(async (): Promise<void> => {});
   const skipPendingRequestSpy = vi.fn(async (): Promise<void> => {});
   const runInterruptSpy = vi.fn(async (): Promise<void> => {});
+  const forkThreadFromMessageSpy = vi.fn(async (): Promise<void> => {});
   const steerMessageSpy = vi.fn(async (): Promise<void> => {});
   const submitMessageSpy = vi.fn(async (): Promise<void> => {});
   const setDebugWorkspaceSectionSpy = vi.fn((): void => {});
@@ -287,10 +288,12 @@ function createUseApplicationShellViewPropertiesFixture() {
     setSuccessBannerDetails: setSuccessBannerDetailsSpy,
     liveStateReductionError: null,
     chatSurfaceState: "ready",
+    interruptedTurnNotice: null,
     selectedThreadId: "thread-001",
     isCoreLoading: false,
     isSelectedThreadLoading: false,
     availableAgentIds: ["codex"],
+    canCreateNewThreadFromComposer: true,
     turnCount: 1,
     scrollRef: scrollReference,
     chatContentRef: chatContentReference,
@@ -311,6 +314,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     skipPendingRequest: skipPendingRequestSpy,
     selectedAgentLabel: "Codex",
     runInterrupt: runInterruptSpy,
+    forkThreadFromMessage: forkThreadFromMessageSpy,
     steerMessage: steerMessageSpy,
     submitMessage: submitMessageSpy,
     chatModeToolbarProperties: createChatModeToolbarPropertiesFixture(),
@@ -451,6 +455,7 @@ function createUseApplicationShellViewPropertiesFixture() {
     openDebugFromErrorBannerSpy,
     setErrorMessageSpy,
     setIsChatAtBottomSpy,
+    forkThreadFromMessageSpy,
     setApiSessionTokenDraftSpy,
     setApiSessionBootstrapErrorSpy,
     uploadFeedbackSpy,
@@ -756,6 +761,37 @@ describe("useApplicationShellViewProperties", () => {
       receivedAtMilliseconds: 1_700_000_000_000,
       refreshedAtMilliseconds: 1_700_000_000_500,
     });
+  });
+
+  it("passes interrupted-turn notice through to chat workspace properties", () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    fixture.input.interruptedTurnNotice = {
+      title: "Turn Interrupted",
+      message:
+        "This turn ended before the agent produced a response. Send another message to retry.",
+    };
+
+    const viewProperties = renderViewProperties(fixture.input);
+
+    expect(viewProperties.chatWorkspacePaneProperties.interruptedTurnNotice).toEqual({
+      title: "Turn Interrupted",
+      message:
+        "This turn ended before the agent produced a response. Send another message to retry.",
+    });
+  });
+
+  it("binds message fork actions to the selected thread identifier", async () => {
+    const fixture = createUseApplicationShellViewPropertiesFixture();
+    const viewProperties = renderViewProperties(fixture.input);
+
+    const onForkFromMessage = viewProperties.chatWorkspacePaneProperties.onForkFromMessage;
+    if (onForkFromMessage === undefined) {
+      throw new Error("Expected chat workspace pane fork handler");
+    }
+
+    await onForkFromMessage("message-22");
+
+    expect(fixture.forkThreadFromMessageSpy).toHaveBeenCalledWith("thread-001", "message-22");
   });
 
   it("toggles settings tab back to chat when settings tab is already active", () => {

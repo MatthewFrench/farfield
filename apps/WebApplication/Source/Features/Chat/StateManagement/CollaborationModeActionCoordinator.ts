@@ -1,6 +1,7 @@
 import type { ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
 import { toErrorMessage } from "@/Shared/Errors/ErrorMessage";
 import { ModeSelectionStateResolver } from "../DomainModel/ModeSelectionStateResolver";
+import { type LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 
 const SET_COLLABORATION_MODE_ACTION_NAME = "set-collaboration-mode";
 
@@ -55,11 +56,15 @@ export interface ApplyCollaborationModeDraftActionInput {
   buildActionRequestOptions: (actionName: string) => CollaborationModeActionRequestOptions;
   onSetModeSyncing: (isModeSyncing: boolean) => void;
   chatClient: CollaborationModeActionChatClient;
-  onReloadSelectedThread: (threadId: string) => Promise<void>;
+  onReloadSelectedThread: (threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>;
   reportTrackedUserInterfaceError: (
     input: CollaborationModeActionErrorReportInput,
   ) => Promise<void>;
 }
+
+const COLLABORATION_MODE_RELOAD_OPTIONS: LoadSelectedThreadOptions = {
+  includeTurns: false,
+};
 
 export class CollaborationModeActionCoordinator {
   private readonly modeSelectionStateResolver: ModeSelectionStateResolver;
@@ -109,7 +114,7 @@ export class CollaborationModeActionCoordinator {
         },
         requestOptions,
       );
-      await input.onReloadSelectedThread(input.selectedThreadId);
+      await input.onReloadSelectedThread(input.selectedThreadId, COLLABORATION_MODE_RELOAD_OPTIONS);
     } catch (error) {
       input.writeLastAppliedModeSignature(lastAppliedModeSignature);
       await input.reportTrackedUserInterfaceError({

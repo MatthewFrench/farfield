@@ -19,11 +19,13 @@ function createRefreshRequest(input: {
   threadId: string;
   includeTurns: boolean;
   includeReadThread: boolean;
+  promotePendingThreadToFullRead?: boolean;
 }): SelectedThreadRefreshRequest {
   return {
     threadId: input.threadId,
     includeTurns: input.includeTurns,
     includeReadThread: input.includeReadThread,
+    promotePendingThreadToFullRead: input.promotePendingThreadToFullRead ?? false,
   };
 }
 
@@ -79,6 +81,63 @@ describe("SelectedThreadRefreshConcurrencyCoordinator", () => {
         threadId: "thread-1",
         includeTurns: true,
         includeReadThread: true,
+      }),
+    ]);
+  });
+
+  it("retains pending-thread promotion when merging queued requests for the same thread", async () => {
+    const coordinator = new SelectedThreadRefreshConcurrencyCoordinator();
+    const executedRequests: SelectedThreadRefreshRequest[] = [];
+    let resolveFirstRefresh: () => void = () => {
+      throw new Error("Expected resolveFirstRefresh to be initialized");
+    };
+    const firstRefreshSettled = new Promise<void>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+
+    const firstRun = coordinator.run({
+      request: createRefreshRequest({
+        threadId: "thread-1",
+        includeTurns: false,
+        includeReadThread: true,
+      }),
+      executeRefresh: async (request) => {
+        executedRequests.push(request);
+        if (executedRequests.length === 1) {
+          await firstRefreshSettled;
+        }
+      },
+      isCanceledError: isCanceledRefreshError,
+    });
+    const secondRun = coordinator.run({
+      request: createRefreshRequest({
+        threadId: "thread-1",
+        includeTurns: false,
+        includeReadThread: true,
+        promotePendingThreadToFullRead: true,
+      }),
+      executeRefresh: async (request) => {
+        executedRequests.push(request);
+      },
+      isCanceledError: isCanceledRefreshError,
+    });
+
+    await Promise.resolve();
+    resolveFirstRefresh();
+
+    await Promise.all([firstRun, secondRun]);
+
+    expect(executedRequests).toEqual([
+      createRefreshRequest({
+        threadId: "thread-1",
+        includeTurns: false,
+        includeReadThread: true,
+      }),
+      createRefreshRequest({
+        threadId: "thread-1",
+        includeTurns: false,
+        includeReadThread: true,
+        promotePendingThreadToFullRead: true,
       }),
     ]);
   });

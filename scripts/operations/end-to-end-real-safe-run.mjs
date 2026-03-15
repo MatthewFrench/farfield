@@ -42,7 +42,7 @@ function readApiToken() {
 }
 
 function readApiBaseUrl() {
-  return (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4311").trim();
+  return (process.env["E2E_REAL_API_URL"] ?? "http://127.0.0.1:4321").trim();
 }
 
 function readHeaders() {

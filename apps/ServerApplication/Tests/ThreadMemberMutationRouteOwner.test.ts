@@ -47,6 +47,7 @@ function createMockRequestResponsePair(): {
 }
 
 function createAgentAdapter(input: {
+  readThread?: (value: AgentReadThreadInput) => Promise<AgentReadThreadResult>;
   sendMessage?: (value: AgentSendMessageInput) => Promise<void>;
   setCollaborationMode?: (
     value: AgentSetCollaborationModeInput,
@@ -111,7 +112,10 @@ function createAgentAdapter(input: {
       throw new Error("Not used in mutation route-owner tests");
     },
     async readThread(_input: AgentReadThreadInput): Promise<AgentReadThreadResult> {
-      throw new Error("Not used in mutation route-owner tests");
+      if (!input.readThread) {
+        throw new Error("Not used in mutation route-owner tests");
+      }
+      return input.readThread(_input);
     },
     async sendMessage(inputValue: AgentSendMessageInput): Promise<void> {
       if (!input.sendMessage) {
@@ -581,6 +585,129 @@ describe("ThreadMemberMutationRouteOwner", () => {
       ok: true,
       threadId: "thread-2",
       sourceThreadId: "thread-1",
+    });
+  });
+
+  it("handles thread-fork-from-message mutations by forking then trimming the new thread", async () => {
+    const { request, response } = createMockRequestResponsePair();
+    request.method = "POST";
+
+    const readThreadCalls: AgentReadThreadInput[] = [];
+    const forkCalls: AgentForkThreadInput[] = [];
+    const rollbackCalls: AgentRollbackThreadInput[] = [];
+    const adapter = createAgentAdapter({
+      readThread: async (value) => {
+        readThreadCalls.push(value);
+        return {
+          thread: {
+            id: "thread-1",
+            turns: [
+              {
+                status: "completed",
+                items: [
+                  {
+                    id: "message-1",
+                    type: "userMessage",
+                    content: [{ type: "text", text: "First" }],
+                  },
+                ],
+              },
+              {
+                status: "completed",
+                items: [
+                  {
+                    id: "message-2",
+                    type: "agentMessage",
+                    text: "Second",
+                  },
+                ],
+              },
+              {
+                status: "completed",
+                items: [
+                  {
+                    id: "message-3",
+                    type: "agentMessage",
+                    text: "Third",
+                  },
+                ],
+              },
+            ],
+            requests: [],
+          },
+        };
+      },
+      forkThread: async (value) => {
+        forkCalls.push(value);
+        return {
+          threadId: "thread-2",
+          thread: {
+            id: "thread-2",
+            preview: "Forked",
+            createdAt: 1,
+            updatedAt: 2,
+            source: "opencode",
+          },
+        };
+      },
+      rollbackThread: async (value) => {
+        rollbackCalls.push(value);
+        return {
+          thread: {
+            id: value.threadId,
+            turns: [],
+            requests: [],
+          },
+        };
+      },
+    });
+
+    let capturedStatusCode: number | null = null;
+    let capturedBody: object | null = null;
+
+    const owner = new ThreadMemberMutationRouteOwner({
+      dependencies: createDependencies({
+        request,
+        response,
+        segments: ["api", "threads", "thread-1", "fork-message"],
+        readJsonBody: async () => ({
+          messageId: "message-2",
+        }),
+        onJsonResponse: (statusCode, body) => {
+          capturedStatusCode = statusCode;
+          capturedBody = body;
+        },
+        pushActionEventWithRequestContext: () => {},
+      }),
+      context: createContext(adapter),
+    });
+
+    const handled = await owner.handle();
+
+    expect(handled).toBe(true);
+    expect(readThreadCalls).toEqual([
+      {
+        threadId: "thread-1",
+        includeTurns: true,
+      },
+    ]);
+    expect(forkCalls).toEqual([
+      {
+        threadId: "thread-1",
+      },
+    ]);
+    expect(rollbackCalls).toEqual([
+      {
+        threadId: "thread-2",
+        numTurns: 1,
+      },
+    ]);
+    expect(capturedStatusCode).toBe(200);
+    expect(capturedBody).toEqual({
+      ok: true,
+      threadId: "thread-2",
+      sourceThreadId: "thread-1",
+      sourceMessageId: "message-2",
     });
   });
 

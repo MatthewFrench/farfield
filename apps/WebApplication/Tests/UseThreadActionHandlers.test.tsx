@@ -9,6 +9,7 @@ import {
 import { ThreadQueryCache } from "../Source/Features/Threads/DataAccess/ThreadQueryCache";
 import { ThreadServerClient } from "../Source/Features/Threads/DataAccess/ThreadServerClient";
 import { PendingThreadMaterializationCoordinator } from "../Source/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
+import { ThreadComposerProjectContextStateOwner } from "../Source/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import { ThreadDisplayNameStateOwner } from "../Source/Features/Threads/StateManagement/ThreadDisplayNameStateOwner";
 import { ThreadListPresentationStateResolver } from "../Source/Features/Threads/StateManagement/ThreadListPresentationStateResolver";
 import { ThreadListStateController } from "../Source/Features/Threads/StateManagement/ThreadListStateController";
@@ -87,6 +88,11 @@ describe("useThreadActionHandlers", () => {
         threadId: "thread-forked",
         sourceThreadId: "thread-source",
       })),
+      forkThreadFromMessage: vi.fn(async () => ({
+        threadId: "thread-forked-from-message",
+        sourceThreadId: "thread-source",
+        sourceMessageId: "message-1",
+      })),
       setThreadName: vi.fn(async () => {}),
       rollbackThread: vi.fn(async () => {}),
       compactThread: vi.fn(async () => {}),
@@ -101,6 +107,7 @@ describe("useThreadActionHandlers", () => {
       current: null,
     };
     const pendingThreadCoordinator = new PendingThreadMaterializationCoordinator();
+    const threadComposerProjectContextStateOwner = new ThreadComposerProjectContextStateOwner();
     const handlersReference: { current: ThreadActionHandlers | null } = {
       current: null,
     };
@@ -124,6 +131,7 @@ describe("useThreadActionHandlers", () => {
       pendingThreadMaterializationCoordinator: pendingThreadCoordinator,
       threadMutationActionCoordinator: new ThreadMutationActionCoordinator(),
       threadMutationServerClient,
+      threadComposerProjectContextStateOwner,
       threadDisplayNameStateOwner: createThreadDisplayNameStateOwner(),
       threadListStateController,
       loadCoreDataTracked,
@@ -167,6 +175,7 @@ describe("useThreadActionHandlers", () => {
     expect(loadCoreDataTracked).toHaveBeenCalledTimes(1);
     expect(loadSelectedThreadTracked).toHaveBeenCalledWith("thread-created");
     expect(pendingThreadCoordinator.isPending("thread-created")).toBe(true);
+    expect(threadComposerProjectContextStateOwner.readCurrentProjectPath()).toBe("/tmp/project");
     expect(selectedThreadIdReference.current).toBe("thread-created");
     expect(prepareActiveThreadQueryForExplicitRefreshSpy.mock.invocationCallOrder[0]).toBeLessThan(
       loadCoreDataTracked.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,

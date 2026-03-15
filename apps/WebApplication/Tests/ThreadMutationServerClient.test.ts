@@ -6,6 +6,7 @@ vi.mock("../Source/Features/Threads/DataAccess/ThreadApi", () => ({
   compactThread: vi.fn(),
   createThread: vi.fn(),
   forkThread: vi.fn(),
+  forkThreadFromMessage: vi.fn(),
   rollbackThread: vi.fn(),
   startThreadReview: vi.fn(),
   setThreadName: vi.fn(),
@@ -18,6 +19,7 @@ import {
   compactThread,
   createThread,
   forkThread,
+  forkThreadFromMessage,
   rollbackThread,
   setThreadName,
   startThreadReview,
@@ -38,6 +40,11 @@ describe("ThreadMutationServerClient", () => {
     vi.mocked(forkThread).mockResolvedValue({
       threadId: "thread-2",
       sourceThreadId: "thread-1",
+    });
+    vi.mocked(forkThreadFromMessage).mockResolvedValue({
+      threadId: "thread-2a",
+      sourceThreadId: "thread-1",
+      sourceMessageId: "message-1",
     });
     vi.mocked(rollbackThread).mockResolvedValue();
     vi.mocked(startThreadReview).mockResolvedValue({
@@ -93,6 +100,10 @@ describe("ThreadMutationServerClient", () => {
     await threadMutationServerClient.archiveThread("  thread-1  ", archiveOptions);
     await threadMutationServerClient.unarchiveThread("  thread-2  ", unarchiveOptions);
     await threadMutationServerClient.forkThread("  thread-3  ", forkOptions);
+    await threadMutationServerClient.forkThreadFromMessage("  thread-3  ", "  message-1  ", {
+      actionId: "action-fork-thread-from-message",
+      actionName: "fork-thread-from-message",
+    });
     await threadMutationServerClient.rollbackThread("  thread-4  ", 2, {
       actionId: "action-rollback-thread",
       actionName: "rollback-thread",
@@ -118,6 +129,16 @@ describe("ThreadMutationServerClient", () => {
     expect(archiveThread).toHaveBeenCalledWith("thread-1", archiveOptions);
     expect(unarchiveThread).toHaveBeenCalledWith("thread-2", unarchiveOptions);
     expect(forkThread).toHaveBeenCalledWith("thread-3", forkOptions);
+    expect(forkThreadFromMessage).toHaveBeenCalledWith(
+      {
+        threadId: "thread-3",
+        messageId: "message-1",
+      },
+      {
+        actionId: "action-fork-thread-from-message",
+        actionName: "fork-thread-from-message",
+      },
+    );
     expect(rollbackThread).toHaveBeenCalledWith(
       {
         threadId: "thread-4",
@@ -161,6 +182,14 @@ describe("ThreadMutationServerClient", () => {
     await expect(threadMutationServerClient.forkThread("\n\t")).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
+    await expect(
+      threadMutationServerClient.forkThreadFromMessage("\n\t", "message-1"),
+    ).rejects.toThrowError("ThreadMutationServerClient requires threadId to be a non-empty string");
+    await expect(
+      threadMutationServerClient.forkThreadFromMessage("thread-1", "\n\t"),
+    ).rejects.toThrowError(
+      "ThreadMutationServerClient requires messageId to be a non-empty string",
+    );
     await expect(threadMutationServerClient.rollbackThread("\n\t", 1)).rejects.toThrowError(
       "ThreadMutationServerClient requires threadId to be a non-empty string",
     );
@@ -179,6 +208,7 @@ describe("ThreadMutationServerClient", () => {
     expect(archiveThread).not.toHaveBeenCalled();
     expect(unarchiveThread).not.toHaveBeenCalled();
     expect(forkThread).not.toHaveBeenCalled();
+    expect(forkThreadFromMessage).not.toHaveBeenCalled();
     expect(rollbackThread).not.toHaveBeenCalled();
     expect(compactThread).not.toHaveBeenCalled();
     expect(cleanThreadBackgroundTerminals).not.toHaveBeenCalled();

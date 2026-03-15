@@ -203,6 +203,8 @@ export function App(): React.JSX.Element {
     debugIssueDerivationWorkerOwner: applicationOwnerDependencies.debugIssueDerivationWorkerOwner,
     threadListPresentationWorkerOwner:
       applicationOwnerDependencies.threadListPresentationWorkerOwner,
+    threadComposerProjectContextStateOwner:
+      applicationOwnerDependencies.threadComposerProjectContextStateOwner,
     threadListStateController: applicationOwnerDependencies.threadListStateController,
   });
 

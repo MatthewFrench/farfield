@@ -73,16 +73,6 @@ function readThreadDisplayNameFromSnapshots(
   );
 }
 
-function hasTurnsInSelectedThreadSnapshots(
-  liveStateSnapshot: LiveStateResponse,
-  readThreadSnapshot: ReadThreadResponse | null,
-): boolean {
-  return (
-    (liveStateSnapshot.conversationState?.turns.length ?? 0) > 0 ||
-    (readThreadSnapshot?.thread.turns.length ?? 0) > 0
-  );
-}
-
 function areJsonValuesEqual(
   leftValue: JsonValue | undefined,
   rightValue: JsonValue | undefined,
@@ -254,10 +244,6 @@ export class SelectedThreadSnapshotStateOwner {
     mode: SnapshotStateApplicationMode = "immediate",
   ): void {
     const expectedSinceSequence = this.readStreamEventsSinceSequenceForRead(snapshotInput.threadId);
-    const containsAnyTurns = hasTurnsInSelectedThreadSnapshots(
-      snapshotInput.liveStateSnapshot,
-      snapshotInput.readThreadSnapshot,
-    );
     const threadDisplayName = readThreadDisplayNameFromSnapshots(snapshotInput);
     if (threadDisplayName !== undefined) {
       this.deps.threadDisplayNameStateOwner.writeThreadDisplayName(
@@ -265,7 +251,7 @@ export class SelectedThreadSnapshotStateOwner {
         threadDisplayName,
       );
     }
-    if (containsAnyTurns) {
+    if (snapshotInput.readThreadSnapshot !== null) {
       this.deps.pendingThreadMaterializationCoordinator.clearPending(snapshotInput.threadId);
     }
 

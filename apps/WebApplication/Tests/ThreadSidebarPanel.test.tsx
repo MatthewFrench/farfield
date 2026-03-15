@@ -24,6 +24,7 @@ const BASE_THREAD_LIST_PANE_PROPERTIES: ThreadListPaneProperties = {
   onCreateThreadForSingleAgent: () => {},
   onCreateNewThread: () => {},
   onSelectThread: () => {},
+  onCopyThreadId: () => {},
   onArchiveThread: () => {},
   onForkThread: () => {},
   onRollbackThread: () => {},

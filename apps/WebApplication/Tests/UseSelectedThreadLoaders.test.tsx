@@ -584,6 +584,85 @@ describe("useSelectedThreadLoaders", () => {
     expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[0]?.includeReadThread).toBe(true);
   });
 
+  it("keeps pending send-created threads on the no-turn read path during the interactive reload", async () => {
+    const pendingThreadMaterializationCoordinator = new PendingThreadMaterializationCoordinator();
+    pendingThreadMaterializationCoordinator.markPending("thread-1");
+    const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([
+      {
+        liveStateSnapshot: {
+          ok: true,
+          threadId: "thread-1",
+          ownerClientId: null,
+          conversationState: null,
+          liveStateError: null,
+        },
+        streamEventsSnapshot: buildStreamEventsSnapshot({
+          threadId: "thread-1",
+          events: [],
+          nextSequence: 0,
+          resetRequired: false,
+        }),
+        streamEventsSinceSequenceUsed: null,
+        readThreadSnapshot: buildReadThreadSnapshot("thread-1", []),
+        includeTurnsUsedForRead: false,
+        containsAnyTurns: false,
+      },
+    ]);
+    const selectedThreadIdRef = { current: "thread-1" };
+    const modeSelectionStateResolver = new ModeSelectionStateResolver();
+    const conversationSyncSignatureBuilder = new ConversationSyncSignatureBuilder(
+      modeSelectionStateResolver,
+    );
+    const selectedThreadRefreshConcurrencyCoordinator =
+      new SelectedThreadRefreshConcurrencyCoordinator();
+    const snapshotReference: {
+      current: SelectedThreadLoadersHarnessSnapshot | null;
+    } = {
+      current: null,
+    };
+
+    render(
+      <SelectedThreadLoadersHarness
+        threads={[]}
+        selectedAgentId="codex"
+        appDefaultModel="gpt-5.3-codex"
+        appDefaultReasoningEffort="medium"
+        selectedThreadIdRef={selectedThreadIdRef}
+        pendingThreadMaterializationCoordinator={pendingThreadMaterializationCoordinator}
+        conversationSyncSignatureBuilder={conversationSyncSignatureBuilder}
+        selectedThreadDataRefreshCoordinator={selectedThreadDataRefreshCoordinator}
+        selectedThreadRefreshConcurrencyCoordinator={selectedThreadRefreshConcurrencyCoordinator}
+        readThreadStateMerger={new ReadThreadStateMerger()}
+        chatServerClient={new ChatServerClient()}
+        selectedThreadSnapshotCacheStore={createSelectedThreadSnapshotCacheStore()}
+        threadDisplayNameStateOwner={createThreadDisplayNameStateOwner(
+          "test.use-selected-thread-loaders.display-name.promote-pending-send",
+        )}
+        onSnapshot={(snapshot) => {
+          snapshotReference.current = snapshot;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(snapshotReference.current).not.toBeNull();
+    });
+    const loadersSnapshot = readLoadersSnapshot(snapshotReference);
+
+    await loadersSnapshot.loaders.loadSelectedThread("thread-1", {
+      includeTurns: false,
+      promotePendingThreadToFullRead: true,
+    });
+
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls).toHaveLength(1);
+    expect(selectedThreadDataRefreshCoordinator.readSnapshotCalls[0]?.includeTurns).toBe(false);
+
+    await waitFor(() => {
+      expect(snapshotReference.current?.readThreadState?.thread.turns).toHaveLength(0);
+    });
+    expect(pendingThreadMaterializationCoordinator.isPending("thread-1")).toBe(false);
+  });
+
   it("reissues selected-thread load with readThread when delta-only refresh returns no thread snapshot", async () => {
     const selectedThreadDataRefreshCoordinator = new TestSelectedThreadDataRefreshCoordinator([
       {

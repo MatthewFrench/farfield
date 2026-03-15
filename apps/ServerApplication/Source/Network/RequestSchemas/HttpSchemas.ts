@@ -20,6 +20,7 @@ const RequestBodySchemaNameByParser = {
   submitUserInput: "SubmitUserInputBody",
   interrupt: "InterruptBody",
   forkThread: "ForkThreadBody",
+  forkThreadFromMessage: "ForkThreadFromMessageBody",
   setThreadName: "SetThreadNameBody",
   rollbackThread: "RollbackThreadBody",
   traceStart: "TraceStartBody",
@@ -96,6 +97,12 @@ export const InterruptBodySchema = z
 
 export const ForkThreadBodySchema = z.object({}).strict();
 
+export const ForkThreadFromMessageBodySchema = z
+  .object({
+    messageId: z.string().trim().min(1),
+  })
+  .strict();
+
 export const SetThreadNameBodySchema = z
   .object({
     name: z.string().trim().min(1).max(THREAD_NAME_MAXIMUM_LENGTH),
@@ -170,6 +177,7 @@ export type SendMessageBody = z.infer<typeof SendMessageBodySchema>;
 export type SubmitUserInputBody = z.infer<typeof SubmitUserInputBodySchema>;
 export type InterruptBody = z.infer<typeof InterruptBodySchema>;
 export type ForkThreadBody = z.infer<typeof ForkThreadBodySchema>;
+export type ForkThreadFromMessageBody = z.infer<typeof ForkThreadFromMessageBodySchema>;
 export type SetThreadNameBody = z.infer<typeof SetThreadNameBodySchema>;
 export type RollbackThreadBody = z.infer<typeof RollbackThreadBodySchema>;
 export type StartThreadReviewBody = z.infer<typeof StartThreadReviewBodySchema>;
@@ -279,6 +287,14 @@ export function parseForkThreadBody(value: JsonValue): ForkThreadBody {
     ForkThreadBodySchema,
     value,
     RequestBodySchemaNameByParser.forkThread,
+  );
+}
+
+export function parseForkThreadFromMessageBody(value: JsonValue): ForkThreadFromMessageBody {
+  return parseOwnedRequestBody(
+    ForkThreadFromMessageBodySchema,
+    value,
+    RequestBodySchemaNameByParser.forkThreadFromMessage,
   );
 }
 

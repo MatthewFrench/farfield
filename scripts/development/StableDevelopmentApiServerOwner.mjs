@@ -8,6 +8,18 @@ const StableApiHealthTimeoutMilliseconds = 15_000;
 const StableApiHealthProbeTimeoutMilliseconds = 1_000;
 const StableApiHealthProbeRetryDelayMilliseconds = 250;
 
+function appendNodeCondition(existingNodeOptions, conditionName) {
+  const trimmedExistingNodeOptions = (existingNodeOptions ?? "").trim();
+  const conditionFlag = `--conditions=${conditionName}`;
+  if (trimmedExistingNodeOptions.length === 0) {
+    return conditionFlag;
+  }
+  if (trimmedExistingNodeOptions.includes(conditionFlag)) {
+    return trimmedExistingNodeOptions;
+  }
+  return `${trimmedExistingNodeOptions} ${conditionFlag}`;
+}
+
 async function waitForServerHealth({ host, port, timeoutMilliseconds }) {
   const startedAt = Date.now();
 
@@ -97,11 +109,15 @@ export class StableDevelopmentApiServerOwner {
       ...this.baseChildEnvironment,
       HOST: this.configuration.host,
       PORT: String(this.configuration.apiPort),
+      NODE_OPTIONS: appendNodeCondition(
+        this.baseChildEnvironment["NODE_OPTIONS"],
+        "farfield-source",
+      ),
       FARFIELD_RUNTIME_PROFILE: STABLE_DEVELOPMENT_RUNTIME_PROFILE,
       WEB_BUILD_ID: buildVersion,
       VITE_APP_BUILD_ID: buildVersion,
     };
-    const serverArguments = ["run", "--cwd", "apps/ServerApplication", "start"];
+    const serverArguments = ["run", "--cwd", "apps/ServerApplication", "start:source"];
     if (this.configuration.agentIds.length > 0) {
       serverArguments.push("--", `--agents=${this.configuration.agentIds.join(",")}`);
     }

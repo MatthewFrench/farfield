@@ -14,7 +14,9 @@ import {
   type FlattenedConversationItem,
 } from "@/Features/Chat/DomainModel/ConversationItemFlattener";
 import { ConversationSyncSignatureBuilder } from "@/Features/Chat/DomainModel/ConversationSyncSignatureBuilder";
+import { type InterruptedTurnNotice } from "@/Features/Chat/DomainModel/InterruptedTurnNoticeDerivation";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { type NewThreadProjectPathResolution } from "@/Features/Chat/DomainModel/NewThreadProjectPathResolver";
 import {
   type PendingUserInputRequest,
   type PendingUserInputRequestSelector,
@@ -39,6 +41,7 @@ import { type DebugIssueDerivationReader } from "@/Features/Debugging/StateManag
 import { type DebugHistoryEntryListItem } from "@/Features/Debugging/UserInterface/DebugHistoryPanel";
 import { type DebugTraceSummary } from "@/Features/Debugging/UserInterface/DebugTracePanel";
 import type { ThreadListItem } from "@/Features/Threads/DomainModel/ThreadGroupTypes";
+import { type ThreadComposerProjectContextStateOwner } from "@/Features/Threads/StateManagement/ThreadComposerProjectContextStateOwner";
 import { type ThreadListPresentationReader } from "@/Features/Threads/StateManagement/ThreadListPresentationWorkerOwner";
 import {
   type ReadThreadListPresentationStateResult,
@@ -114,6 +117,7 @@ export interface UseApplicationDerivedStateInput {
   debugIssueStateResolver: DebugIssueStateResolver;
   debugIssueDerivationWorkerOwner?: DebugIssueDerivationReader | null;
   threadListPresentationWorkerOwner?: ThreadListPresentationReader | null;
+  threadComposerProjectContextStateOwner: ThreadComposerProjectContextStateOwner;
   threadListStateController: ThreadListStateController;
 }
 
@@ -173,6 +177,7 @@ export interface ApplicationDerivedState {
   appDefaultReasoningEffort: string;
   selectedAgentLabel: string;
   selectedAgentCapabilities: AgentDescriptor["capabilities"] | null;
+  newThreadProjectPathResolution: NewThreadProjectPathResolution;
   activeProjectGroups: ReadThreadListPresentationStateResult["activeProjectGroups"];
   archivedProjectGroups: ReadThreadListPresentationStateResult["archivedProjectGroups"];
   archivedThreadIds: ReadThreadListPresentationStateResult["archivedThreadIdentifiers"];
@@ -204,6 +209,7 @@ export interface ApplicationDerivedState {
   deferredConversationState: ConversationState | null;
   turns: ConversationState["turns"];
   lastTurn: ConversationState["turns"][number] | undefined;
+  interruptedTurnNotice: InterruptedTurnNotice | null;
   isGenerating: boolean;
   threadListState: ApplicationThreadListState;
   chatSurfaceState: ApplicationChatSurfaceState;

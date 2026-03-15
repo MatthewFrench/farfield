@@ -48,6 +48,7 @@ export function createCodexAgentAdapterOwners(
     threadStreamStateOwner: input.threadStreamStateOwner,
     runAppServerCall,
     isConversationNotFoundError: input.isConversationNotFoundError,
+    isThreadNotLoadedError: input.isThreadNotLoadedError,
   });
   const threadManagementOwner = new CodexThreadManagementOwner({
     appClient: input.appClient,

@@ -4,9 +4,16 @@ import {
   type FileChangeApprovalResponsePayload,
   type ToolCallResponsePayload,
 } from "@farfield/protocol";
-import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useCallback,
+  useRef,
+} from "react";
 import { PendingThreadMaterializationCoordinator } from "@/Features/Threads/StateManagement/PendingThreadMaterializationCoordinator";
 import type { AgentId, ApiRequestOptions } from "@/Shared/Contracts/ApiContracts";
+import { type NewThreadProjectPathResolution } from "../DomainModel/NewThreadProjectPathResolver";
 import { type PendingApplyPatchApprovalRequest } from "../DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "../DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingCommandExecutionApprovalRequest } from "../DomainModel/PendingCommandExecutionApprovalRequestSelector";
@@ -33,6 +40,8 @@ import {
   type CollaborationModeActionErrorReportInput,
   type CollaborationModeActionModeOption,
 } from "./CollaborationModeActionCoordinator";
+import { NewThreadFirstTurnHydrationCoordinator } from "./NewThreadFirstTurnHydrationCoordinator";
+import { type LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
 
 interface ActionRequestOptions {
   actionId: string;
@@ -77,6 +86,7 @@ function buildNextAnswerDraftByQuestionId(input: {
 export interface UseChatActionHandlersInput {
   selectedThreadId: string | null;
   selectedAgentId: AgentId;
+  newThreadProjectPathResolution: NewThreadProjectPathResolution;
   modes: CollaborationModeActionModeOption[];
   isModeSyncing: boolean;
   activeRequest: PendingUserInputRequest | null;
@@ -89,6 +99,7 @@ export interface UseChatActionHandlersInput {
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
   buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
+  setErrorMessage: Dispatch<SetStateAction<string>>;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
   setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>;
@@ -100,11 +111,28 @@ export interface UseChatActionHandlersInput {
   chatRequestActionCoordinator: ChatRequestActionCoordinator;
   collaborationModeActionCoordinator: CollaborationModeActionCoordinator;
   chatClient: ChatRequestActionChatClient & CollaborationModeActionChatClient;
+  selectedThreadReadClient: {
+    readThread: (
+      threadId: string,
+      options?: {
+        includeTurns?: boolean;
+      },
+    ) => Promise<{
+      thread: {
+        preview: string | undefined;
+        status:
+          | {
+              type: string;
+            }
+          | undefined;
+      };
+    }>;
+  };
   threadMutationClient: ChatRequestActionThreadMutationClient;
   pendingUserInputAnswerBuilder: PendingUserInputAnswerBuilder;
   onInvalidateActiveThreadQuery: () => void;
   refreshActiveThreadListTracked: () => Promise<void>;
-  onReloadSelectedThread: (threadId: string) => Promise<void>;
+  onReloadSelectedThread: (threadId: string, options?: LoadSelectedThreadOptions) => Promise<void>;
   reportTrackedUserInterfaceError: (input: ChatActionErrorReportInput) => Promise<void>;
 }
 
@@ -259,30 +287,72 @@ function createSubmitToolCallRequestResponseHandler(
 }
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
+  const newThreadFirstTurnHydrationCoordinatorReference =
+    useRef<NewThreadFirstTurnHydrationCoordinator | null>(null);
+  if (newThreadFirstTurnHydrationCoordinatorReference.current === null) {
+    newThreadFirstTurnHydrationCoordinatorReference.current =
+      new NewThreadFirstTurnHydrationCoordinator({
+        reloadSelectedThread: input.onReloadSelectedThread,
+        readThreadWithoutTurns: async (threadId) => {
+          return input.selectedThreadReadClient.readThread(threadId, { includeTurns: false });
+        },
+      });
+  } else {
+    newThreadFirstTurnHydrationCoordinatorReference.current.updateDependencies({
+      reloadSelectedThread: input.onReloadSelectedThread,
+      readThreadWithoutTurns: async (threadId) => {
+        return input.selectedThreadReadClient.readThread(threadId, { includeTurns: false });
+      },
+    });
+  }
+  const newThreadFirstTurnHydrationCoordinator =
+    newThreadFirstTurnHydrationCoordinatorReference.current;
+
   const refreshThreadData = useCallback(
-    async (threadId: string, preferStreamDrivenSelectedThreadRefresh: boolean): Promise<void> => {
+    async (inputValue: {
+      threadId: string;
+      preferStreamDrivenSelectedThreadRefresh: boolean;
+      preserveNoTurnsReload: boolean;
+      hydrateFirstTurnInBackground: boolean;
+    }): Promise<void> => {
+      const shouldPreferStreamDrivenSelectedThreadRefresh =
+        inputValue.preferStreamDrivenSelectedThreadRefresh &&
+        !input.pendingThreadMaterializationCoordinator.isPending(inputValue.threadId);
       if (
-        preferStreamDrivenSelectedThreadRefresh &&
+        shouldPreferStreamDrivenSelectedThreadRefresh &&
         input.eventsConnectedRef.current &&
-        input.selectedThreadIdRef.current === threadId
+        input.selectedThreadIdRef.current === inputValue.threadId
       ) {
         void input.refreshActiveThreadListTracked();
         return;
       }
       await input.refreshActiveThreadListTracked();
-      await input.onReloadSelectedThread(threadId);
+      await input.onReloadSelectedThread(
+        inputValue.threadId,
+        inputValue.preserveNoTurnsReload ? { includeTurns: false } : undefined,
+      );
+      if (inputValue.hydrateFirstTurnInBackground) {
+        newThreadFirstTurnHydrationCoordinator.scheduleHydration(inputValue.threadId);
+      }
     },
     [
       input.eventsConnectedRef,
       input.onReloadSelectedThread,
       input.refreshActiveThreadListTracked,
+      input.selectedThreadReadClient,
       input.selectedThreadIdRef,
+      newThreadFirstTurnHydrationCoordinator,
     ],
   );
 
   const refreshExistingThreadData = useCallback(
     async (threadId: string): Promise<void> => {
-      await refreshThreadData(threadId, true);
+      await refreshThreadData({
+        threadId,
+        preferStreamDrivenSelectedThreadRefresh: true,
+        preserveNoTurnsReload: false,
+        hydrateFirstTurnInBackground: false,
+      });
     },
     [refreshThreadData],
   );
@@ -301,11 +371,23 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     async (draft: string) => {
       const selectedThreadAlreadyExisted =
         input.selectedThreadId !== null && input.selectedThreadId.length > 0;
+      if (
+        !selectedThreadAlreadyExisted &&
+        input.newThreadProjectPathResolution.status !== "resolved"
+      ) {
+        input.setErrorMessage(input.newThreadProjectPathResolution.message);
+        return;
+      }
       await input.chatRequestActionCoordinator.sendMessage({
         draft,
         selectedThreadId: input.selectedThreadId,
         selectedAgentId: input.selectedAgentId,
+        projectPathForNewThread:
+          input.newThreadProjectPathResolution.status === "resolved"
+            ? input.newThreadProjectPathResolution.projectPath
+            : null,
         buildActionRequestOptions: input.buildActionRequestOptions,
+        onSetErrorMessage: input.setErrorMessage,
         onSetBusy: input.setIsBusy,
         onThreadSelected: handleThreadSelected,
         onMarkThreadPendingMaterialization: markThreadPendingMaterialization,
@@ -313,7 +395,12 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
         threadMutationClient: input.threadMutationClient,
         onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
         onRefreshThreadData: async (threadId) => {
-          await refreshThreadData(threadId, selectedThreadAlreadyExisted);
+          await refreshThreadData({
+            threadId,
+            preferStreamDrivenSelectedThreadRefresh: selectedThreadAlreadyExisted,
+            preserveNoTurnsReload: !selectedThreadAlreadyExisted,
+            hydrateFirstTurnInBackground: !selectedThreadAlreadyExisted,
+          });
         },
         reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
       });
@@ -324,10 +411,12 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
       input.chatRequestActionCoordinator,
       handleThreadSelected,
       markThreadPendingMaterialization,
+      input.newThreadProjectPathResolution,
       input.onInvalidateActiveThreadQuery,
       input.reportTrackedUserInterfaceError,
       input.selectedAgentId,
       input.selectedThreadId,
+      input.setErrorMessage,
       input.setIsBusy,
       input.threadMutationClient,
       refreshThreadData,

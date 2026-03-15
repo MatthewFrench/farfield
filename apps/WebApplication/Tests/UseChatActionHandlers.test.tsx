@@ -3,6 +3,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { type MutableRefObject, useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModeSelectionStateResolver } from "@/Features/Chat/DomainModel/ModeSelectionStateResolver";
+import { type NewThreadProjectPathResolution } from "@/Features/Chat/DomainModel/NewThreadProjectPathResolver";
 import { type PendingApplyPatchApprovalRequest } from "@/Features/Chat/DomainModel/PendingApplyPatchApprovalRequestSelector";
 import { type PendingAuthTokenRefreshRequest } from "@/Features/Chat/DomainModel/PendingAuthTokenRefreshRequestSelector";
 import { type PendingExecuteCommandApprovalRequest } from "@/Features/Chat/DomainModel/PendingExecuteCommandApprovalRequestSelector";
@@ -44,6 +45,7 @@ interface StatefulAnswerHarnessProps {
 
 interface TestInputOverrides {
   selectedThreadId?: string | null;
+  newThreadProjectPathResolution?: NewThreadProjectPathResolution;
   activeRequest?: PendingUserInputRequest | null;
   activeAuthTokenRefreshRequest?: PendingAuthTokenRefreshRequest | null;
   activeApplyPatchApprovalRequest?: PendingApplyPatchApprovalRequest | null;
@@ -57,6 +59,7 @@ type NullableThreadIdentifierSetterValue =
   | string
   | null
   | ((previousValue: string | null) => string | null);
+type ErrorSetterValue = string | ((previousValue: string) => string);
 type BooleanSetterValue = boolean | ((previousValue: boolean) => boolean);
 type AnswerDraftSetterValue =
   | PendingUserInputAnswerDraftByQuestionId
@@ -66,6 +69,7 @@ type AnswerDraftSetterValue =
 type ChatActionHandlersChatClient = ChatRequestActionChatClient & CollaborationModeActionChatClient;
 
 const DEFAULT_AGENT_IDENTIFIER = "codex";
+const DEFAULT_PROJECT_PATH = "/workspace/project-alpha";
 const DEFAULT_THREAD_IDENTIFIER = "thread-1";
 const CREATED_THREAD_IDENTIFIER = "thread-created";
 const DEFAULT_MODES: CollaborationModeActionModeOption[] = [
@@ -205,6 +209,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
   const pendingThreadMaterializationCoordinator = new PendingThreadMaterializationCoordinator();
   const pendingUserInputAnswerBuilder = new PendingUserInputAnswerBuilder();
   const setAnswerDraft = vi.fn<(value: AnswerDraftSetterValue) => void>();
+  const setErrorMessage = vi.fn<(value: ErrorSetterValue) => void>();
   const setIsBusy = vi.fn<(value: BooleanSetterValue) => void>();
   const setIsModeSyncing = vi.fn<(value: BooleanSetterValue) => void>();
   const setSelectedThreadId = vi.fn<(value: NullableThreadIdentifierSetterValue) => void>();
@@ -219,8 +224,27 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     current: true,
   };
   const refreshActiveThreadListTracked = vi.fn(async () => {});
-  const onReloadSelectedThread = vi.fn(async (_threadId: string) => {});
+  const onReloadSelectedThread = vi.fn(
+    async (
+      _threadId: string,
+      _options?: {
+        includeTurns?: boolean;
+        includeReadThread?: boolean;
+        promotePendingThreadToFullRead?: boolean;
+      },
+    ) => {},
+  );
   const onInvalidateActiveThreadQuery = vi.fn();
+  const selectedThreadReadClient = {
+    readThread: vi.fn(async () => ({
+      thread: {
+        preview: "Reply with exactly EMPTY-CREATE-COMPOSER-OK and nothing else.",
+        status: {
+          type: "idle",
+        },
+      },
+    })),
+  };
   const reportTrackedUserInterfaceError = vi.fn(
     async (_input: {
       operation: string;
@@ -234,6 +258,11 @@ function createTestInput(overrides: TestInputOverrides = {}) {
   const input: UseChatActionHandlersInput = {
     selectedThreadId,
     selectedAgentId: DEFAULT_AGENT_IDENTIFIER,
+    newThreadProjectPathResolution: overrides.newThreadProjectPathResolution ?? {
+      status: "resolved",
+      projectPath: DEFAULT_PROJECT_PATH,
+      source: "selectedAgentProjectDirectory",
+    },
     modes: overrides.modes ?? DEFAULT_MODES,
     isModeSyncing: overrides.isModeSyncing ?? false,
     activeRequest: overrides.activeRequest ?? null,
@@ -243,6 +272,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     answerDraft: overrides.answerDraft ?? {},
     setAnswerDraft,
     buildActionRequestOptions,
+    setErrorMessage,
     setIsBusy,
     setIsModeSyncing,
     setSelectedThreadId,
@@ -254,6 +284,7 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     chatRequestActionCoordinator,
     collaborationModeActionCoordinator,
     chatClient: createChatClient(),
+    selectedThreadReadClient,
     threadMutationClient: createThreadMutationClient(),
     pendingUserInputAnswerBuilder,
     onInvalidateActiveThreadQuery,
@@ -271,12 +302,14 @@ function createTestInput(overrides: TestInputOverrides = {}) {
     eventsConnectedRef,
     refreshActiveThreadListTracked,
     onReloadSelectedThread,
+    setErrorMessage,
     setSelectedThreadId,
     selectedThreadIdRef,
   };
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
 });
 
@@ -312,9 +345,8 @@ describe("UseChatActionHandlers", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(handlerState.current).not.toBeNull();
-    });
+    await Promise.resolve();
+    await Promise.resolve();
 
     const handlers = handlerState.current;
     if (handlers === null) {
@@ -327,6 +359,7 @@ describe("UseChatActionHandlers", () => {
         draft: "hello world",
         selectedThreadId: null,
         selectedAgentId: DEFAULT_AGENT_IDENTIFIER,
+        projectPathForNewThread: DEFAULT_PROJECT_PATH,
       }),
     );
     expect(markPendingSpy).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
@@ -334,6 +367,60 @@ describe("UseChatActionHandlers", () => {
     expect(setSelectedThreadId).toHaveBeenCalledWith(CREATED_THREAD_IDENTIFIER);
     expect(selectedThreadIdRef.current).toBe(CREATED_THREAD_IDENTIFIER);
     expect(pendingThreadMaterializationCoordinator.isPending(CREATED_THREAD_IDENTIFIER)).toBe(true);
+  });
+
+  it("promotes the first reload to a full read after creating a new thread from the composer", async () => {
+    vi.useFakeTimers();
+    const {
+      input,
+      chatRequestActionCoordinator,
+      refreshActiveThreadListTracked,
+      onReloadSelectedThread,
+    } = createTestInput({
+      selectedThreadId: null,
+    });
+    const sendMessageSpy = vi
+      .spyOn(chatRequestActionCoordinator, "sendMessage")
+      .mockImplementation(async (nextInput) => {
+        nextInput.onMarkThreadPendingMaterialization(CREATED_THREAD_IDENTIFIER);
+        nextInput.onThreadSelected(CREATED_THREAD_IDENTIFIER);
+        await nextInput.onRefreshThreadData(CREATED_THREAD_IDENTIFIER);
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const handlers = handlerState.current;
+    if (handlers === null) {
+      throw new Error("expected handlers to be ready");
+    }
+    await handlers.submitMessage("hello world");
+
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
+    expect(onReloadSelectedThread).toHaveBeenNthCalledWith(1, CREATED_THREAD_IDENTIFIER, {
+      includeTurns: false,
+    });
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    await Promise.resolve();
+
+    expect(onReloadSelectedThread).toHaveBeenNthCalledWith(2, CREATED_THREAD_IDENTIFIER, {
+      includeTurns: true,
+    });
   });
 
   it("delegates mode draft application with the current owner state", async () => {
@@ -424,7 +511,7 @@ describe("UseChatActionHandlers", () => {
 
     expect(sendMessageSpy).toHaveBeenCalledTimes(1);
     expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
-    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_IDENTIFIER);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_IDENTIFIER, undefined);
     expect(refreshActiveThreadListTracked.mock.invocationCallOrder[0]).toBeLessThan(
       onReloadSelectedThread.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
@@ -470,6 +557,92 @@ describe("UseChatActionHandlers", () => {
     expect(sendMessageSpy).toHaveBeenCalledTimes(1);
     expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
     expect(onReloadSelectedThread).not.toHaveBeenCalled();
+  });
+
+  it("reloads the selected thread after chat refresh while the thread is still pending materialization", async () => {
+    const {
+      input,
+      chatRequestActionCoordinator,
+      eventsConnectedRef,
+      pendingThreadMaterializationCoordinator,
+      refreshActiveThreadListTracked,
+      onReloadSelectedThread,
+    } = createTestInput();
+    eventsConnectedRef.current = true;
+    pendingThreadMaterializationCoordinator.markPending(DEFAULT_THREAD_IDENTIFIER);
+    const sendMessageSpy = vi
+      .spyOn(chatRequestActionCoordinator, "sendMessage")
+      .mockImplementation(async (nextInput) => {
+        await nextInput.onRefreshThreadData(DEFAULT_THREAD_IDENTIFIER);
+      });
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null) {
+      throw new Error("expected handlers to be ready");
+    }
+    await handlers.submitMessage("hello world");
+
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(refreshActiveThreadListTracked).toHaveBeenCalledTimes(1);
+    expect(onReloadSelectedThread).toHaveBeenCalledWith(DEFAULT_THREAD_IDENTIFIER, undefined);
+    expect(refreshActiveThreadListTracked.mock.invocationCallOrder[0]).toBeLessThan(
+      onReloadSelectedThread.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("shows a clear error and skips send when a new thread project path is ambiguous", async () => {
+    const { input, chatRequestActionCoordinator, setErrorMessage } = createTestInput({
+      selectedThreadId: null,
+      newThreadProjectPathResolution: {
+        status: "ambiguous",
+        message:
+          "Cannot start a new thread from chat: multiple project contexts are available. Create the thread from a specific project in the sidebar.",
+      },
+    });
+    const sendMessageSpy = vi.spyOn(chatRequestActionCoordinator, "sendMessage");
+
+    const handlerState: { current: ChatActionHandlers | null } = {
+      current: null,
+    };
+    render(
+      <HandlerHarness
+        input={input}
+        onHandlersReady={(handlers) => {
+          handlerState.current = handlers;
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(handlerState.current).not.toBeNull();
+    });
+
+    const handlers = handlerState.current;
+    if (handlers === null) {
+      throw new Error("expected handlers to be ready");
+    }
+    await handlers.submitMessage("hello world");
+
+    expect(setErrorMessage).toHaveBeenCalledWith(
+      "Cannot start a new thread from chat: multiple project contexts are available. Create the thread from a specific project in the sidebar.",
+    );
+    expect(sendMessageSpy).not.toHaveBeenCalled();
   });
 
   it("builds pending user input answers and submits the derived payload", async () => {
