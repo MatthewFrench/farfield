@@ -21,9 +21,7 @@ import { type PendingExecuteCommandApprovalRequest } from "../DomainModel/Pendin
 import { type PendingFileChangeApprovalRequest } from "../DomainModel/PendingFileChangeApprovalRequestSelector";
 import { type PendingToolCallRequest } from "../DomainModel/PendingToolCallRequestSelector";
 import {
-  createEmptyPendingUserInputAnswerDraft,
   PendingUserInputAnswerBuilder,
-  type PendingUserInputAnswerDraft,
   type PendingUserInputAnswerDraftByQuestionId,
 } from "../DomainModel/PendingUserInputAnswerBuilder";
 import { type PendingUserInputRequest } from "../DomainModel/PendingUserInputRequestSelector";
@@ -41,47 +39,17 @@ import {
   type CollaborationModeActionModeOption,
 } from "./CollaborationModeActionCoordinator";
 import { NewThreadFirstTurnHydrationCoordinator } from "./NewThreadFirstTurnHydrationCoordinator";
+import {
+  type ChatActionRequestOptions,
+  type PendingUserInputAnswerField,
+  useChatRequestActionHandlers,
+} from "./UseChatRequestActionHandlers";
 import { type LoadSelectedThreadOptions } from "./UseSelectedThreadLoaders";
-
-interface ActionRequestOptions {
-  actionId: string;
-  requestOptions: ApiRequestOptions;
-}
 
 type ChatActionErrorReportInput =
   | ChatRequestActionErrorReportInput
   | CollaborationModeActionErrorReportInput;
-type PendingUserInputAnswerField = "option" | "freeform";
 type ChatActionModeDraft = CollaborationModeActionDraft;
-
-const PENDING_USER_INPUT_ANSWER_OPTION_FIELD: PendingUserInputAnswerField = "option";
-const PENDING_USER_INPUT_ANSWER_FREEFORM_FIELD: PendingUserInputAnswerField = "freeform";
-
-function buildNextAnswerDraftByQuestionId(input: {
-  previousAnswerDraftByQuestionId: PendingUserInputAnswerDraftByQuestionId;
-  questionId: string;
-  field: PendingUserInputAnswerField;
-  value: string;
-}): PendingUserInputAnswerDraftByQuestionId {
-  const previousQuestionDraft =
-    input.previousAnswerDraftByQuestionId[input.questionId] ??
-    createEmptyPendingUserInputAnswerDraft();
-  const nextQuestionDraft: PendingUserInputAnswerDraft = {
-    option: previousQuestionDraft.option,
-    freeform: previousQuestionDraft.freeform,
-  };
-
-  if (input.field === PENDING_USER_INPUT_ANSWER_OPTION_FIELD) {
-    nextQuestionDraft.option = input.value;
-  } else if (input.field === PENDING_USER_INPUT_ANSWER_FREEFORM_FIELD) {
-    nextQuestionDraft.freeform = input.value;
-  }
-
-  return {
-    ...input.previousAnswerDraftByQuestionId,
-    [input.questionId]: nextQuestionDraft,
-  };
-}
 
 export interface UseChatActionHandlersInput {
   selectedThreadId: string | null;
@@ -98,7 +66,7 @@ export interface UseChatActionHandlersInput {
   activeToolCallRequest?: PendingToolCallRequest | null;
   answerDraft: PendingUserInputAnswerDraftByQuestionId;
   setAnswerDraft: Dispatch<SetStateAction<PendingUserInputAnswerDraftByQuestionId>>;
-  buildActionRequestOptions: (actionName: string) => ActionRequestOptions;
+  buildActionRequestOptions: (actionName: string) => ChatActionRequestOptions;
   setErrorMessage: Dispatch<SetStateAction<string>>;
   setIsBusy: Dispatch<SetStateAction<boolean>>;
   setIsModeSyncing: Dispatch<SetStateAction<boolean>>;
@@ -142,148 +110,28 @@ export interface ChatActionHandlers {
   applyModeDraft: (draft: ChatActionModeDraft) => Promise<void>;
   submitPendingRequest: () => Promise<void>;
   skipPendingRequest: () => Promise<void>;
-  submitAuthTokenRefreshRequest?: (
+  submitAuthTokenRefreshRequest: (
     accessToken: string,
     chatgptAccountId: string,
     chatgptPlanType: string | null,
   ) => Promise<void>;
-  submitApplyPatchApprovalRequest?: (decision: DeprecatedApprovalReviewDecision) => Promise<void>;
-  submitCommandExecutionApprovalRequest?: (
+  submitApplyPatchApprovalRequest: (decision: DeprecatedApprovalReviewDecision) => Promise<void>;
+  submitCommandExecutionApprovalRequest: (
     decision: CommandExecutionApprovalResponsePayload["decision"],
   ) => Promise<void>;
-  submitExecuteCommandApprovalRequest?: (
+  submitExecuteCommandApprovalRequest: (
     decision: DeprecatedApprovalReviewDecision,
   ) => Promise<void>;
-  submitFileChangeApprovalRequest?: (
+  submitFileChangeApprovalRequest: (
     decision: FileChangeApprovalResponsePayload["decision"],
   ) => Promise<void>;
-  submitToolCallRequestResponse?: (payload: ToolCallResponsePayload) => Promise<void>;
+  submitToolCallRequestResponse: (payload: ToolCallResponsePayload) => Promise<void>;
   runInterrupt: () => Promise<void>;
   handleAnswerChange: (
     questionId: string,
     field: PendingUserInputAnswerField,
     value: string,
   ) => void;
-}
-
-function createSubmitCommandExecutionApprovalRequestHandler(
-  input: UseChatActionHandlersInput,
-  refreshThreadData: (threadId: string) => Promise<void>,
-): (decision: CommandExecutionApprovalResponsePayload["decision"]) => Promise<void> {
-  return async (decision: CommandExecutionApprovalResponsePayload["decision"]) => {
-    const activeCommandExecutionApprovalRequest = input.activeCommandExecutionApprovalRequest;
-    if (!activeCommandExecutionApprovalRequest) {
-      return;
-    }
-
-    await input.chatRequestActionCoordinator.submitCommandExecutionApprovalRequest({
-      selectedThreadId: input.selectedThreadId,
-      requestId: activeCommandExecutionApprovalRequest.id,
-      decision,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  };
-}
-
-function createSubmitApplyPatchApprovalRequestHandler(
-  input: UseChatActionHandlersInput,
-  refreshThreadData: (threadId: string) => Promise<void>,
-): (decision: DeprecatedApprovalReviewDecision) => Promise<void> {
-  return async (decision: DeprecatedApprovalReviewDecision) => {
-    const activeApplyPatchApprovalRequest = input.activeApplyPatchApprovalRequest;
-    if (!activeApplyPatchApprovalRequest) {
-      return;
-    }
-
-    await input.chatRequestActionCoordinator.submitApplyPatchApprovalRequest({
-      selectedThreadId: input.selectedThreadId,
-      requestId: activeApplyPatchApprovalRequest.id,
-      decision,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  };
-}
-
-function createSubmitExecuteCommandApprovalRequestHandler(
-  input: UseChatActionHandlersInput,
-  refreshThreadData: (threadId: string) => Promise<void>,
-): (decision: DeprecatedApprovalReviewDecision) => Promise<void> {
-  return async (decision: DeprecatedApprovalReviewDecision) => {
-    const activeExecuteCommandApprovalRequest = input.activeExecuteCommandApprovalRequest;
-    if (!activeExecuteCommandApprovalRequest) {
-      return;
-    }
-
-    await input.chatRequestActionCoordinator.submitExecuteCommandApprovalRequest({
-      selectedThreadId: input.selectedThreadId,
-      requestId: activeExecuteCommandApprovalRequest.id,
-      decision,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  };
-}
-
-function createSubmitFileChangeApprovalRequestHandler(
-  input: UseChatActionHandlersInput,
-  refreshThreadData: (threadId: string) => Promise<void>,
-): (decision: FileChangeApprovalResponsePayload["decision"]) => Promise<void> {
-  return async (decision: FileChangeApprovalResponsePayload["decision"]) => {
-    const activeFileChangeApprovalRequest = input.activeFileChangeApprovalRequest;
-    if (!activeFileChangeApprovalRequest) {
-      return;
-    }
-
-    await input.chatRequestActionCoordinator.submitFileChangeApprovalRequest({
-      selectedThreadId: input.selectedThreadId,
-      requestId: activeFileChangeApprovalRequest.id,
-      decision,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  };
-}
-
-function createSubmitToolCallRequestResponseHandler(
-  input: UseChatActionHandlersInput,
-  refreshThreadData: (threadId: string) => Promise<void>,
-): (payload: ToolCallResponsePayload) => Promise<void> {
-  return async (payload: ToolCallResponsePayload) => {
-    const activeToolCallRequest = input.activeToolCallRequest;
-    if (!activeToolCallRequest) {
-      return;
-    }
-
-    await input.chatRequestActionCoordinator.submitToolCallResponseRequest({
-      selectedThreadId: input.selectedThreadId,
-      requestId: activeToolCallRequest.id,
-      payload,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  };
 }
 
 export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatActionHandlers {
@@ -479,158 +327,37 @@ export function useChatActionHandlers(input: UseChatActionHandlersInput): ChatAc
     ],
   );
 
-  const submitPendingRequest = useCallback(async () => {
-    if (!input.activeRequest) {
-      return;
-    }
-    const answers = input.pendingUserInputAnswerBuilder.buildAnswersByQuestionId({
-      questions: input.activeRequest.params.questions,
-      answerDraftByQuestionId: input.answerDraft,
-    });
-    await input.chatRequestActionCoordinator.submitPendingUserInput({
-      selectedThreadId: input.selectedThreadId,
-      requestId: input.activeRequest.id,
-      answers,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshExistingThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  }, [
-    input.activeRequest,
-    input.answerDraft,
-    input.buildActionRequestOptions,
-    input.chatClient,
-    input.chatRequestActionCoordinator,
-    input.onInvalidateActiveThreadQuery,
-    input.pendingUserInputAnswerBuilder,
-    input.reportTrackedUserInterfaceError,
-    input.selectedThreadId,
-    input.setIsBusy,
-    refreshExistingThreadData,
-  ]);
-
-  const skipPendingRequest = useCallback(async () => {
-    if (!input.activeRequest) {
-      return;
-    }
-    await input.chatRequestActionCoordinator.skipPendingUserInput({
-      selectedThreadId: input.selectedThreadId,
-      requestId: input.activeRequest.id,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshExistingThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  }, [
-    input.activeRequest,
-    input.buildActionRequestOptions,
-    input.chatClient,
-    input.chatRequestActionCoordinator,
-    input.onInvalidateActiveThreadQuery,
-    input.reportTrackedUserInterfaceError,
-    input.selectedThreadId,
-    input.setIsBusy,
-    refreshExistingThreadData,
-  ]);
-
-  const submitAuthTokenRefreshRequest = useCallback(
-    async (accessToken: string, chatgptAccountId: string, chatgptPlanType: string | null) => {
-      const activeAuthTokenRefreshRequest = input.activeAuthTokenRefreshRequest;
-      if (!activeAuthTokenRefreshRequest) {
-        return;
-      }
-
-      await input.chatRequestActionCoordinator.submitAuthTokenRefreshRequest({
-        selectedThreadId: input.selectedThreadId,
-        requestId: activeAuthTokenRefreshRequest.id,
-        accessToken,
-        chatgptAccountId,
-        chatgptPlanType,
-        buildActionRequestOptions: input.buildActionRequestOptions,
-        onSetBusy: input.setIsBusy,
-        chatClient: input.chatClient,
-        onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-        onRefreshThreadData: refreshExistingThreadData,
-        reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-      });
-    },
-    [
-      input.activeAuthTokenRefreshRequest,
-      input.buildActionRequestOptions,
-      input.chatClient,
-      input.chatRequestActionCoordinator,
-      input.onInvalidateActiveThreadQuery,
-      input.reportTrackedUserInterfaceError,
-      input.selectedThreadId,
-      input.setIsBusy,
-      refreshExistingThreadData,
-    ],
-  );
-
-  const submitApplyPatchApprovalRequest = createSubmitApplyPatchApprovalRequestHandler(
-    input,
-    refreshExistingThreadData,
-  );
-
-  const submitCommandExecutionApprovalRequest = createSubmitCommandExecutionApprovalRequestHandler(
-    input,
-    refreshExistingThreadData,
-  );
-
-  const submitExecuteCommandApprovalRequest = createSubmitExecuteCommandApprovalRequestHandler(
-    input,
-    refreshExistingThreadData,
-  );
-
-  const submitFileChangeApprovalRequest = createSubmitFileChangeApprovalRequestHandler(
-    input,
-    refreshExistingThreadData,
-  );
-
-  const submitToolCallRequestResponse = createSubmitToolCallRequestResponseHandler(
-    input,
-    refreshExistingThreadData,
-  );
-
-  const runInterrupt = useCallback(async () => {
-    await input.chatRequestActionCoordinator.interruptThread({
-      selectedThreadId: input.selectedThreadId,
-      buildActionRequestOptions: input.buildActionRequestOptions,
-      onSetBusy: input.setIsBusy,
-      chatClient: input.chatClient,
-      onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
-      onRefreshThreadData: refreshExistingThreadData,
-      reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
-    });
-  }, [
-    input.buildActionRequestOptions,
-    input.chatClient,
-    input.chatRequestActionCoordinator,
-    input.onInvalidateActiveThreadQuery,
-    input.reportTrackedUserInterfaceError,
-    input.selectedThreadId,
-    input.setIsBusy,
-    refreshExistingThreadData,
-  ]);
-
-  const handleAnswerChange = useCallback(
-    (questionId: string, field: PendingUserInputAnswerField, value: string) => {
-      input.setAnswerDraft((previousAnswerDraft) =>
-        buildNextAnswerDraftByQuestionId({
-          previousAnswerDraftByQuestionId: previousAnswerDraft,
-          questionId,
-          field,
-          value,
-        }),
-      );
-    },
-    [input.setAnswerDraft],
-  );
+  const {
+    submitPendingRequest,
+    skipPendingRequest,
+    submitAuthTokenRefreshRequest,
+    submitApplyPatchApprovalRequest,
+    submitCommandExecutionApprovalRequest,
+    submitExecuteCommandApprovalRequest,
+    submitFileChangeApprovalRequest,
+    submitToolCallRequestResponse,
+    runInterrupt,
+    handleAnswerChange,
+  } = useChatRequestActionHandlers({
+    selectedThreadId: input.selectedThreadId,
+    activeRequest: input.activeRequest,
+    activeAuthTokenRefreshRequest: input.activeAuthTokenRefreshRequest,
+    activeApplyPatchApprovalRequest: input.activeApplyPatchApprovalRequest,
+    activeCommandExecutionApprovalRequest: input.activeCommandExecutionApprovalRequest,
+    activeExecuteCommandApprovalRequest: input.activeExecuteCommandApprovalRequest,
+    activeFileChangeApprovalRequest: input.activeFileChangeApprovalRequest,
+    activeToolCallRequest: input.activeToolCallRequest,
+    answerDraft: input.answerDraft,
+    setAnswerDraft: input.setAnswerDraft,
+    buildActionRequestOptions: input.buildActionRequestOptions,
+    setIsBusy: input.setIsBusy,
+    chatRequestActionCoordinator: input.chatRequestActionCoordinator,
+    chatClient: input.chatClient,
+    pendingUserInputAnswerBuilder: input.pendingUserInputAnswerBuilder,
+    onInvalidateActiveThreadQuery: input.onInvalidateActiveThreadQuery,
+    onRefreshThreadData: refreshExistingThreadData,
+    reportTrackedUserInterfaceError: input.reportTrackedUserInterfaceError,
+  });
 
   return {
     submitMessage,

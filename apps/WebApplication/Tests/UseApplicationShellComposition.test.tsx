@@ -158,6 +158,62 @@ function createChatFeatureCompositionFixture(): ApplicationChatFeatureCompositio
     applyModeDraft: vi.fn(async (): Promise<void> => {}),
     submitPendingRequest: vi.fn(async (): Promise<void> => {}),
     skipPendingRequest: vi.fn(async (): Promise<void> => {}),
+    submitAuthTokenRefreshRequest: vi.fn(
+      async (
+        _accessToken: string,
+        _chatgptAccountId: string,
+        _chatgptPlanType: string | null,
+      ): Promise<void> => {},
+    ),
+    submitApplyPatchApprovalRequest: vi.fn(
+      async (
+        _decision:
+          | "approved"
+          | "denied"
+          | "approved_for_session"
+          | "abort"
+          | {
+              approved_execpolicy_amendment: {
+                proposed_execpolicy_amendment: string[];
+              };
+            },
+      ): Promise<void> => {},
+    ),
+    submitCommandExecutionApprovalRequest: vi.fn(
+      async (_decision: "accept" | "acceptForSession" | "decline" | "abort"): Promise<void> => {},
+    ),
+    submitExecuteCommandApprovalRequest: vi.fn(
+      async (
+        _decision:
+          | "approved"
+          | "denied"
+          | "approved_for_session"
+          | "abort"
+          | {
+              approved_execpolicy_amendment: {
+                proposed_execpolicy_amendment: string[];
+              };
+            },
+      ): Promise<void> => {},
+    ),
+    submitFileChangeApprovalRequest: vi.fn(
+      async (_decision: "accept" | "decline"): Promise<void> => {},
+    ),
+    submitToolCallRequestResponse: vi.fn(
+      async (_payload: {
+        success: boolean;
+        contentItems: Array<
+          | {
+              type: "inputText";
+              text: string;
+            }
+          | {
+              type: "inputImage";
+              imageUrl: string;
+            }
+        >;
+      }): Promise<void> => {},
+    ),
     runInterrupt: vi.fn(async (): Promise<void> => {}),
     handleAnswerChange: vi.fn((): void => {}),
     chatModeToolbarProperties: createChatModeToolbarPropertiesFixture(),
